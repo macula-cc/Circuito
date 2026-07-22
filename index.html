@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Circuito de Arte do Centro do Rio de Janeiro</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+
+<style>
+  :root{
+    --serif: Georgia, 'Iowan Old Style', 'Times New Roman', ui-serif, serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --ink:#111;
+    --line: rgba(0,0,0,0.15);
+    --gray: #6b6b6b;
+    --hover: #f0f0f0;
+    --paper:#fff;
+  }
+  *{ box-sizing:border-box; }
+  html, body{ height:100%; overflow:hidden; }
+  body{ margin:0; color:var(--ink); font-family:var(--sans); background:var(--paper); }
+  a{ color:inherit; }
+  button{ font:inherit; touch-action:manipulation; }
+  .row, .drawer-close, .switcher button, .sort-switch button{ -webkit-tap-highlight-color:transparent; }
+
+  /* ---------------- Hero: full-bleed map (always mounted) ---------------- */
+  .hero{ position:fixed; inset:0; }
+  #map{ position:absolute; inset:0; width:100%; height:100%; background:#e9e9e9;
+        filter: grayscale(1) contrast(1.05) brightness(1.03); }
+  .leaflet-container{ background:#e9e9e9; font-family:var(--sans); }
+
+  .hero-title{ position:absolute; top:0; left:0;
+               padding:calc(1.6rem + env(safe-area-inset-top)) 1.6rem 0 calc(1.6rem + env(safe-area-inset-left));
+               z-index:200; pointer-events:none; }
+  .hero-title h1{ font-family:var(--serif); font-weight:400; font-size:clamp(1.3rem, 3vw, 1.9rem);
+                  line-height:1.25; margin:0; max-width:14ch; letter-spacing:-0.01em; }
+  .hero-meta{ font-family:var(--mono); font-size:0.72rem; color:var(--gray); margin-top:0.4rem; }
+
+  .hero-count{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:calc(1.6rem + env(safe-area-inset-left)); z-index:200;
+               font-family:var(--mono); font-size:0.72rem; color:var(--gray); pointer-events:none; }
+
+  /* ---------------- View switcher ---------------- */
+  .switcher{ position:absolute; top:calc(1.1rem + env(safe-area-inset-top)); right:calc(0.9rem + env(safe-area-inset-right)); z-index:600;
+             display:flex; gap:0.3rem; font-family:var(--mono); font-size:0.75rem; }
+  .switcher button{ background:none; border:none; cursor:pointer; color:var(--gray);
+                     padding:0.7rem 0.6rem; min-height:44px;
+                     border-bottom:1px solid transparent; transition:color 0.15s ease, border-color 0.15s ease; }
+  .switcher button.active{ color:var(--ink); border-bottom:1px solid var(--ink); }
+  .switcher button:hover{ color:var(--ink); }
+
+  .sort-switch{ position:absolute; top:calc(3.4rem + env(safe-area-inset-top)); right:calc(0.9rem + env(safe-area-inset-right)); z-index:600;
+                display:flex; gap:0.2rem; font-family:var(--mono); font-size:0.68rem;
+                opacity:0; pointer-events:none; transition:opacity 0.2s ease; }
+  .sort-switch.visible{ opacity:1; pointer-events:auto; }
+  .sort-switch button{ background:none; border:none; cursor:pointer; color:var(--gray);
+                        padding:0.6rem 0.5rem; min-height:40px;
+                        border-bottom:1px solid transparent; transition:color 0.15s ease, border-color 0.15s ease; }
+  .sort-switch button.active{ color:var(--ink); border-bottom:1px solid var(--ink); }
+
+  /* pins: 40px invisible tap target, 10px visible dot centered inside */
+  .pin-hit{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .pin{ width:10px; height:10px; border-radius:50%; background:#111; border:1.5px solid #fff;
+        box-shadow:0 0 0 1px rgba(0,0,0,0.4);
+        transition:transform 0.18s cubic-bezier(.4,0,.2,1); transform:scale(1); }
+  .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.6); }
+  .pin.active{ transform:scale(1.6); box-shadow:0 0 0 3px rgba(0,0,0,0.18); }
+
+  .leaflet-control-zoom{ border:none !important; }
+  .leaflet-control-zoom a{ background:#fff !important; color:#111 !important; border:1px solid var(--line) !important;
+                            border-radius:0 !important; font-family:var(--mono) !important; }
+  .leaflet-control-attribution{ font-family:var(--mono); font-size:0.62rem !important; background:rgba(255,255,255,0.75) !important; }
+
+  /* ---------------- List overlay ---------------- */
+  .list-overlay{ position:fixed; inset:0; background:var(--paper); z-index:400;
+                 opacity:0; pointer-events:none; transform:translateY(8px);
+                 transition:opacity 0.25s ease, transform 0.25s ease;
+                 display:flex; flex-direction:column; }
+  .list-overlay.open{ opacity:1; pointer-events:auto; transform:translateY(0); }
+
+  .list-head{ padding:calc(1.6rem + env(safe-area-inset-top)) 1.6rem 1rem; border-bottom:1px solid var(--ink); flex-shrink:0; }
+  .list-head h2{ font-family:var(--serif); font-weight:400; font-size:1.2rem; margin:0 0 0.2rem; }
+
+  .rows{ overflow-y:auto; -webkit-overflow-scrolling:touch; flex-grow:1; max-width:920px; width:100%; margin:0 auto;
+         padding:0 1.6rem calc(3rem + env(safe-area-inset-bottom)); }
+  .row{ display:flex; align-items:baseline; gap:1rem; padding:0.85rem 0.2rem; border-bottom:1px solid var(--line);
+        cursor:pointer; background:none; border-left:none; border-right:none; border-top:none; width:100%;
+        text-align:left; font-family:inherit; transition:background 0.15s ease, padding-left 0.15s ease; }
+  .row:hover{ background:var(--hover); padding-left:0.6rem; }
+  .row.pending{ color:var(--gray); font-style:italic; }
+  .row-num{ font-family:var(--mono); font-size:0.75rem; color:var(--gray); width:1.6rem; flex-shrink:0; }
+  .row-main{ flex-grow:1; min-width:0; }
+  .row-title{ font-family:var(--serif); font-size:1.05rem; }
+  .row-sub{ font-family:var(--mono); font-size:0.72rem; color:var(--gray); display:block; margin-top:0.15rem; }
+  .row-count{ font-family:var(--mono); font-size:0.72rem; color:var(--gray); white-space:nowrap; }
+
+  /* ---------------- Drawer ---------------- */
+  .overlay{ position:fixed; inset:0; background:rgba(0,0,0,0.15); opacity:0; pointer-events:none;
+            transition:opacity 0.25s ease; z-index:900; }
+  .overlay.open{ opacity:1; pointer-events:auto; }
+
+  .drawer{ position:fixed; background:var(--paper); z-index:950; display:flex; flex-direction:column;
+           transition:transform 0.35s cubic-bezier(.4,0,.2,1); border-left:1px solid var(--ink); }
+  @media (min-width:781px){
+    .drawer{ top:0; right:0; bottom:0; width:380px; transform:translateX(100%); }
+    .drawer.open{ transform:translateX(0); }
+  }
+  @media (max-width:780px){
+    .drawer{ left:0; right:0; bottom:0; max-height:82vh; transform:translateY(100%); border-left:none; border-top:1px solid var(--ink); }
+    .drawer.open{ transform:translateY(0); }
+  }
+
+  .drawer-head{ padding:1.5rem 1.6rem 1.1rem; border-bottom:1px solid var(--line); flex-shrink:0; position:relative; }
+  .drawer-title{ font-family:var(--serif); font-size:1.4rem; margin:0 0 0.15rem; line-height:1.2; }
+  .drawer-addr{ font-family:var(--mono); font-size:0.75rem; color:var(--gray); }
+  .drawer-count{ font-family:var(--mono); font-size:0.7rem; color:var(--gray); margin-top:0.5rem; }
+
+  .drawer-close{ position:absolute; top:0.9rem; right:0.9rem; background:none; border:none; cursor:pointer;
+                 padding:0.7rem; min-height:44px;
+                 font-family:var(--mono); font-size:0.85rem; color:var(--ink); transition:opacity 0.15s ease; }
+  .drawer-close:hover{ opacity:0.5; }
+
+  .drawer-list{ overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); }
+  .artist{ padding:1rem 0; border-bottom:1px solid var(--line); display:flex; gap:0.9rem; align-items:flex-start; }
+  .artist:last-child{ border-bottom:none; }
+
+  .avatar{ width:36px; height:36px; border-radius:50%; border:1px solid var(--ink); flex-shrink:0;
+           display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:0.68rem;
+           color:var(--ink); background-size:cover; background-position:center; }
+
+  .artist-name{ font-family:var(--serif); font-size:1rem; margin:0 0 0.2rem; }
+  .artist-meta{ font-family:var(--mono); font-size:0.72rem; color:var(--gray); display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; }
+  .artist-meta a{ color:var(--ink); text-decoration:underline; text-underline-offset:2px; }
+  .artist-meta a:hover{ opacity:0.6; }
+  .artist-obs{ border:1px solid var(--line); padding:0.05rem 0.35rem; }
+  .photo-note{ font-family:var(--mono); font-size:0.68rem; color:var(--gray); font-style:italic; margin-top:0.4rem; }
+
+  .map-error{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+              font-family:var(--mono); font-size:0.8rem; color:var(--gray); text-align:center; padding:2rem; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div id="map"></div>
+  <div class="hero-title">
+    <h1>Circuito de Arte<br>do Centro do Rio de Janeiro</h1>
+    <div class="hero-meta">Edição 0 — 18–19 de setembro</div>
+  </div>
+  <div class="hero-count" id="hero-count">— endereços · — artistas</div>
+</div>
+
+<div class="switcher">
+  <button id="switch-map" class="active">mapa</button>
+  <button id="switch-list">lista</button>
+</div>
+<div class="sort-switch" id="sort-switch">
+  <button id="sort-endereco" class="active">por endereço</button>
+  <button id="sort-artista">por artista</button>
+</div>
+
+<div class="list-overlay" id="list-overlay">
+  <div class="list-head"><h2>Índice do circuito</h2></div>
+  <div class="rows" id="rows"></div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <button class="drawer-close" id="drawer-close" aria-label="Fechar">fechar ×</button>
+    <div class="drawer-title" id="drawer-local">—</div>
+    <div class="drawer-addr" id="drawer-endereco">—</div>
+    <div class="drawer-count" id="drawer-count">—</div>
+  </div>
+  <div class="drawer-list" id="drawer-list"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+/* ============================================================
+   DATA SOURCE
+   Hoje: dados embutidos (gerados a partir do documento original).
+   Depois: trocar por fetch() da planilha do Google publicada em CSV.
+   ============================================================ */
+const LOCATIONS = [{"id": "loc0", "local": "", "endereco": "Av. Churchill, 94 / 4º andar", "lat": -22.9095612, "lng": -43.1717542, "artistas": [{"nome": "Amauri", "instagram": "amauriletc", "obs": "", "foto": ""}, {"nome": "Angélica Arechavala", "instagram": "angelicaarechavala", "obs": "", "foto": ""}, {"nome": "Alessandra Sposetti", "instagram": "alessandrasposetti", "obs": "", "foto": ""}, {"nome": "Clara Barros", "instagram": "clarabarros", "obs": "", "foto": ""}, {"nome": "Fernanda Sattamini", "instagram": "fernandasattamini", "obs": "", "foto": ""}, {"nome": "Heleno Bernardi", "instagram": "_heleno.bernardi", "obs": "", "foto": ""}, {"nome": "Raissa Góes Rapozo", "instagram": "raissa_de_goes_arte", "obs": "", "foto": ""}, {"nome": "Marina Lazzarotto", "instagram": "marinalazzarotto_", "obs": "", "foto": ""}, {"nome": "Giovanna Melo de Moura", "instagram": "melodemoura_", "obs": "", "foto": ""}, {"nome": "Carolina Romero", "instagram": "soseiquenadasei.33", "obs": "", "foto": ""}, {"nome": "Talita Persi", "instagram": "talitapersi", "obs": "", "foto": ""}]}, {"id": "loc1", "local": "Salve", "endereco": "Av. Erasmo Braga 255 / Sobreloja", "lat": -22.9056853, "lng": -43.1744404, "artistas": [{"nome": "Projeto Rachel", "instagram": "projeto.rachel", "obs": "ateliê C", "foto": ""}, {"nome": "Pedro Victor Brandão", "instagram": "pedr_vict_r", "obs": "ateliê H", "foto": ""}]}, {"id": "loc2", "local": "Ed. Portugal", "endereco": "Avenida Franklin Roosevelt 39", "lat": -22.9097993, "lng": -43.1713584, "artistas": [{"nome": "Rafael Adorján", "instagram": "radorjan", "obs": "sala 815", "foto": ""}, {"nome": "Hildebranda", "instagram": "hildebranda_", "obs": "sala 1318", "foto": ""}, {"nome": "Itinera Arte", "instagram": "itinera_arte", "obs": "sala 717 / sala 703", "foto": ""}]}, {"id": "loc3", "local": "", "endereco": "Rua México 164", "lat": -22.9071644, "lng": -43.1757713, "artistas": [{"nome": "Nuno Quinhões", "instagram": "nunoquinhoes", "obs": "sala 82", "foto": ""}, {"nome": "Ana Klaus", "instagram": "anaklaus.art", "obs": "sala 16", "foto": ""}, {"nome": "Adriana Macedo", "instagram": "adrianamacedo_artist", "obs": "sala 112", "foto": ""}, {"nome": "Elisa Simões", "instagram": "elisasimoes02", "obs": "sala 86", "foto": ""}, {"nome": "Ravi Tubenchlak", "instagram": "ravitubenchlak", "obs": "sala 17", "foto": ""}, {"nome": "Rodrigo Hull", "instagram": "rodrigohull", "obs": "sala 11", "foto": ""}, {"nome": "Filipi Dahrlan", "instagram": "fdahrlan", "obs": "sala 63", "foto": ""}, {"nome": "Cali", "instagram": "calicohen_", "obs": "sala 111", "foto": ""}, {"nome": "Maria Paganelli", "instagram": "mariaivpaganelli", "obs": "sala 117", "foto": ""}, {"nome": "Vinicius Pitô", "instagram": "artistacostureiro", "obs": "sala 67", "foto": ""}, {"nome": "Fel Barros", "instagram": "apenasfel", "obs": "sala 67", "foto": ""}, {"nome": "Liége Santos", "instagram": "liege_santos", "obs": "", "foto": ""}, {"nome": "Flavio Fassheber", "instagram": "flaviofassheber", "obs": "sala 65", "foto": ""}, {"nome": "Reinaldo Hingel", "instagram": "reinaldohingel_art", "obs": "sala 65", "foto": ""}, {"nome": "Joana e Beth", "instagram": "joanapassi", "obs": "sala 83/84", "foto": ""}, {"nome": "Amanda Monasterio e Raquel Gandra", "instagram": "amandamonasterio", "obs": "sala 66", "foto": ""}, {"nome": "Maria Thereza Fortes", "instagram": "mtrfortes", "obs": "sala 112", "foto": ""}, {"nome": "Fortes Jewellery", "instagram": "fortesjewellery", "obs": "sala 113", "foto": ""}]}, {"id": "loc4", "local": "Ateliê Cidade Baixa", "endereco": "Largo de Santa Rita 6, sobrado", "lat": -22.8998691, "lng": -43.1811527, "artistas": [{"nome": "Clara Machado", "instagram": "cidadebaixa.arte", "obs": "", "foto": ""}, {"nome": "Diana Sandes", "instagram": "cidadebaixa.arte", "obs": "", "foto": ""}, {"nome": "Fernanda Morais", "instagram": "cidadebaixa.arte", "obs": "", "foto": ""}, {"nome": "Maria Baigur", "instagram": "cidadebaixa.arte", "obs": "", "foto": ""}, {"nome": "Pedro Carneiro", "instagram": "cidadebaixa.arte", "obs": "", "foto": ""}, {"nome": "Raphael Couto", "instagram": "cidadebaixa.arte", "obs": "", "foto": ""}, {"nome": "William Araújo", "instagram": "cidadebaixa.arte", "obs": "", "foto": ""}]}, {"id": "loc5", "local": "Ateliê Terreiro", "endereco": "Rua Acre 83 sala 505, Saúde", "lat": -22.9005015, "lng": -43.181881, "artistas": [{"nome": "Luanda", "instagram": "luandafrancisco", "obs": "luanda.art.br", "foto": ""}]}, {"id": "loc6", "local": "", "endereco": "Rua Uruguaiana, 10/1512", "lat": -22.9062579, "lng": -43.178552, "artistas": [{"nome": "Rodrigo Westin", "instagram": "rodrigowestin", "obs": "", "foto": ""}]}, {"id": "loc7", "local": "Ateliê Caroline Valansi", "endereco": "Rua Álvaro Alvim 21 / 18º andar", "lat": -22.9115713, "lng": -43.1761788, "artistas": [{"nome": "Caroline Valansi", "instagram": "caroline_valansi", "obs": "", "foto": ""}]}, {"id": "loc8", "local": "Agrado", "endereco": "Endereço a confirmar", "lat": null, "lng": null, "artistas": [{"nome": "Kat Alden", "instagram": "katalden", "obs": "", "foto": ""}, {"nome": "Ana Clara Vendramini", "instagram": "vendrahhh", "obs": "", "foto": ""}, {"nome": "Antônia Muricy Leite", "instagram": "antmrcy", "obs": "", "foto": ""}, {"nome": "Amanda Bellucci", "instagram": "demoworlds", "obs": "", "foto": ""}]}, {"id": "loc9", "local": "Ateliê Renato Bezerra de Mello", "endereco": "Rua Álvaro Alvim 24 / 8º andar", "lat": -22.9112097, "lng": -43.1761669, "artistas": [{"nome": "Renato Bezerra de Mello", "instagram": "renatobezerrademello", "obs": "", "foto": ""}]}, {"id": "loc10", "local": "Largo das Artes", "endereco": "Rua Luís de Camões, 02, sobrado", "lat": -22.904813, "lng": -43.1811294, "artistas": [{"nome": "Eliane Fraulob", "instagram": "elianefraulob", "obs": "", "foto": ""}, {"nome": "Elias de Aquino", "instagram": "elias.deaquino", "obs": "", "foto": ""}, {"nome": "Esther Barki", "instagram": "esther_barki", "obs": "", "foto": ""}, {"nome": "Felipe Braga", "instagram": "felipebraga____", "obs": "", "foto": ""}, {"nome": "Gabriela Noujaim", "instagram": "gabrielanoujaim", "obs": "", "foto": ""}, {"nome": "Mariana Lloyd", "instagram": "moosaic_marianalloyd", "obs": "", "foto": ""}, {"nome": "Marssares", "instagram": "marssares", "obs": "", "foto": ""}, {"nome": "Pedro Rangel", "instagram": "pdrorngel", "obs": "", "foto": ""}, {"nome": "Pedro Varela", "instagram": "pedrosantosvarela", "obs": "", "foto": ""}, {"nome": "Zazá Lima", "instagram": "zazalima", "obs": "", "foto": ""}]}, {"id": "loc11", "local": "Atelie 31", "endereco": "Rua México 31 - 1003/1004", "lat": -22.9114856, "lng": -43.1743552, "artistas": [{"nome": "Anderson Ramalho", "instagram": "ramalho.cabelo", "obs": "", "foto": ""}, {"nome": "Andrea Antonon", "instagram": "andreaantonon", "obs": "", "foto": ""}, {"nome": "Aruane Garzedin", "instagram": "aruanegarzedin.art", "obs": "", "foto": ""}, {"nome": "Cibele Nogueira", "instagram": "cibelenogueira__", "obs": "", "foto": ""}, {"nome": "Karen Tyler", "instagram": "karentyler.art", "obs": "", "foto": ""}, {"nome": "Pedro Lago", "instagram": "", "obs": "", "foto": ""}]}, {"id": "loc12", "local": "Ateliê Weslley Ferreira", "endereco": "Rua da Conceição, 105 apt. 1009", "lat": -22.9016505, "lng": -43.1836073, "artistas": [{"nome": "Weslley Ferreira", "instagram": "weslleyf.ba", "obs": "", "foto": ""}]}, {"id": "loc13", "local": "Studio Monte", "endereco": "Rua dos Inválidos, 27 sobrado", "lat": -22.909045, "lng": -43.1856733, "artistas": [{"nome": "Vinicius Monte", "instagram": "monte.vinicius", "obs": "", "foto": ""}]}, {"id": "loc14", "local": "", "endereco": "Avenida Beira Mar 216, sala 902", "lat": -22.9105342, "lng": -43.1704502, "artistas": [{"nome": "Clara Tibery", "instagram": "claratibery", "obs": "", "foto": ""}, {"nome": "Eduardo Mattos", "instagram": "macula.cc", "obs": "", "foto": ""}]}, {"id": "loc15", "local": "Virtua3000", "endereco": "Rua do Senado nº227", "lat": -22.9107373, "lng": -43.1891061, "artistas": [{"nome": "Bruno Magliari", "instagram": "brunomagliari", "obs": "", "foto": ""}, {"nome": "Gpeto", "instagram": "gpeto_", "obs": "", "foto": ""}, {"nome": "Duda Borowicz", "instagram": "dudaborowicz", "obs": "", "foto": ""}, {"nome": "Marcelle Nascimento", "instagram": "marcecraam", "obs": "", "foto": ""}, {"nome": "Ian Raposo", "instagram": "ian.raposo", "obs": "", "foto": ""}, {"nome": "Bernardo Liu", "instagram": "bernardoliu", "obs": "", "foto": ""}, {"nome": "Taf", "instagram": "taf____", "obs": "", "foto": ""}, {"nome": "Pedro Azaleia", "instagram": "pedro.azaleia", "obs": "", "foto": ""}, {"nome": "Luiza Lukah", "instagram": "a___lukah", "obs": "", "foto": ""}]}, {"id": "loc16", "local": "", "endereco": "Rua da Alfândega, 91 - 809", "lat": -22.9025776, "lng": -43.1797789, "artistas": [{"nome": "Ygor Landarin", "instagram": "", "obs": "", "foto": ""}]}, {"id": "loc17", "local": "Ateliê Eloá Carvalho", "endereco": "Av. Rio Branco, 277, 601 A", "lat": -22.9118133, "lng": -43.1747917, "artistas": [{"nome": "Eloá Carvalho", "instagram": "eloa_carvalho", "obs": "", "foto": ""}]}, {"id": "loc18", "local": "Atelier Sanitário", "endereco": "Rua Pedro Ernesto 56, Gamboa", "lat": -22.8960326, "lng": -43.1936254, "artistas": [{"nome": "Daniel Murgel", "instagram": "danielmurgel", "obs": "", "foto": ""}, {"nome": "Oficina do Prelo", "instagram": "oficinadoprelo", "obs": "", "foto": ""}, {"nome": "Antonio Carlos Rodrigues", "instagram": "rodrigues.anc", "obs": "", "foto": ""}, {"nome": "Cláudio Fernandes", "instagram": "", "obs": "", "foto": ""}]}, {"id": "loc19", "local": "Ateliê Ju Morais", "endereco": "Av. Marechal Floriano, 143, sala 1403", "lat": -22.9024075, "lng": -43.1853374, "artistas": [{"nome": "Ju Morais", "instagram": "", "obs": "jumorais.com.br", "foto": ""}]}, {"id": "loc20", "local": "Sindycato", "endereco": "Rua do Rosário 104, 4º andar", "lat": -22.9026452, "lng": -43.1777889, "artistas": [{"nome": "Gabriela Perigo", "instagram": "gabirielaperigo", "obs": "", "foto": ""}, {"nome": "Lucas Vaz", "instagram": "lvcaz", "obs": "", "foto": ""}, {"nome": "Maia Gama", "instagram": "cosperraiox", "obs": "", "foto": ""}, {"nome": "Maria Clara Contrucci", "instagram": "mccontrucci", "obs": "", "foto": ""}]}, {"id": "loc21", "local": "Ateliê Carlos Bobi", "endereco": "Rua da Quitanda 3, SL 607", "lat": -22.9053821, "lng": -43.1760508, "artistas": [{"nome": "Carlos Bobi", "instagram": "carlosbobi", "obs": "", "foto": ""}]}, {"id": "loc22", "local": "Ateliê Radar (Residentes)", "endereco": "Rua da Quitanda 3, sl 606", "lat": -22.9053821, "lng": -43.1760508, "artistas": [{"nome": "João Alto", "instagram": "__joaoalto", "obs": "", "foto": ""}, {"nome": "Felipe", "instagram": "felp_02", "obs": "", "foto": ""}, {"nome": "Lolly", "instagram": "lollyverso", "obs": "", "foto": ""}, {"nome": "Juliana Crispiniano", "instagram": "julianacrispiniano", "obs": "", "foto": ""}]}, {"id": "loc23", "local": "Ateliê rOnA (gÁz)", "endereco": "Arco do Telles, 17 - Praça XV", "lat": -22.9027582, "lng": -43.1746864, "artistas": [{"nome": "LadoB", "instagram": "ronaartista", "obs": "", "foto": ""}]}];
+
+function initials(name){
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0,2).toUpperCase();
+  return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
+}
+
+document.getElementById('hero-count').textContent =
+  `${LOCATIONS.length} endereços · ${LOCATIONS.reduce((s,l)=>s+l.artistas.length,0)} artistas`;
+
+// ---------------- map (isolated in try/catch so a load failure doesn't break the rest) ----------------
+let map = null;
+const markers = {};
+function makePinIcon(active){
+  return L.divIcon({
+    className:'',
+    html:`<div class="pin-hit"><div class="pin${active?' active':''}"></div></div>`,
+    iconSize:[40,40],
+    iconAnchor:[20,20]
+  });
+}
+try{
+  if (typeof L === 'undefined') throw new Error('Leaflet não carregou');
+  map = L.map('map', { scrollWheelZoom:false, zoomControl:false }).setView([-22.9065, -43.1795], 15);
+  L.control.zoom({ position:'bottomright' }).addTo(map);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19
+  }).addTo(map);
+
+  LOCATIONS.forEach((loc) => {
+    if (loc.lat == null || loc.lng == null) return;
+    const marker = L.marker([loc.lat, loc.lng], { icon: makePinIcon(false) }).addTo(map);
+    marker.on('click', () => openDrawer(loc.id));
+    markers[loc.id] = marker;
+  });
+} catch(err){
+  console.error('Mapa indisponível:', err);
+  const mapEl = document.getElementById('map');
+  mapEl.innerHTML = '<div class="map-error">Não foi possível carregar o mapa agora.<br>A lista de endereços continua disponível.</div>';
+}
+
+function setActivePin(activeId){
+  LOCATIONS.forEach((loc) => {
+    const m = markers[loc.id];
+    if (!m) return;
+    m.setIcon(makePinIcon(loc.id === activeId));
+  });
+}
+
+// ---------------- drawer ----------------
+const overlay = document.getElementById('overlay');
+const drawer = document.getElementById('drawer');
+
+function openDrawer(locId){
+  const loc = LOCATIONS.find(l => l.id === locId);
+  if (!loc) return;
+
+  document.getElementById('drawer-local').textContent = loc.local || loc.endereco;
+  document.getElementById('drawer-endereco').textContent = loc.local ? loc.endereco : '';
+  document.getElementById('drawer-count').textContent = loc.artistas.length + (loc.artistas.length===1 ? ' artista' : ' artistas');
+
+  const list = document.getElementById('drawer-list');
+  list.innerHTML = '';
+  loc.artistas.forEach(art => {
+    const row = document.createElement('div');
+    row.className = 'artist';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    if (art.foto){ avatar.style.backgroundImage = `url('${art.foto}')`; }
+    else { avatar.textContent = initials(art.nome); }
+
+    const info = document.createElement('div');
+    const name = document.createElement('p');
+    name.className = 'artist-name';
+    name.textContent = art.nome;
+    info.appendChild(name);
+
+    const meta = document.createElement('div');
+    meta.className = 'artist-meta';
+    if (art.instagram){
+      const a = document.createElement('a');
+      a.href = `https://instagram.com/${art.instagram}`;
+      a.target = '_blank'; a.rel = 'noopener';
+      a.textContent = '@' + art.instagram;
+      meta.appendChild(a);
+    }
+    if (art.obs){
+      const tag = document.createElement('span');
+      tag.className = 'artist-obs';
+      tag.textContent = art.obs;
+      meta.appendChild(tag);
+    }
+    info.appendChild(meta);
+
+    row.appendChild(avatar);
+    row.appendChild(info);
+    list.appendChild(row);
+  });
+
+  if (loc.artistas.every(a => !a.foto)){
+    const note = document.createElement('p');
+    note.className = 'photo-note';
+    note.textContent = 'Fotos dos trabalhos em breve.';
+    list.appendChild(note);
+  }
+
+  setActivePin(locId);
+  overlay.classList.add('open');
+  drawer.classList.add('open');
+}
+function closeDrawer(){
+  overlay.classList.remove('open');
+  drawer.classList.remove('open');
+  setActivePin(null);
+}
+document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+overlay.addEventListener('click', closeDrawer);
+
+function goToLocation(loc){
+  setView('map');
+  if (map && loc.lat != null){
+    setTimeout(() => map.flyTo([loc.lat, loc.lng], 17, { duration:0.6 }), 50);
+  }
+  openDrawer(loc.id);
+}
+
+// ---------------- view switch (mapa / lista) ----------------
+const listOverlay = document.getElementById('list-overlay');
+const switchMapBtn = document.getElementById('switch-map');
+const switchListBtn = document.getElementById('switch-list');
+const sortSwitch = document.getElementById('sort-switch');
+const sortEnderecoBtn = document.getElementById('sort-endereco');
+const sortArtistaBtn = document.getElementById('sort-artista');
+
+let currentView = 'map';
+let currentSort = 'endereco';
+
+function setView(v){
+  currentView = v;
+  const isList = v === 'list';
+  listOverlay.classList.toggle('open', isList);
+  switchMapBtn.classList.toggle('active', !isList);
+  switchListBtn.classList.toggle('active', isList);
+  sortSwitch.classList.toggle('visible', isList);
+}
+function setSort(s){
+  currentSort = s;
+  sortEnderecoBtn.classList.toggle('active', s === 'endereco');
+  sortArtistaBtn.classList.toggle('active', s === 'artista');
+  renderRows();
+}
+
+switchMapBtn.addEventListener('click', () => setView('map'));
+switchListBtn.addEventListener('click', () => setView('list'));
+sortEnderecoBtn.addEventListener('click', () => setSort('endereco'));
+sortArtistaBtn.addEventListener('click', () => setSort('artista'));
+
+// ---------------- rows rendering ----------------
+const rowsEl = document.getElementById('rows');
+
+function renderRowsByEndereco(){
+  rowsEl.innerHTML = '';
+  const sorted = LOCATIONS
+    .map((loc) => loc)
+    .sort((a,b) => (a.local || a.endereco).localeCompare(b.local || b.endereco, 'pt-BR', { sensitivity:'base' }));
+
+  sorted.forEach((loc, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'row' + (loc.lat == null ? ' pending' : '');
+    btn.innerHTML = `
+      <span class="row-num">${String(i+1).padStart(2,'0')}</span>
+      <span class="row-main">
+        <span class="row-title">${loc.local || loc.endereco}</span>
+        ${loc.local ? `<span class="row-sub">${loc.endereco}</span>` : ''}
+      </span>
+      <span class="row-count">${loc.artistas.length}</span>
+    `;
+    btn.addEventListener('click', () => goToLocation(loc));
+    rowsEl.appendChild(btn);
+  });
+}
+
+function renderRowsByArtista(){
+  rowsEl.innerHTML = '';
+  let flat = [];
+  LOCATIONS.forEach((loc) => {
+    loc.artistas.forEach(art => {
+      flat.push({ nome: art.nome, instagram: art.instagram, loc });
+    });
+  });
+  flat.sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity:'base' }));
+
+  flat.forEach((entry, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'row' + (entry.loc.lat == null ? ' pending' : '');
+    btn.innerHTML = `
+      <span class="row-num">${String(i+1).padStart(2,'0')}</span>
+      <span class="row-main">
+        <span class="row-title">${entry.nome}</span>
+        <span class="row-sub">${entry.loc.local || entry.loc.endereco}</span>
+      </span>
+      <span class="row-count">${entry.instagram ? '@'+entry.instagram : ''}</span>
+    `;
+    btn.addEventListener('click', () => goToLocation(entry.loc));
+    rowsEl.appendChild(btn);
+  });
+}
+
+function renderRows(){
+  if (currentSort === 'endereco') renderRowsByEndereco();
+  else renderRowsByArtista();
+}
+renderRows();
+</script>
+</body>
+</html>
