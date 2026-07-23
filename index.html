@@ -40,23 +40,32 @@
   .hero-count{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:calc(1.6rem + env(safe-area-inset-left)); z-index:200;
                font-family:var(--mono); font-size:0.72rem; color:var(--gray); pointer-events:none; }
 
-  /* ---------------- View switcher ---------------- */
+  /* ---------------- View switcher (glass pill toggle) ---------------- */
   .switcher{ position:absolute; top:calc(1.1rem + env(safe-area-inset-top)); right:calc(0.9rem + env(safe-area-inset-right)); z-index:600;
-             display:flex; gap:0.3rem; font-family:var(--mono); font-size:0.75rem; }
-  .switcher button{ background:none; border:none; cursor:pointer; color:var(--gray);
-                     padding:0.7rem 0.6rem; min-height:44px;
-                     border-bottom:1px solid transparent; transition:color 0.15s ease, border-color 0.15s ease; }
-  .switcher button.active{ color:var(--ink); border-bottom:1px solid var(--ink); }
-  .switcher button:hover{ color:var(--ink); }
+             display:flex; gap:2px; font-family:var(--mono); font-size:0.72rem;
+             background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
+             -webkit-backdrop-filter:blur(18px) saturate(180%);
+             border:1px solid rgba(255,255,255,0.4); border-radius:999px; padding:3px;
+             box-shadow:0 2px 10px rgba(0,0,0,0.08); }
+  .switcher button{ background:transparent; border:none; cursor:pointer; color:var(--ink);
+                     padding:0.55rem 0.9rem; min-height:38px; border-radius:999px;
+                     transition:background 0.2s ease, color 0.2s ease; }
+  .switcher button.active{ background:#111; color:#fff; }
+  .switcher button:not(.active):hover{ background:rgba(255,255,255,0.35); }
 
-  .sort-switch{ position:absolute; top:calc(3.4rem + env(safe-area-inset-top)); right:calc(0.9rem + env(safe-area-inset-right)); z-index:600;
-                display:flex; gap:0.2rem; font-family:var(--mono); font-size:0.68rem;
+  .sort-switch{ position:absolute; top:calc(4rem + env(safe-area-inset-top)); right:calc(0.9rem + env(safe-area-inset-right)); z-index:600;
+                display:flex; gap:2px; font-family:var(--mono); font-size:0.66rem;
+                background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
+                -webkit-backdrop-filter:blur(18px) saturate(180%);
+                border:1px solid rgba(255,255,255,0.4); border-radius:999px; padding:3px;
+                box-shadow:0 2px 10px rgba(0,0,0,0.08);
                 opacity:0; pointer-events:none; transition:opacity 0.2s ease; }
   .sort-switch.visible{ opacity:1; pointer-events:auto; }
-  .sort-switch button{ background:none; border:none; cursor:pointer; color:var(--gray);
-                        padding:0.6rem 0.5rem; min-height:40px;
-                        border-bottom:1px solid transparent; transition:color 0.15s ease, border-color 0.15s ease; }
-  .sort-switch button.active{ color:var(--ink); border-bottom:1px solid var(--ink); }
+  .sort-switch button{ background:transparent; border:none; cursor:pointer; color:var(--ink);
+                        padding:0.5rem 0.7rem; min-height:34px; border-radius:999px;
+                        transition:background 0.2s ease, color 0.2s ease; }
+  .sort-switch button.active{ background:#111; color:#fff; }
+  .sort-switch button:not(.active):hover{ background:rgba(255,255,255,0.35); }
 
   /* pins: 40px invisible tap target, 10px visible dot centered inside */
   .pin-hit{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
@@ -102,7 +111,7 @@
   .drawer{ position:fixed; background:var(--paper); z-index:950; display:flex; flex-direction:column;
            transition:transform 0.35s cubic-bezier(.4,0,.2,1); border-left:1px solid var(--ink); }
   @media (min-width:781px){
-    .drawer{ top:0; right:0; bottom:0; width:380px; transform:translateX(100%); }
+    .drawer{ top:0; right:0; bottom:0; width:440px; transform:translateX(100%); }
     .drawer.open{ transform:translateX(0); }
   }
   @media (max-width:780px){
@@ -120,24 +129,63 @@
                  font-family:var(--mono); font-size:0.85rem; color:var(--ink); transition:opacity 0.15s ease; }
   .drawer-close:hover{ opacity:0.5; }
 
-  .drawer-list{ overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); }
-  .artist{ padding:1rem 0; border-bottom:1px solid var(--line); display:flex; gap:0.9rem; align-items:flex-start; }
-  .artist:last-child{ border-bottom:none; }
+  .drawer-list{ overflow-y:auto; -webkit-overflow-scrolling:touch; padding:1rem 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); }
+  .artist-grid{ display:grid; grid-template-columns:1fr 1fr; gap:1.1rem 0.9rem; }
 
-  .avatar{ width:36px; height:36px; border-radius:50%; border:1px solid var(--ink); flex-shrink:0;
-           display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:0.68rem;
-           color:var(--ink); background-size:cover; background-position:center; }
+  .artist-card{ display:flex; flex-direction:column; }
+  .artist-photo{ width:100%; aspect-ratio:4/3; background:#e4e4e4; border:1px solid var(--ink);
+                 background-size:cover; background-position:center;
+                 display:flex; align-items:center; justify-content:center;
+                 font-family:var(--mono); font-size:0.85rem; color:var(--gray);
+                 cursor:zoom-in; transition:opacity 0.15s ease; }
+  .artist-photo:hover{ opacity:0.85; }
 
-  .artist-name{ font-family:var(--serif); font-size:1rem; margin:0 0 0.2rem; }
-  .artist-meta{ font-family:var(--mono); font-size:0.72rem; color:var(--gray); display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; }
+  .artist-name{ font-family:var(--serif); font-size:0.95rem; margin:0.55rem 0 0.15rem; line-height:1.2; }
+  .artist-meta{ font-family:var(--mono); font-size:0.7rem; color:var(--gray); display:flex; flex-wrap:wrap; gap:0.4rem; align-items:center; }
   .artist-meta a{ color:var(--ink); text-decoration:underline; text-underline-offset:2px; }
   .artist-meta a:hover{ opacity:0.6; }
-  .artist-obs{ border:1px solid var(--line); padding:0.05rem 0.35rem; }
-  .photo-note{ font-family:var(--mono); font-size:0.68rem; color:var(--gray); font-style:italic; margin-top:0.4rem; }
+  .artist-obs{ border:1px solid var(--line); padding:0.05rem 0.3rem; }
+  .photo-note{ font-family:var(--mono); font-size:0.68rem; color:var(--gray); font-style:italic; margin-top:0.9rem; grid-column:1 / -1; }
 
   .map-error{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
               font-family:var(--mono); font-size:0.8rem; color:var(--gray); text-align:center; padding:2rem; }
+
+  /* ---------------- Lightbox (modal, glassmorphism) ---------------- */
+  .lightbox{ position:fixed; inset:0; z-index:1000;
+             background:transparent;
+             display:flex; align-items:center; justify-content:center;
+             opacity:0; pointer-events:none; transition:opacity 0.25s ease;
+             padding:calc(1rem + env(safe-area-inset-top)) calc(1rem + env(safe-area-inset-right))
+                     calc(1rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left)); }
+  .lightbox.open{ opacity:1; pointer-events:auto; }
+
+  .lightbox-modal{ position:relative; width:100%; height:100%;
+                    overflow-y:auto; -webkit-overflow-scrolling:touch;
+                    background:rgba(255,255,255,0.35);
+                    backdrop-filter:blur(32px) saturate(180%);
+                    -webkit-backdrop-filter:blur(32px) saturate(180%);
+                    border:1px solid rgba(255,255,255,0.6);
+                    border-radius:10px;
+                    padding:2.2rem 1.8rem;
+                    box-shadow:0 24px 70px rgba(0,0,0,0.25);
+                    display:flex; flex-direction:column; align-items:center; justify-content:center;
+                    transform:scale(0.97); transition:transform 0.25s ease; }
+  .lightbox.open .lightbox-modal{ transform:scale(1); }
+
+  .lightbox-modal img{ max-width:100%; max-height:70vh; object-fit:contain; border:1px solid rgba(0,0,0,0.1); }
+  .lightbox-placeholder{ display:none; width:100%; max-width:520px; aspect-ratio:4/3; background:rgba(0,0,0,0.05);
+                          align-items:center; justify-content:center;
+                          font-family:var(--mono); font-size:1.1rem; color:var(--gray); border:1px solid rgba(0,0,0,0.12); }
+  .lightbox-placeholder.show{ display:flex; }
+  .lightbox-caption{ max-width:520px; margin-top:1.4rem; text-align:center; }
+  .lightbox-caption .lb-name{ font-family:var(--serif); font-size:1.2rem; color:var(--ink); margin:0 0 0.4rem; }
+  .lightbox-caption .lb-bio{ font-family:var(--sans); font-size:0.88rem; line-height:1.55; color:var(--gray); margin:0; }
+  .lightbox-close{ position:absolute; top:1rem; right:1rem;
+                    background:none; border:none; cursor:pointer; padding:0.6rem; min-height:36px;
+                    font-family:var(--mono); font-size:0.78rem; color:var(--ink); }
+  .lightbox-close:hover{ opacity:0.6; }
 </style>
+
 </head>
 <body>
 
@@ -175,6 +223,18 @@
   <div class="drawer-list" id="drawer-list"></div>
 </div>
 
+<div class="lightbox" id="lightbox">
+  <div class="lightbox-modal">
+    <button class="lightbox-close" id="lightbox-close" aria-label="Fechar imagem">fechar ×</button>
+    <img id="lightbox-img" src="" alt="">
+    <div class="lightbox-placeholder" id="lightbox-placeholder"></div>
+    <div class="lightbox-caption" id="lightbox-caption">
+      <p class="lb-name" id="lightbox-name"></p>
+      <p class="lb-bio" id="lightbox-bio"></p>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 /* ============================================================
@@ -182,7 +242,7 @@
    Hoje: dados embutidos (gerados a partir do documento original).
    Depois: trocar por fetch() da planilha do Google publicada em CSV.
    ============================================================ */
-const LOCATIONS = [{"id": "loc0", "local": "", "endereco": "Av. Churchill, 94 / 4º andar", "lat": -22.9095612, "lng": -43.1717542, "artistas": [{"nome": "Amauri", "instagram": "amauriletc", "obs": "", "foto": ""}, {"nome": "Angélica Arechavala", "instagram": "angelicaarechavala", "obs": "", "foto": ""}, {"nome": "Alessandra Sposetti", "instagram": "alessandrasposetti", "obs": "", "foto": ""}, {"nome": "Clara Barros", "instagram": "clarabarros", "obs": "", "foto": ""}, {"nome": "Fernanda Sattamini", "instagram": "fernandasattamini", "obs": "", "foto": ""}, {"nome": "Heleno Bernardi", "instagram": "_heleno.bernardi", "obs": "", "foto": ""}, {"nome": "Raissa Góes Rapozo", "instagram": "raissa_de_goes_arte", "obs": "", "foto": ""}, {"nome": "Marina Lazzarotto", "instagram": "marinalazzarotto_", "obs": "", "foto": ""}, {"nome": "Giovanna Melo de Moura", "instagram": "melodemoura_", "obs": "", "foto": ""}, {"nome": "Carolina Romero", "instagram": "soseiquenadasei.33", "obs": "", "foto": ""}, {"nome": "Talita Persi", "instagram": "talitapersi", "obs": "", "foto": ""}]}, {"id": "loc1", "local": "Salve", "endereco": "Av. Erasmo Braga 255 / Sobreloja", "lat": -22.9056853, "lng": -43.1744404, "artistas": [{"nome": "Projeto Rachel", "instagram": "projeto.rachel", "obs": "ateliê C", "foto": ""}, {"nome": "Pedro Victor Brandão", "instagram": "pedr_vict_r", "obs": "ateliê H", "foto": ""}]}, {"id": "loc2", "local": "Ed. Portugal", "endereco": "Avenida Franklin Roosevelt 39", "lat": -22.9097993, "lng": -43.1713584, "artistas": [{"nome": "Rafael Adorján", "instagram": "radorjan", "obs": "sala 815", "foto": ""}, {"nome": "Hildebranda", "instagram": "hildebranda_", "obs": "sala 1318", "foto": ""}, {"nome": "Itinera Arte", "instagram": "itinera_arte", "obs": "sala 717 / sala 703", "foto": ""}]}, {"id": "loc3", "local": "", "endereco": "Rua México 164", "lat": -22.9071644, "lng": -43.1757713, "artistas": [{"nome": "Nuno Quinhões", "instagram": "nunoquinhoes", "obs": "sala 82", "foto": ""}, {"nome": "Ana Klaus", "instagram": "anaklaus.art", "obs": "sala 16", "foto": ""}, {"nome": "Adriana Macedo", "instagram": "adrianamacedo_artist", "obs": "sala 112", "foto": ""}, {"nome": "Elisa Simões", "instagram": "elisasimoes02", "obs": "sala 86", "foto": ""}, {"nome": "Ravi Tubenchlak", "instagram": "ravitubenchlak", "obs": "sala 17", "foto": ""}, {"nome": "Rodrigo Hull", "instagram": "rodrigohull", "obs": "sala 11", "foto": ""}, {"nome": "Filipi Dahrlan", "instagram": "fdahrlan", "obs": "sala 63", "foto": ""}, {"nome": "Cali", "instagram": "calicohen_", "obs": "sala 111", "foto": ""}, {"nome": "Maria Paganelli", "instagram": "mariaivpaganelli", "obs": "sala 117", "foto": ""}, {"nome": "Vinicius Pitô", "instagram": "artistacostureiro", "obs": "sala 67", "foto": ""}, {"nome": "Fel Barros", "instagram": "apenasfel", "obs": "sala 67", "foto": ""}, {"nome": "Liége Santos", "instagram": "liege_santos", "obs": "", "foto": ""}, {"nome": "Flavio Fassheber", "instagram": "flaviofassheber", "obs": "sala 65", "foto": ""}, {"nome": "Reinaldo Hingel", "instagram": "reinaldohingel_art", "obs": "sala 65", "foto": ""}, {"nome": "Joana e Beth", "instagram": "joanapassi", "obs": "sala 83/84", "foto": ""}, {"nome": "Amanda Monasterio e Raquel Gandra", "instagram": "amandamonasterio", "obs": "sala 66", "foto": ""}, {"nome": "Maria Thereza Fortes", "instagram": "mtrfortes", "obs": "sala 112", "foto": ""}, {"nome": "Fortes Jewellery", "instagram": "fortesjewellery", "obs": "sala 113", "foto": ""}]}, {"id": "loc4", "local": "Ateliê Cidade Baixa", "endereco": "Largo de Santa Rita 6, sobrado", "lat": -22.8998691, "lng": -43.1811527, "artistas": [{"nome": "Clara Machado", "instagram": "cidadebaixa.arte", "obs": "", "foto": ""}, {"nome": "Diana Sandes", "instagram": "cidadebaixa.arte", "obs": "", "foto": ""}, {"nome": "Fernanda Morais", "instagram": "cidadebaixa.arte", "obs": "", "foto": ""}, {"nome": "Maria Baigur", "instagram": "cidadebaixa.arte", "obs": "", "foto": ""}, {"nome": "Pedro Carneiro", "instagram": "cidadebaixa.arte", "obs": "", "foto": ""}, {"nome": "Raphael Couto", "instagram": "cidadebaixa.arte", "obs": "", "foto": ""}, {"nome": "William Araújo", "instagram": "cidadebaixa.arte", "obs": "", "foto": ""}]}, {"id": "loc5", "local": "Ateliê Terreiro", "endereco": "Rua Acre 83 sala 505, Saúde", "lat": -22.9005015, "lng": -43.181881, "artistas": [{"nome": "Luanda", "instagram": "luandafrancisco", "obs": "luanda.art.br", "foto": ""}]}, {"id": "loc6", "local": "", "endereco": "Rua Uruguaiana, 10/1512", "lat": -22.9062579, "lng": -43.178552, "artistas": [{"nome": "Rodrigo Westin", "instagram": "rodrigowestin", "obs": "", "foto": ""}]}, {"id": "loc7", "local": "Ateliê Caroline Valansi", "endereco": "Rua Álvaro Alvim 21 / 18º andar", "lat": -22.9115713, "lng": -43.1761788, "artistas": [{"nome": "Caroline Valansi", "instagram": "caroline_valansi", "obs": "", "foto": ""}]}, {"id": "loc8", "local": "Agrado", "endereco": "Endereço a confirmar", "lat": null, "lng": null, "artistas": [{"nome": "Kat Alden", "instagram": "katalden", "obs": "", "foto": ""}, {"nome": "Ana Clara Vendramini", "instagram": "vendrahhh", "obs": "", "foto": ""}, {"nome": "Antônia Muricy Leite", "instagram": "antmrcy", "obs": "", "foto": ""}, {"nome": "Amanda Bellucci", "instagram": "demoworlds", "obs": "", "foto": ""}]}, {"id": "loc9", "local": "Ateliê Renato Bezerra de Mello", "endereco": "Rua Álvaro Alvim 24 / 8º andar", "lat": -22.9112097, "lng": -43.1761669, "artistas": [{"nome": "Renato Bezerra de Mello", "instagram": "renatobezerrademello", "obs": "", "foto": ""}]}, {"id": "loc10", "local": "Largo das Artes", "endereco": "Rua Luís de Camões, 02, sobrado", "lat": -22.904813, "lng": -43.1811294, "artistas": [{"nome": "Eliane Fraulob", "instagram": "elianefraulob", "obs": "", "foto": ""}, {"nome": "Elias de Aquino", "instagram": "elias.deaquino", "obs": "", "foto": ""}, {"nome": "Esther Barki", "instagram": "esther_barki", "obs": "", "foto": ""}, {"nome": "Felipe Braga", "instagram": "felipebraga____", "obs": "", "foto": ""}, {"nome": "Gabriela Noujaim", "instagram": "gabrielanoujaim", "obs": "", "foto": ""}, {"nome": "Mariana Lloyd", "instagram": "moosaic_marianalloyd", "obs": "", "foto": ""}, {"nome": "Marssares", "instagram": "marssares", "obs": "", "foto": ""}, {"nome": "Pedro Rangel", "instagram": "pdrorngel", "obs": "", "foto": ""}, {"nome": "Pedro Varela", "instagram": "pedrosantosvarela", "obs": "", "foto": ""}, {"nome": "Zazá Lima", "instagram": "zazalima", "obs": "", "foto": ""}]}, {"id": "loc11", "local": "Atelie 31", "endereco": "Rua México 31 - 1003/1004", "lat": -22.9114856, "lng": -43.1743552, "artistas": [{"nome": "Anderson Ramalho", "instagram": "ramalho.cabelo", "obs": "", "foto": ""}, {"nome": "Andrea Antonon", "instagram": "andreaantonon", "obs": "", "foto": ""}, {"nome": "Aruane Garzedin", "instagram": "aruanegarzedin.art", "obs": "", "foto": ""}, {"nome": "Cibele Nogueira", "instagram": "cibelenogueira__", "obs": "", "foto": ""}, {"nome": "Karen Tyler", "instagram": "karentyler.art", "obs": "", "foto": ""}, {"nome": "Pedro Lago", "instagram": "", "obs": "", "foto": ""}]}, {"id": "loc12", "local": "Ateliê Weslley Ferreira", "endereco": "Rua da Conceição, 105 apt. 1009", "lat": -22.9016505, "lng": -43.1836073, "artistas": [{"nome": "Weslley Ferreira", "instagram": "weslleyf.ba", "obs": "", "foto": ""}]}, {"id": "loc13", "local": "Studio Monte", "endereco": "Rua dos Inválidos, 27 sobrado", "lat": -22.909045, "lng": -43.1856733, "artistas": [{"nome": "Vinicius Monte", "instagram": "monte.vinicius", "obs": "", "foto": ""}]}, {"id": "loc14", "local": "", "endereco": "Avenida Beira Mar 216, sala 902", "lat": -22.9105342, "lng": -43.1704502, "artistas": [{"nome": "Clara Tibery", "instagram": "claratibery", "obs": "", "foto": ""}, {"nome": "Eduardo Mattos", "instagram": "macula.cc", "obs": "", "foto": ""}]}, {"id": "loc15", "local": "Virtua3000", "endereco": "Rua do Senado nº227", "lat": -22.9107373, "lng": -43.1891061, "artistas": [{"nome": "Bruno Magliari", "instagram": "brunomagliari", "obs": "", "foto": ""}, {"nome": "Gpeto", "instagram": "gpeto_", "obs": "", "foto": ""}, {"nome": "Duda Borowicz", "instagram": "dudaborowicz", "obs": "", "foto": ""}, {"nome": "Marcelle Nascimento", "instagram": "marcecraam", "obs": "", "foto": ""}, {"nome": "Ian Raposo", "instagram": "ian.raposo", "obs": "", "foto": ""}, {"nome": "Bernardo Liu", "instagram": "bernardoliu", "obs": "", "foto": ""}, {"nome": "Taf", "instagram": "taf____", "obs": "", "foto": ""}, {"nome": "Pedro Azaleia", "instagram": "pedro.azaleia", "obs": "", "foto": ""}, {"nome": "Luiza Lukah", "instagram": "a___lukah", "obs": "", "foto": ""}]}, {"id": "loc16", "local": "", "endereco": "Rua da Alfândega, 91 - 809", "lat": -22.9025776, "lng": -43.1797789, "artistas": [{"nome": "Ygor Landarin", "instagram": "", "obs": "", "foto": ""}]}, {"id": "loc17", "local": "Ateliê Eloá Carvalho", "endereco": "Av. Rio Branco, 277, 601 A", "lat": -22.9118133, "lng": -43.1747917, "artistas": [{"nome": "Eloá Carvalho", "instagram": "eloa_carvalho", "obs": "", "foto": ""}]}, {"id": "loc18", "local": "Atelier Sanitário", "endereco": "Rua Pedro Ernesto 56, Gamboa", "lat": -22.8960326, "lng": -43.1936254, "artistas": [{"nome": "Daniel Murgel", "instagram": "danielmurgel", "obs": "", "foto": ""}, {"nome": "Oficina do Prelo", "instagram": "oficinadoprelo", "obs": "", "foto": ""}, {"nome": "Antonio Carlos Rodrigues", "instagram": "rodrigues.anc", "obs": "", "foto": ""}, {"nome": "Cláudio Fernandes", "instagram": "", "obs": "", "foto": ""}]}, {"id": "loc19", "local": "Ateliê Ju Morais", "endereco": "Av. Marechal Floriano, 143, sala 1403", "lat": -22.9024075, "lng": -43.1853374, "artistas": [{"nome": "Ju Morais", "instagram": "", "obs": "jumorais.com.br", "foto": ""}]}, {"id": "loc20", "local": "Sindycato", "endereco": "Rua do Rosário 104, 4º andar", "lat": -22.9026452, "lng": -43.1777889, "artistas": [{"nome": "Gabriela Perigo", "instagram": "gabirielaperigo", "obs": "", "foto": ""}, {"nome": "Lucas Vaz", "instagram": "lvcaz", "obs": "", "foto": ""}, {"nome": "Maia Gama", "instagram": "cosperraiox", "obs": "", "foto": ""}, {"nome": "Maria Clara Contrucci", "instagram": "mccontrucci", "obs": "", "foto": ""}]}, {"id": "loc21", "local": "Ateliê Carlos Bobi", "endereco": "Rua da Quitanda 3, SL 607", "lat": -22.9053821, "lng": -43.1760508, "artistas": [{"nome": "Carlos Bobi", "instagram": "carlosbobi", "obs": "", "foto": ""}]}, {"id": "loc22", "local": "Ateliê Radar (Residentes)", "endereco": "Rua da Quitanda 3, sl 606", "lat": -22.9053821, "lng": -43.1760508, "artistas": [{"nome": "João Alto", "instagram": "__joaoalto", "obs": "", "foto": ""}, {"nome": "Felipe", "instagram": "felp_02", "obs": "", "foto": ""}, {"nome": "Lolly", "instagram": "lollyverso", "obs": "", "foto": ""}, {"nome": "Juliana Crispiniano", "instagram": "julianacrispiniano", "obs": "", "foto": ""}]}, {"id": "loc23", "local": "Ateliê rOnA (gÁz)", "endereco": "Arco do Telles, 17 - Praça XV", "lat": -22.9027582, "lng": -43.1746864, "artistas": [{"nome": "LadoB", "instagram": "ronaartista", "obs": "", "foto": ""}]}];
+const LOCATIONS = [{"id": "loc0", "local": "", "endereco": "Av. Churchill, 94 / 4º andar", "lat": -22.9095612, "lng": -43.1717542, "artistas": [{"nome": "Amauri", "instagram": "amauriletc", "obs": "", "foto": "", "bio": ""}, {"nome": "Angélica Arechavala", "instagram": "angelicaarechavala", "obs": "", "foto": "", "bio": ""}, {"nome": "Alessandra Sposetti", "instagram": "alessandrasposetti", "obs": "", "foto": "", "bio": ""}, {"nome": "Clara Barros", "instagram": "clarabarros", "obs": "", "foto": "", "bio": ""}, {"nome": "Fernanda Sattamini", "instagram": "fernandasattamini", "obs": "", "foto": "", "bio": ""}, {"nome": "Heleno Bernardi", "instagram": "_heleno.bernardi", "obs": "", "foto": "", "bio": ""}, {"nome": "Raissa Góes Rapozo", "instagram": "raissa_de_goes_arte", "obs": "", "foto": "", "bio": ""}, {"nome": "Marina Lazzarotto", "instagram": "marinalazzarotto_", "obs": "", "foto": "", "bio": ""}, {"nome": "Giovanna Melo de Moura", "instagram": "melodemoura_", "obs": "", "foto": "", "bio": ""}, {"nome": "Carolina Romero", "instagram": "soseiquenadasei.33", "obs": "", "foto": "", "bio": ""}, {"nome": "Talita Persi", "instagram": "talitapersi", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc1", "local": "Salve", "endereco": "Av. Erasmo Braga 255 / Sobreloja", "lat": -22.9056853, "lng": -43.1744404, "artistas": [{"nome": "Projeto Rachel", "instagram": "projeto.rachel", "obs": "ateliê C", "foto": "", "bio": ""}, {"nome": "Pedro Victor Brandão", "instagram": "pedr_vict_r", "obs": "ateliê H", "foto": "", "bio": ""}]}, {"id": "loc2", "local": "Ed. Portugal", "endereco": "Avenida Franklin Roosevelt 39", "lat": -22.9097993, "lng": -43.1713584, "artistas": [{"nome": "Rafael Adorján", "instagram": "radorjan", "obs": "sala 815", "foto": "", "bio": ""}, {"nome": "Hildebranda", "instagram": "hildebranda_", "obs": "sala 1318", "foto": "", "bio": ""}, {"nome": "Itinera Arte", "instagram": "itinera_arte", "obs": "sala 717 / sala 703", "foto": "", "bio": ""}]}, {"id": "loc3", "local": "", "endereco": "Rua México 164", "lat": -22.9071644, "lng": -43.1757713, "artistas": [{"nome": "Nuno Quinhões", "instagram": "nunoquinhoes", "obs": "sala 82", "foto": "", "bio": ""}, {"nome": "Ana Klaus", "instagram": "anaklaus.art", "obs": "sala 16", "foto": "", "bio": ""}, {"nome": "Adriana Macedo", "instagram": "adrianamacedo_artist", "obs": "sala 112", "foto": "", "bio": ""}, {"nome": "Elisa Simões", "instagram": "elisasimoes02", "obs": "sala 86", "foto": "", "bio": ""}, {"nome": "Ravi Tubenchlak", "instagram": "ravitubenchlak", "obs": "sala 17", "foto": "", "bio": ""}, {"nome": "Rodrigo Hull", "instagram": "rodrigohull", "obs": "sala 11", "foto": "", "bio": ""}, {"nome": "Filipi Dahrlan", "instagram": "fdahrlan", "obs": "sala 63", "foto": "", "bio": ""}, {"nome": "Cali", "instagram": "calicohen_", "obs": "sala 111", "foto": "", "bio": ""}, {"nome": "Maria Paganelli", "instagram": "mariaivpaganelli", "obs": "sala 117", "foto": "", "bio": ""}, {"nome": "Vinicius Pitô", "instagram": "artistacostureiro", "obs": "sala 67", "foto": "", "bio": ""}, {"nome": "Fel Barros", "instagram": "apenasfel", "obs": "sala 67", "foto": "", "bio": ""}, {"nome": "Liége Santos", "instagram": "liege_santos", "obs": "", "foto": "", "bio": ""}, {"nome": "Flavio Fassheber", "instagram": "flaviofassheber", "obs": "sala 65", "foto": "", "bio": ""}, {"nome": "Reinaldo Hingel", "instagram": "reinaldohingel_art", "obs": "sala 65", "foto": "", "bio": ""}, {"nome": "Joana e Beth", "instagram": "joanapassi", "obs": "sala 83/84", "foto": "", "bio": ""}, {"nome": "Amanda Monasterio e Raquel Gandra", "instagram": "amandamonasterio", "obs": "sala 66", "foto": "", "bio": ""}, {"nome": "Maria Thereza Fortes", "instagram": "mtrfortes", "obs": "sala 112", "foto": "", "bio": ""}, {"nome": "Fortes Jewellery", "instagram": "fortesjewellery", "obs": "sala 113", "foto": "", "bio": ""}]}, {"id": "loc4", "local": "Ateliê Cidade Baixa", "endereco": "Largo de Santa Rita 6, sobrado", "lat": -22.8998691, "lng": -43.1811527, "artistas": [{"nome": "Clara Machado", "instagram": "cidadebaixa.arte", "obs": "", "foto": "", "bio": ""}, {"nome": "Diana Sandes", "instagram": "cidadebaixa.arte", "obs": "", "foto": "", "bio": ""}, {"nome": "Fernanda Morais", "instagram": "cidadebaixa.arte", "obs": "", "foto": "", "bio": ""}, {"nome": "Maria Baigur", "instagram": "cidadebaixa.arte", "obs": "", "foto": "", "bio": ""}, {"nome": "Pedro Carneiro", "instagram": "cidadebaixa.arte", "obs": "", "foto": "", "bio": ""}, {"nome": "Raphael Couto", "instagram": "cidadebaixa.arte", "obs": "", "foto": "", "bio": ""}, {"nome": "William Araújo", "instagram": "cidadebaixa.arte", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc5", "local": "Ateliê Terreiro", "endereco": "Rua Acre 83 sala 505, Saúde", "lat": -22.9005015, "lng": -43.181881, "artistas": [{"nome": "Luanda", "instagram": "luandafrancisco", "obs": "luanda.art.br", "foto": "", "bio": ""}]}, {"id": "loc6", "local": "", "endereco": "Rua Uruguaiana, 10/1512", "lat": -22.9062579, "lng": -43.178552, "artistas": [{"nome": "Rodrigo Westin", "instagram": "rodrigowestin", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc7", "local": "Ateliê Caroline Valansi", "endereco": "Rua Álvaro Alvim 21 / 18º andar", "lat": -22.9115713, "lng": -43.1761788, "artistas": [{"nome": "Caroline Valansi", "instagram": "caroline_valansi", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc8", "local": "Agrado", "endereco": "Endereço a confirmar", "lat": null, "lng": null, "artistas": [{"nome": "Kat Alden", "instagram": "katalden", "obs": "", "foto": "", "bio": ""}, {"nome": "Ana Clara Vendramini", "instagram": "vendrahhh", "obs": "", "foto": "", "bio": ""}, {"nome": "Antônia Muricy Leite", "instagram": "antmrcy", "obs": "", "foto": "", "bio": ""}, {"nome": "Amanda Bellucci", "instagram": "demoworlds", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc9", "local": "Ateliê Renato Bezerra de Mello", "endereco": "Rua Álvaro Alvim 24 / 8º andar", "lat": -22.9112097, "lng": -43.1761669, "artistas": [{"nome": "Renato Bezerra de Mello", "instagram": "renatobezerrademello", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc10", "local": "Largo das Artes", "endereco": "Rua Luís de Camões, 02, sobrado", "lat": -22.904813, "lng": -43.1811294, "artistas": [{"nome": "Eliane Fraulob", "instagram": "elianefraulob", "obs": "", "foto": "", "bio": ""}, {"nome": "Elias de Aquino", "instagram": "elias.deaquino", "obs": "", "foto": "", "bio": ""}, {"nome": "Esther Barki", "instagram": "esther_barki", "obs": "", "foto": "", "bio": ""}, {"nome": "Felipe Braga", "instagram": "felipebraga____", "obs": "", "foto": "", "bio": ""}, {"nome": "Gabriela Noujaim", "instagram": "gabrielanoujaim", "obs": "", "foto": "", "bio": ""}, {"nome": "Mariana Lloyd", "instagram": "moosaic_marianalloyd", "obs": "", "foto": "", "bio": ""}, {"nome": "Marssares", "instagram": "marssares", "obs": "", "foto": "", "bio": ""}, {"nome": "Pedro Rangel", "instagram": "pdrorngel", "obs": "", "foto": "", "bio": ""}, {"nome": "Pedro Varela", "instagram": "pedrosantosvarela", "obs": "", "foto": "", "bio": ""}, {"nome": "Zazá Lima", "instagram": "zazalima", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc11", "local": "Atelie 31", "endereco": "Rua México 31 - 1003/1004", "lat": -22.9114856, "lng": -43.1743552, "artistas": [{"nome": "Anderson Ramalho", "instagram": "ramalho.cabelo", "obs": "", "foto": "", "bio": ""}, {"nome": "Andrea Antonon", "instagram": "andreaantonon", "obs": "", "foto": "", "bio": ""}, {"nome": "Aruane Garzedin", "instagram": "aruanegarzedin.art", "obs": "", "foto": "", "bio": ""}, {"nome": "Cibele Nogueira", "instagram": "cibelenogueira__", "obs": "", "foto": "", "bio": ""}, {"nome": "Karen Tyler", "instagram": "karentyler.art", "obs": "", "foto": "", "bio": ""}, {"nome": "Pedro Lago", "instagram": "", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc12", "local": "Ateliê Weslley Ferreira", "endereco": "Rua da Conceição, 105 apt. 1009", "lat": -22.9016505, "lng": -43.1836073, "artistas": [{"nome": "Weslley Ferreira", "instagram": "weslleyf.ba", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc13", "local": "Studio Monte", "endereco": "Rua dos Inválidos, 27 sobrado", "lat": -22.909045, "lng": -43.1856733, "artistas": [{"nome": "Vinicius Monte", "instagram": "monte.vinicius", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc14", "local": "", "endereco": "Avenida Beira Mar 216, sala 902", "lat": -22.9105342, "lng": -43.1704502, "artistas": [{"nome": "Clara Tibery", "instagram": "claratibery", "obs": "", "foto": "", "bio": ""}, {"nome": "Eduardo Mattos", "instagram": "macula.cc", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc15", "local": "Virtua3000", "endereco": "Rua do Senado nº227", "lat": -22.9107373, "lng": -43.1891061, "artistas": [{"nome": "Bruno Magliari", "instagram": "brunomagliari", "obs": "", "foto": "", "bio": ""}, {"nome": "Gpeto", "instagram": "gpeto_", "obs": "", "foto": "", "bio": ""}, {"nome": "Duda Borowicz", "instagram": "dudaborowicz", "obs": "", "foto": "", "bio": ""}, {"nome": "Marcelle Nascimento", "instagram": "marcecraam", "obs": "", "foto": "", "bio": ""}, {"nome": "Ian Raposo", "instagram": "ian.raposo", "obs": "", "foto": "", "bio": ""}, {"nome": "Bernardo Liu", "instagram": "bernardoliu", "obs": "", "foto": "", "bio": ""}, {"nome": "Taf", "instagram": "taf____", "obs": "", "foto": "", "bio": ""}, {"nome": "Pedro Azaleia", "instagram": "pedro.azaleia", "obs": "", "foto": "", "bio": ""}, {"nome": "Luiza Lukah", "instagram": "a___lukah", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc16", "local": "", "endereco": "Rua da Alfândega, 91 - 809", "lat": -22.9025776, "lng": -43.1797789, "artistas": [{"nome": "Ygor Landarin", "instagram": "", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc17", "local": "Ateliê Eloá Carvalho", "endereco": "Av. Rio Branco, 277, 601 A", "lat": -22.9118133, "lng": -43.1747917, "artistas": [{"nome": "Eloá Carvalho", "instagram": "eloa_carvalho", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc18", "local": "Atelier Sanitário", "endereco": "Rua Pedro Ernesto 56, Gamboa", "lat": -22.8960326, "lng": -43.1936254, "artistas": [{"nome": "Daniel Murgel", "instagram": "danielmurgel", "obs": "", "foto": "", "bio": ""}, {"nome": "Oficina do Prelo", "instagram": "oficinadoprelo", "obs": "", "foto": "", "bio": ""}, {"nome": "Antonio Carlos Rodrigues", "instagram": "rodrigues.anc", "obs": "", "foto": "", "bio": ""}, {"nome": "Cláudio Fernandes", "instagram": "", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc19", "local": "Ateliê Ju Morais", "endereco": "Av. Marechal Floriano, 143, sala 1403", "lat": -22.9024075, "lng": -43.1853374, "artistas": [{"nome": "Ju Morais", "instagram": "", "obs": "jumorais.com.br", "foto": "", "bio": ""}]}, {"id": "loc20", "local": "Sindycato", "endereco": "Rua do Rosário 104, 4º andar", "lat": -22.9026452, "lng": -43.1777889, "artistas": [{"nome": "Gabriela Perigo", "instagram": "gabirielaperigo", "obs": "", "foto": "", "bio": ""}, {"nome": "Lucas Vaz", "instagram": "lvcaz", "obs": "", "foto": "", "bio": ""}, {"nome": "Maia Gama", "instagram": "cosperraiox", "obs": "", "foto": "", "bio": ""}, {"nome": "Maria Clara Contrucci", "instagram": "mccontrucci", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc21", "local": "Ateliê Carlos Bobi", "endereco": "Rua da Quitanda 3, SL 607", "lat": -22.9053821, "lng": -43.1760508, "artistas": [{"nome": "Carlos Bobi", "instagram": "carlosbobi", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc22", "local": "Ateliê Radar (Residentes)", "endereco": "Rua da Quitanda 3, sl 606", "lat": -22.9053821, "lng": -43.1760508, "artistas": [{"nome": "João Alto", "instagram": "__joaoalto", "obs": "", "foto": "", "bio": ""}, {"nome": "Felipe", "instagram": "felp_02", "obs": "", "foto": "", "bio": ""}, {"nome": "Lolly", "instagram": "lollyverso", "obs": "", "foto": "", "bio": ""}, {"nome": "Juliana Crispiniano", "instagram": "julianacrispiniano", "obs": "", "foto": "", "bio": ""}]}, {"id": "loc23", "local": "Ateliê rOnA (gÁz)", "endereco": "Arco do Telles, 17 - Praça XV", "lat": -22.9027582, "lng": -43.1746864, "artistas": [{"nome": "LadoB", "instagram": "ronaartista", "obs": "", "foto": "", "bio": ""}]}];
 
 function initials(name){
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -247,20 +307,23 @@ function openDrawer(locId){
 
   const list = document.getElementById('drawer-list');
   list.innerHTML = '';
+
+  const grid = document.createElement('div');
+  grid.className = 'artist-grid';
+
   loc.artistas.forEach(art => {
-    const row = document.createElement('div');
-    row.className = 'artist';
+    const card = document.createElement('div');
+    card.className = 'artist-card';
 
-    const avatar = document.createElement('div');
-    avatar.className = 'avatar';
-    if (art.foto){ avatar.style.backgroundImage = `url('${art.foto}')`; }
-    else { avatar.textContent = initials(art.nome); }
+    const photo = document.createElement('div');
+    photo.className = 'artist-photo';
+    if (art.foto){ photo.style.backgroundImage = `url('${art.foto}')`; }
+    else { photo.textContent = initials(art.nome); }
+    photo.addEventListener('click', () => openLightbox(art));
 
-    const info = document.createElement('div');
     const name = document.createElement('p');
     name.className = 'artist-name';
     name.textContent = art.nome;
-    info.appendChild(name);
 
     const meta = document.createElement('div');
     meta.className = 'artist-meta';
@@ -277,12 +340,14 @@ function openDrawer(locId){
       tag.textContent = art.obs;
       meta.appendChild(tag);
     }
-    info.appendChild(meta);
 
-    row.appendChild(avatar);
-    row.appendChild(info);
-    list.appendChild(row);
+    card.appendChild(photo);
+    card.appendChild(name);
+    card.appendChild(meta);
+    grid.appendChild(card);
   });
+
+  list.appendChild(grid);
 
   if (loc.artistas.every(a => !a.foto)){
     const note = document.createElement('p');
@@ -302,6 +367,36 @@ function closeDrawer(){
 }
 document.getElementById('drawer-close').addEventListener('click', closeDrawer);
 overlay.addEventListener('click', closeDrawer);
+
+// ---------------- lightbox ----------------
+const lightbox = document.getElementById('lightbox');
+const lightboxImg = document.getElementById('lightbox-img');
+const lightboxPlaceholder = document.getElementById('lightbox-placeholder');
+const lightboxName = document.getElementById('lightbox-name');
+const lightboxBio = document.getElementById('lightbox-bio');
+function openLightbox(art){
+  if (art.foto){
+    lightboxImg.src = art.foto;
+    lightboxImg.alt = art.nome || '';
+    lightboxImg.style.display = 'block';
+    lightboxPlaceholder.classList.remove('show');
+  } else {
+    lightboxImg.style.display = 'none';
+    lightboxImg.src = '';
+    lightboxPlaceholder.textContent = initials(art.nome) + ' — sem foto ainda';
+    lightboxPlaceholder.classList.add('show');
+  }
+  lightboxName.textContent = art.nome || '';
+  lightboxBio.textContent = (art.bio && art.bio.trim()) ? art.bio : 'Mini bio em breve.';
+  lightbox.classList.add('open');
+}
+function closeLightbox(){
+  lightbox.classList.remove('open');
+  lightboxImg.src = '';
+}
+document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
+lightbox.addEventListener('click', (e) => { if (e.target === lightbox) closeLightbox(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLightbox(); });
 
 function goToLocation(loc){
   setView('map');
