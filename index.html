@@ -255,7 +255,90 @@
    Hoje: dados embutidos (gerados a partir do documento original).
    Depois: trocar por fetch() da planilha do Google publicada em CSV.
    ============================================================ */
-const LOCATIONS = [{"id": "loc0", "local": "", "endereco": "Av. Churchill, 94 / 4º andar", "lat": -22.9095612, "lng": -43.1717542, "artistas": [{"nome": "Amauri", "instagram": "amauriletc", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Angélica Arechavala", "instagram": "angelicaarechavala", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Alessandra Sposetti", "instagram": "alessandrasposetti", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Clara Barros", "instagram": "clarabarros", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Fernanda Sattamini", "instagram": "fernandasattamini", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Heleno Bernardi", "instagram": "_heleno.bernardi", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Raissa Góes Rapozo", "instagram": "raissa_de_goes_arte", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Marina Lazzarotto", "instagram": "marinalazzarotto_", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Giovanna Melo de Moura", "instagram": "melodemoura_", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Carolina Romero", "instagram": "soseiquenadasei.33", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Talita Persi", "instagram": "talitapersi", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc1", "local": "Salve", "endereco": "Av. Erasmo Braga 255 / Sobreloja", "lat": -22.9056853, "lng": -43.1744404, "artistas": [{"nome": "Projeto Rachel", "instagram": "projeto.rachel", "obs": "ateliê C", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Pedro Victor Brandão", "instagram": "pedr_vict_r", "obs": "ateliê H", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc2", "local": "Ed. Portugal", "endereco": "Avenida Franklin Roosevelt 39", "lat": -22.9097993, "lng": -43.1713584, "artistas": [{"nome": "Rafael Adorján", "instagram": "radorjan", "obs": "sala 815", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Hildebranda", "instagram": "hildebranda_", "obs": "sala 1318", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Itinera Arte", "instagram": "itinera_arte", "obs": "sala 717 / sala 703", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc3", "local": "", "endereco": "Rua México 164", "lat": -22.9071644, "lng": -43.1757713, "artistas": [{"nome": "Nuno Quinhões", "instagram": "nunoquinhoes", "obs": "sala 82", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Ana Klaus", "instagram": "anaklaus.art", "obs": "sala 16", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Adriana Macedo", "instagram": "adrianamacedo_artist", "obs": "sala 112", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Elisa Simões", "instagram": "elisasimoes02", "obs": "sala 86", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Ravi Tubenchlak", "instagram": "ravitubenchlak", "obs": "sala 17", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Rodrigo Hull", "instagram": "rodrigohull", "obs": "sala 11", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Filipi Dahrlan", "instagram": "fdahrlan", "obs": "sala 63", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Cali", "instagram": "calicohen_", "obs": "sala 111", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Maria Paganelli", "instagram": "mariaivpaganelli", "obs": "sala 117", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Vinicius Pitô", "instagram": "artistacostureiro", "obs": "sala 67", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Fel Barros", "instagram": "apenasfel", "obs": "sala 67", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Liége Santos", "instagram": "liege_santos", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Flavio Fassheber", "instagram": "flaviofassheber", "obs": "sala 65", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Reinaldo Hingel", "instagram": "reinaldohingel_art", "obs": "sala 65", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Joana e Beth", "instagram": "joanapassi", "obs": "sala 83/84", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Amanda Monasterio e Raquel Gandra", "instagram": "amandamonasterio", "obs": "sala 66", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Maria Thereza Fortes", "instagram": "mtrfortes", "obs": "sala 112", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Fortes Jewellery", "instagram": "fortesjewellery", "obs": "sala 113", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc4", "local": "Ateliê Cidade Baixa", "endereco": "Largo de Santa Rita 6, sobrado", "lat": -22.8998691, "lng": -43.1811527, "artistas": [{"nome": "Clara Machado", "instagram": "cidadebaixa.arte", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Diana Sandes", "instagram": "cidadebaixa.arte", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Fernanda Morais", "instagram": "cidadebaixa.arte", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Maria Baigur", "instagram": "cidadebaixa.arte", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Pedro Carneiro", "instagram": "cidadebaixa.arte", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Raphael Couto", "instagram": "cidadebaixa.arte", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "William Araújo", "instagram": "cidadebaixa.arte", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc5", "local": "Ateliê Terreiro", "endereco": "Rua Acre 83 sala 505, Saúde", "lat": -22.9005015, "lng": -43.181881, "artistas": [{"nome": "Luanda", "instagram": "luandafrancisco", "obs": "luanda.art.br", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc6", "local": "", "endereco": "Rua Uruguaiana, 10/1512", "lat": -22.9062579, "lng": -43.178552, "artistas": [{"nome": "Rodrigo Westin", "instagram": "rodrigowestin", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc7", "local": "Ateliê Caroline Valansi", "endereco": "Rua Álvaro Alvim 21 / 18º andar", "lat": -22.9115713, "lng": -43.1761788, "artistas": [{"nome": "Caroline Valansi", "instagram": "caroline_valansi", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc8", "local": "Agrado", "endereco": "Endereço a confirmar", "lat": null, "lng": null, "artistas": [{"nome": "Kat Alden", "instagram": "katalden", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Ana Clara Vendramini", "instagram": "vendrahhh", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Antônia Muricy Leite", "instagram": "antmrcy", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Amanda Bellucci", "instagram": "demoworlds", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc9", "local": "Ateliê Renato Bezerra de Mello", "endereco": "Rua Álvaro Alvim 24 / 8º andar", "lat": -22.9112097, "lng": -43.1761669, "artistas": [{"nome": "Renato Bezerra de Mello", "instagram": "renatobezerrademello", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc10", "local": "Largo das Artes", "endereco": "Rua Luís de Camões, 02, sobrado", "lat": -22.904813, "lng": -43.1811294, "artistas": [{"nome": "Eliane Fraulob", "instagram": "elianefraulob", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Elias de Aquino", "instagram": "elias.deaquino", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Esther Barki", "instagram": "esther_barki", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Felipe Braga", "instagram": "felipebraga____", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Gabriela Noujaim", "instagram": "gabrielanoujaim", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Mariana Lloyd", "instagram": "moosaic_marianalloyd", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Marssares", "instagram": "marssares", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Pedro Rangel", "instagram": "pdrorngel", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Pedro Varela", "instagram": "pedrosantosvarela", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Zazá Lima", "instagram": "zazalima", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc11", "local": "Atelie 31", "endereco": "Rua México 31 - 1003/1004", "lat": -22.9114856, "lng": -43.1743552, "artistas": [{"nome": "Anderson Ramalho", "instagram": "ramalho.cabelo", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Andrea Antonon", "instagram": "andreaantonon", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Aruane Garzedin", "instagram": "aruanegarzedin.art", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Cibele Nogueira", "instagram": "cibelenogueira__", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Karen Tyler", "instagram": "karentyler.art", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Pedro Lago", "instagram": "", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc12", "local": "Ateliê Weslley Ferreira", "endereco": "Rua da Conceição, 105 apt. 1009", "lat": -22.9016505, "lng": -43.1836073, "artistas": [{"nome": "Weslley Ferreira", "instagram": "weslleyf.ba", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc13", "local": "Studio Monte", "endereco": "Rua dos Inválidos, 27 sobrado", "lat": -22.909045, "lng": -43.1856733, "artistas": [{"nome": "Vinicius Monte", "instagram": "monte.vinicius", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc14", "local": "", "endereco": "Avenida Beira Mar 216, sala 902", "lat": -22.9105342, "lng": -43.1704502, "artistas": [{"nome": "Clara Tibery", "instagram": "claratibery", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Eduardo Mattos", "instagram": "macula.cc", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc15", "local": "Virtua3000", "endereco": "Rua do Senado nº227", "lat": -22.9107373, "lng": -43.1891061, "artistas": [{"nome": "Bruno Magliari", "instagram": "brunomagliari", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Gpeto", "instagram": "gpeto_", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Duda Borowicz", "instagram": "dudaborowicz", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Marcelle Nascimento", "instagram": "marcecraam", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Ian Raposo", "instagram": "ian.raposo", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Bernardo Liu", "instagram": "bernardoliu", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Taf", "instagram": "taf____", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Pedro Azaleia", "instagram": "pedro.azaleia", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Luiza Lukah", "instagram": "a___lukah", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc16", "local": "", "endereco": "Rua da Alfândega, 91 - 809", "lat": -22.9025776, "lng": -43.1797789, "artistas": [{"nome": "Ygor Landarin", "instagram": "", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc17", "local": "Ateliê Eloá Carvalho", "endereco": "Av. Rio Branco, 277, 601 A", "lat": -22.9118133, "lng": -43.1747917, "artistas": [{"nome": "Eloá Carvalho", "instagram": "eloa_carvalho", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc18", "local": "Atelier Sanitário", "endereco": "Rua Pedro Ernesto 56, Gamboa", "lat": -22.8960326, "lng": -43.1936254, "artistas": [{"nome": "Daniel Murgel", "instagram": "danielmurgel", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Oficina do Prelo", "instagram": "oficinadoprelo", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Antonio Carlos Rodrigues", "instagram": "rodrigues.anc", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Cláudio Fernandes", "instagram": "", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc19", "local": "Ateliê Ju Morais", "endereco": "Av. Marechal Floriano, 143, sala 1403", "lat": -22.9024075, "lng": -43.1853374, "artistas": [{"nome": "Ju Morais", "instagram": "", "obs": "jumorais.com.br", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc20", "local": "Sindycato", "endereco": "Rua do Rosário 104, 4º andar", "lat": -22.9026452, "lng": -43.1777889, "artistas": [{"nome": "Gabriela Perigo", "instagram": "gabirielaperigo", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Lucas Vaz", "instagram": "lvcaz", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Maia Gama", "instagram": "cosperraiox", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Maria Clara Contrucci", "instagram": "mccontrucci", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc21", "local": "Ateliê Carlos Bobi", "endereco": "Rua da Quitanda 3, SL 607", "lat": -22.9053821, "lng": -43.1760508, "artistas": [{"nome": "Carlos Bobi", "instagram": "carlosbobi", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc22", "local": "Ateliê Radar (Residentes)", "endereco": "Rua da Quitanda 3, sl 606", "lat": -22.9053821, "lng": -43.1760508, "artistas": [{"nome": "João Alto", "instagram": "__joaoalto", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Felipe", "instagram": "felp_02", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Lolly", "instagram": "lollyverso", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}, {"nome": "Juliana Crispiniano", "instagram": "julianacrispiniano", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}, {"id": "loc23", "local": "Ateliê rOnA (gÁz)", "endereco": "Arco do Telles, 17 - Praça XV", "lat": -22.9027582, "lng": -43.1746864, "artistas": [{"nome": "LadoB", "instagram": "ronaartista", "obs": "", "foto": "", "bio": "", "dia18": false, "dia19": false}]}];
+let LOCATIONS = [];
+
+const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
+
+// simple RFC4180-ish CSV parser: handles quoted fields, embedded commas, escaped quotes ("")
+function parseCSV(text){
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (inQuotes){
+      if (c === '"'){
+        if (text[i+1] === '"'){ field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += c;
+      }
+    } else {
+      if (c === '"'){ inQuotes = true; }
+      else if (c === ','){ row.push(field); field = ''; }
+      else if (c === '\r'){ /* ignore */ }
+      else if (c === '\n'){ row.push(field); field = ''; rows.push(row); row = []; }
+      else { field += c; }
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+async function loadLocationsFromSheet(){
+  const res = await fetch(SHEET_CSV_URL);
+  if (!res.ok) throw new Error('Falha ao buscar a planilha: HTTP ' + res.status);
+  const text = await res.text();
+  const table = parseCSV(text).filter(r => r.some(c => c !== undefined && c.trim() !== ''));
+  if (table.length < 2) throw new Error('Planilha vazia ou em formato inesperado');
+
+  const headers = table[0].map(h => h.trim());
+  const hIdx = {};
+  headers.forEach((h, i) => { hIdx[h] = i; });
+  const get = (row, name) => {
+    const i = hIdx[name];
+    return (i != null && row[i] != null) ? row[i].trim() : '';
+  };
+
+  const locMap = {};
+  const order = [];
+
+  table.slice(1).forEach(row => {
+    const local = get(row, 'Local / Coletivo');
+    const endereco = get(row, 'Endereço');
+    const nome = get(row, 'Nome do Artista');
+    if (!endereco && !nome) return; // linha em branco
+
+    const instagram = get(row, 'Instagram').replace(/^@/, '');
+    const foto = get(row, 'Foto do trabalho (URL)');
+    const bio = get(row, 'Mini bio (1 parágrafo curto)');
+    const obs = get(row, 'Observações');
+    const latRaw = get(row, 'Latitude');
+    const lngRaw = get(row, 'Longitude');
+    const d18Raw = get(row, 'Presente dia 18/09 (X)');
+    const d19Raw = get(row, 'Presente dia 19/09 (X)');
+
+    const key = endereco;
+    if (!locMap[key]){
+      locMap[key] = {
+        id: 'loc' + order.length,
+        local, endereco,
+        lat: latRaw ? parseFloat(latRaw.replace(',', '.')) : null,
+        lng: lngRaw ? parseFloat(lngRaw.replace(',', '.')) : null,
+        artistas: []
+      };
+      order.push(key);
+    }
+    locMap[key].artistas.push({
+      nome, instagram, obs, foto, bio,
+      dia18: d18Raw.trim() !== '',
+      dia19: d19Raw.trim() !== ''
+    });
+  });
+
+  return order.map(k => locMap[k]);
+}
 
 function initials(name){
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -264,8 +347,10 @@ function initials(name){
   return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
 }
 
-document.getElementById('hero-count').textContent =
-  `${LOCATIONS.length} endereços · ${LOCATIONS.reduce((s,l)=>s+l.artistas.length,0)} artistas`;
+function updateHeroCount(){
+  document.getElementById('hero-count').textContent =
+    `${LOCATIONS.length} endereços · ${LOCATIONS.reduce((s,l)=>s+l.artistas.length,0)} artistas`;
+}
 
 // ---------------- map (isolated in try/catch so a load failure doesn't break the rest) ----------------
 let map = null;
@@ -287,19 +372,21 @@ function addMarkerForLocation(loc){
   markers[loc.id] = marker;
 }
 
-try{
-  if (typeof L === 'undefined') throw new Error('Leaflet não carregou');
-  map = L.map('map', { scrollWheelZoom:false, zoomControl:false }).setView([-22.9065, -43.1795], 15);
-  L.control.zoom({ position:'bottomright' }).addTo(map);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19
-  }).addTo(map);
+function initMap(){
+  try{
+    if (typeof L === 'undefined') throw new Error('Leaflet não carregou');
+    map = L.map('map', { scrollWheelZoom:false, zoomControl:false }).setView([-22.9065, -43.1795], 15);
+    L.control.zoom({ position:'bottomright' }).addTo(map);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19
+    }).addTo(map);
 
-  LOCATIONS.forEach((loc) => addMarkerForLocation(loc));
-} catch(err){
-  console.error('Mapa indisponível:', err);
-  const mapEl = document.getElementById('map');
-  mapEl.innerHTML = '<div class="map-error">Não foi possível carregar o mapa agora.<br>A lista de endereços continua disponível.</div>';
+    LOCATIONS.forEach((loc) => addMarkerForLocation(loc));
+  } catch(err){
+    console.error('Mapa indisponível:', err);
+    const mapEl = document.getElementById('map');
+    mapEl.innerHTML = '<div class="map-error">Não foi possível carregar o mapa agora.<br>A lista de endereços continua disponível.</div>';
+  }
 }
 
 // ---------------- geocodificação automática (fallback) ----------------
@@ -339,7 +426,7 @@ async function resolveMissingCoordinates(){
     await new Promise(r => setTimeout(r, 1100));
   }
 }
-resolveMissingCoordinates();
+
 
 function setActivePin(activeId){
   LOCATIONS.forEach((loc) => {
@@ -595,7 +682,24 @@ function renderRows(){
   if (currentSort === 'endereco') renderRowsByEndereco();
   else renderRowsByArtista();
 }
-renderRows();
+
+async function boot(){
+  try{
+    LOCATIONS = await loadLocationsFromSheet();
+  } catch(err){
+    console.error('Falha ao carregar a planilha:', err);
+    document.getElementById('map').innerHTML =
+      '<div class="map-error">Não foi possível carregar os dados da planilha agora.<br>Tente recarregar a página em instantes.</div>';
+    document.getElementById('rows').innerHTML =
+      '<p style="font-family:var(--mono);font-size:0.8rem;color:var(--gray);padding:1rem 0.2rem;">Não foi possível carregar os dados agora.</p>';
+    return;
+  }
+  updateHeroCount();
+  initMap();
+  resolveMissingCoordinates();
+  renderRows();
+}
+boot();
 </script>
 </body>
 </html>
