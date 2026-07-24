@@ -327,13 +327,16 @@ function shuffledIndices(n){
 function startTour(){
   if (PTS.length < 2){ setStatus('não há ateliês suficientes com coordenadas.', true); return; }
   tourOrder = shuffledIndices(PTS.length);
-  visitedIdx = [tourOrder[0]];
-  trail = [{ x: PTS[tourOrder[0]].x, y: PTS[tourOrder[0]].y }];
-  head = { ...trail[0] };
-  targetIdx = 1;
-  activeCardLoc = PTS[tourOrder[0]].loc;
-  mode = 'paused';
-  pauseUntil = performance.now() + PAUSE_MS;
+  visitedIdx = [];
+  // a cobrinha sempre entra pela margem inferior do quadro — lado da
+  // Marina da Glória, de onde as pessoas chegam — não por cima de um ateliê
+  const spawn = { x: W/2, y: H + 30 };
+  trail = [{ ...spawn }];
+  head = { ...spawn };
+  targetIdx = 0;
+  activeCardLoc = null;
+  mode = 'moving';
+  pauseUntil = 0;
   lastTs = null;
   if (!rafId) rafId = requestAnimationFrame(loop);
 }
@@ -458,7 +461,7 @@ function drawCard(loc){
   const rows = Math.ceil(artistas.length / 2);
   const cardX = 60, cardY = 60, cardW = 620, radius = 22;
   const headerH = 210;
-  const rowH = 46;
+  const rowH = 54;
   const cardH = artistas.length ? headerH + rows*rowH + 30 : headerH - 20;
 
   // fundo desfocado, igual ao efeito glass do drawer/lightbox do index.html
@@ -507,18 +510,18 @@ function drawCard(loc){
 
   if (artistas.length){
     y += 62;
-    ctx.fillStyle = '#111';
-    ctx.font = "32px 'Instrument Serif', Georgia, serif";
+    ctx.fillStyle = '#6b6b6b';
+    ctx.font = "18px 'Instrument Serif', Georgia, serif";
     ctx.fillText('Artistas', px, y);
-    y += 42;
+    y += 46;
     const col2X = px + (cardW - 80)/2;
     artistas.forEach((nome, i) => {
       const col = i % 2, rowN = Math.floor(i/2);
       const x = col === 0 ? px : col2X;
       const ry = y + rowN*rowH;
       ctx.fillStyle = '#111';
-      // nomes dos artistas — família serif do site (.artist-name), bem maior
-      ctx.font = "27px 'Instrument Serif', Georgia, serif";
+      // nomes dos artistas — família serif do site (.artist-name), o maior texto do bloco
+      ctx.font = "34px 'Instrument Serif', Georgia, serif";
       ctx.fillText(nome, x, ry);
     });
   }
@@ -581,10 +584,10 @@ function buildStaticRoute(targetLocId){
   const n = Math.min(others.length, 3 + Math.floor(Math.random()*3)); // 3 a 5 antes do alvo
   const route = [...others.slice(0, n), targetPtIdx];
 
-  trail = [];
-  route.forEach((idx, i) => {
+  const spawn = { x: W/2, y: H + 30 };
+  trail = [{ ...spawn }];
+  route.forEach((idx) => {
     const p = PTS[idx];
-    if (i === 0){ trail.push({x:p.x,y:p.y}); return; }
     const prev = trail[trail.length-1];
     const dist = Math.hypot(p.x-prev.x, p.y-prev.y);
     const steps = Math.max(1, Math.floor(dist/SAMPLE_DIST));
