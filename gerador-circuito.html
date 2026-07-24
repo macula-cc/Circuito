@@ -457,57 +457,77 @@ function drawCard(loc){
   const num = String(alphaNum[loc.id] || 0).padStart(2,'0');
   const artistas = loc.artistas || [];
   const rows = Math.ceil(artistas.length / 2);
-  const cardX = 50, cardY = 50, cardW = 560;
-  const headerH = 168;
-  const rowH = 24;
-  const cardH = artistas.length ? headerH + rows*rowH + 26 : headerH + 10;
+  const cardX = 60, cardY = 60, cardW = 620, radius = 22;
+  const headerH = 232;
+  const rowH = 40;
+  const cardH = artistas.length ? headerH + rows*rowH + 30 : headerH - 20;
+
+  // fundo desfocado, igual ao efeito glass do drawer/lightbox do index.html
+  ctx.save();
+  roundRect(cardX, cardY, cardW, cardH, radius);
+  ctx.clip();
+  try{
+    ctx.filter = 'blur(22px) saturate(1.1)';
+    ctx.drawImage(basemapCanvas || canvas, -20, -20, W+40, H+40);
+    ctx.filter = 'none';
+  } catch(e){}
+  ctx.restore();
+
+  // painel translúcido + sombra suave + borda clara — mesma linguagem do
+  // .drawer / .list-modal / .lightbox-modal do site
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.28)';
+  ctx.shadowBlur = 46;
+  ctx.shadowOffsetY = 18;
+  roundRect(cardX, cardY, cardW, cardH, radius);
+  ctx.fillStyle = 'rgba(255,255,255,0.42)';
+  ctx.fill();
+  ctx.restore();
 
   ctx.save();
-  roundRect(cardX, cardY, cardW, cardH, 18);
-  ctx.fillStyle = 'rgba(255,255,255,0.82)';
-  ctx.fill();
+  roundRect(cardX, cardY, cardW, cardH, radius);
   ctx.lineWidth = 1;
-  ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.75)';
   ctx.stroke();
+  ctx.restore();
 
-  const px = cardX + 34;
-  let y = cardY + 54;
+  const px = cardX + 40;
+  let y = cardY + 76;
 
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = '#6b6b6b';
-  ctx.font = "13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-  ctx.fillText(num, px, y - 34);
-
   ctx.fillStyle = '#111';
-  ctx.font = "34px 'Instrument Serif', Georgia, serif";
-  ctx.fillText(loc.local || loc.endereco, px, y);
+  ctx.font = "20px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+  const numW = ctx.measureText(num).width;
+  ctx.fillText(num, px, y);
 
-  y += 34;
+  ctx.font = "46px 'Instrument Serif', Georgia, serif";
+  ctx.fillText(loc.local || loc.endereco, px + numW + 16, y);
+
+  y += 46;
   ctx.fillStyle = '#6b6b6b';
-  ctx.font = "12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-  ctx.fillText('ENDEREÇO', px, y);
-  y += 20;
+  ctx.font = "16px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+  ctx.fillText('Endereço', px, y);
+  y += 28;
   ctx.fillStyle = '#111';
-  ctx.font = "15px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+  ctx.font = "20px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
   ctx.fillText(loc.endereco, px, y);
 
   if (artistas.length){
-    y += 40;
-    ctx.fillStyle = '#6b6b6b';
-    ctx.font = "12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-    ctx.fillText('ARTISTAS', px, y);
-    y += 22;
-    const col2X = px + (cardW - 68)/2;
+    y += 56;
+    ctx.fillStyle = '#111';
+    ctx.font = "32px 'Instrument Serif', Georgia, serif";
+    ctx.fillText('Artistas', px, y);
+    y += 36;
+    const col2X = px + (cardW - 80)/2;
     artistas.forEach((nome, i) => {
       const col = i % 2, rowN = Math.floor(i/2);
       const x = col === 0 ? px : col2X;
       const ry = y + rowN*rowH;
       ctx.fillStyle = '#111';
-      ctx.font = "15px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+      ctx.font = "19px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
       ctx.fillText(nome, x, ry);
     });
   }
-  ctx.restore();
 }
 
 function drawFrame(){
@@ -694,7 +714,7 @@ async function boot(){
 
   setStatus('carregando mapa…');
   try{
-    basemapCanvas = await buildBasemap(bounds, W, H, 15);
+    basemapCanvas = await buildBasemap(bounds, W, H, 30);
   } catch(err){
     console.warn('Mapa indisponível, seguindo com fundo neutro:', err);
   }
