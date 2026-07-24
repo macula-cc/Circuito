@@ -98,13 +98,15 @@
   .sort-switch button.active{ background:#111; color:#fff; }
   .sort-switch button:not(.active):hover{ background:rgba(255,255,255,0.35); }
 
-  /* pins: 40px invisible tap target, 10px visible dot centered inside */
+  /* pins: 40px invisible tap target, badge circle with initials centered inside */
   .pin-hit{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
-  .pin{ width:10px; height:10px; border-radius:50%; background:#111; border:1.5px solid #fff;
+  .pin{ width:24px; height:24px; border-radius:50%; background:#111; border:1.5px solid #fff;
         box-shadow:0 0 0 1px rgba(0,0,0,0.4);
+        display:flex; align-items:center; justify-content:center;
+        font-family:var(--mono); font-size:0.6rem; font-weight:500; color:#fff; letter-spacing:0.01em;
         transition:transform 0.18s cubic-bezier(.4,0,.2,1); transform:scale(1); }
-  .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.6); }
-  .pin.active{ transform:scale(1.6); box-shadow:0 0 0 3px rgba(0,0,0,0.18); }
+  .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.18); }
+  .pin.active{ transform:scale(1.18); box-shadow:0 0 0 3px rgba(0,0,0,0.18); }
 
   .leaflet-control-zoom{ border:none !important; }
   .leaflet-control-zoom a{ background:#fff !important; color:#111 !important; border:1px solid var(--line) !important;
@@ -408,6 +410,18 @@ function initials(name){
   return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
 }
 
+// Label shown on the map pin: initials of the space/collective name when one
+// exists, otherwise initials derived from the street address (with generic
+// prefixes like "Rua"/"Av." stripped so the letters are more distinctive).
+// Deliberately not a number — numbering would imply ranking between venues
+// that all have equal standing in the circuit.
+function pinLabel(loc){
+  const source = loc.local && loc.local.trim()
+    ? loc.local
+    : loc.endereco.replace(/^(Rua|Av\.?|Avenida|Largo|Praça|Arco do)\s+/i, '');
+  return initials(source);
+}
+
 function updateHeroCount(){
   document.getElementById('hero-count').textContent =
     `${LOCATIONS.length} endereços · ${LOCATIONS.reduce((s,l)=>s+l.artistas.length,0)} artistas`;
@@ -416,10 +430,10 @@ function updateHeroCount(){
 // ---------------- map (isolated in try/catch so a load failure doesn't break the rest) ----------------
 let map = null;
 const markers = {};
-function makePinIcon(active){
+function makePinIcon(label, active){
   return L.divIcon({
     className:'',
-    html:`<div class="pin-hit"><div class="pin${active?' active':''}"></div></div>`,
+    html:`<div class="pin-hit"><div class="pin${active?' active':''}">${label}</div></div>`,
     iconSize:[40,40],
     iconAnchor:[20,20]
   });
@@ -428,7 +442,7 @@ function makePinIcon(active){
 function addMarkerForLocation(loc){
   if (!map || loc.lat == null || loc.lng == null) return;
   if (markers[loc.id]) return; // already placed
-  const marker = L.marker([loc.lat, loc.lng], { icon: makePinIcon(false) }).addTo(map);
+  const marker = L.marker([loc.lat, loc.lng], { icon: makePinIcon(pinLabel(loc), false) }).addTo(map);
   marker.on('click', () => openDrawer(loc.id));
   markers[loc.id] = marker;
 }
@@ -521,7 +535,7 @@ function setActivePin(activeId){
   LOCATIONS.forEach((loc) => {
     const m = markers[loc.id];
     if (!m) return;
-    m.setIcon(makePinIcon(loc.id === activeId));
+    m.setIcon(makePinIcon(pinLabel(loc), loc.id === activeId));
   });
 }
 
