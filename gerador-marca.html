@@ -83,7 +83,7 @@
     <div class="field">
       <label>Pontos do desenho</label>
       <div class="checklist" id="checklist"></div>
-      <div class="count-note" id="count-note">selecione ao menos 2 ateliês para desenhar as linhas</div>
+      <div class="count-note" id="count-note">selecione ao menos 2 ateliês — o título corre sobre a linha entre eles</div>
       <div class="row-btns" style="margin-top:0.7rem;">
         <button class="btn" id="btn-shuffle">sortear pontos</button>
         <button class="btn" id="btn-clear">limpar</button>
@@ -106,7 +106,8 @@
 <script>
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
 const EVENT_TITLE = 'Circuito Paralelo Ateliês do Centro do Rio';
-const EVENT_DATES = '18–19 DE SETEMBRO';
+const EVENT_DATES = '18 – 19 de Setembro';
+const TITLE_SIZE = 44; // tamanho usado tanto no título correndo pela linha quanto na data abaixo
 
 function parseCSV(text){
   const rows = []; let row = []; let field = ''; let inQuotes = false;
@@ -206,7 +207,7 @@ function renderChecklist(){
     checklistEl.appendChild(row);
   });
   countNote.textContent = selectedOrder.length < 2
-    ? `${selectedOrder.length} selecionado(s) — mínimo de 2 para traçar uma linha`
+    ? `${selectedOrder.length} selecionado(s) — mínimo de 2 para o título correr entre eles`
     : `${selectedOrder.length} pontos conectados, nesta ordem`;
 }
 
@@ -291,26 +292,19 @@ async function draw(){
   ctx.lineWidth = 1;
   ctx.strokeRect(0.5,0.5,W-1,H-1);
 
-  const margin = 110;
-  const box = { x: margin, y: margin, w: W - margin*2, h: W - margin*2 };
+  const margin = 90;
+  const box = { x: margin, y: margin, w: W - margin*2, h: 600 };
   const pts = projectPoints(box);
 
   if (pts.length >= 2){
-    ctx.strokeStyle = 'rgba(17,17,17,0.85)';
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
-    ctx.stroke();
-
+    // sem traçado — só os pontos marcam os ateliês, o desenho da linha
+    // é lido através do próprio texto que corre sobre ela
     pts.forEach(p => {
-      ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI*2);
-      ctx.fillStyle = '#fff'; ctx.fill();
-      ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI*2);
-      ctx.strokeStyle = '#111'; ctx.lineWidth = 1.6; ctx.stroke();
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(17,17,17,0.5)'; ctx.fill();
     });
 
-    drawTextAlongPath(ctx, EVENT_TITLE, pts, 27, '#111', "'Instrument Serif', Georgia, serif");
+    drawTextAlongPath(ctx, EVENT_TITLE, pts, TITLE_SIZE, '#111', "'Instrument Serif', Georgia, serif");
   } else {
     ctx.fillStyle = '#6b6b6b';
     ctx.font = '16px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -319,10 +313,13 @@ async function draw(){
     ctx.textAlign = 'left';
   }
 
-  ctx.textAlign = 'left';
+  // data: mesma família e mesmo tamanho do título, em cinza — igual ao
+  // par hero-title / hero-date do index.html
+  ctx.textAlign = 'center';
   ctx.fillStyle = '#6b6b6b';
-  ctx.font = '13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-  ctx.fillText(EVENT_DATES, margin, H - margin + 46);
+  ctx.font = `${TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
+  ctx.fillText(EVENT_DATES, W/2, box.y + box.h + 110);
+  ctx.textAlign = 'left';
 }
 
 downloadBtn.addEventListener('click', () => {
@@ -338,7 +335,7 @@ downloadBtn.addEventListener('click', () => {
 });
 
 async function boot(){
-  try{ await document.fonts.load("27px 'Instrument Serif'"); } catch(e){}
+  try{ await document.fonts.load(`${TITLE_SIZE}px 'Instrument Serif'`); } catch(e){}
   try{
     LOCATIONS = await loadLocationsFromSheet();
   } catch(err){
