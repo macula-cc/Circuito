@@ -101,12 +101,6 @@
                             border-radius:0 !important; font-family:var(--mono) !important; }
   .leaflet-control-attribution{ font-family:var(--mono); font-size:0.68rem !important; background:rgba(255,255,255,0.75) !important; }
 
-  .locate-control a{ background:#fff !important; color:#111 !important; border:1px solid var(--line) !important;
-                      border-radius:0 !important; font-size:1rem !important; line-height:26px !important;
-                      width:26px !important; height:26px !important; display:block; text-align:center;
-                      text-decoration:none !important; }
-  .locate-control a:hover{ background:var(--hover) !important; }
-
   .user-dot{ position:relative; width:14px; height:14px; border-radius:50%; background:#3B82F6; border:2px solid #fff;
              box-shadow:0 0 0 4px rgba(59,130,246,0.28); }
   .user-dot::after{ content:''; position:absolute; inset:-8px; border-radius:50%;
@@ -439,23 +433,7 @@ function initMap(){
     }).addTo(map);
 
     LOCATIONS.forEach((loc) => addMarkerForLocation(loc));
-
-    const LocateControl = L.Control.extend({
-      options: { position: 'bottomright' },
-      onAdd: function(){
-        const container = L.DomUtil.create('div', 'leaflet-bar locate-control');
-        const link = L.DomUtil.create('a', '', container);
-        link.href = '#';
-        link.title = 'Minha localização';
-        link.setAttribute('role', 'button');
-        link.setAttribute('aria-label', 'Mostrar minha localização no mapa');
-        link.innerHTML = '◎';
-        L.DomEvent.disableClickPropagation(container);
-        L.DomEvent.on(link, 'click', (e) => { e.preventDefault(); locateUser(link); });
-        return container;
-      }
-    });
-    new LocateControl().addTo(map);
+    locateUserAutomatically();
   } catch(err){
     console.error('Mapa indisponível:', err);
     const mapEl = document.getElementById('map');
@@ -463,39 +441,28 @@ function initMap(){
   }
 }
 
-// ---------------- "minha localização" ----------------
-let userMarker = null;
-function locateUser(triggerEl){
-  if (!map) return;
-  if (!navigator.geolocation){
-    alert('Este navegador não suporta geolocalização.');
-    return;
-  }
-  const originalText = triggerEl ? triggerEl.innerHTML : null;
-  if (triggerEl) triggerEl.innerHTML = '···';
+// ---------------- localização do visitante (automática, sem botão) ----------------
+// O navegador exibe seu próprio prompt nativo de permissão — não pedimos nada
+// além disso. Se a pessoa negar, ou o navegador não suportar, falha em
+// silêncio (sem alertas), já que isso roda sozinho ao carregar a página.
+function locateUserAutomatically(){
+  if (!map || !navigator.geolocation) return;
 
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      if (triggerEl) triggerEl.innerHTML = originalText;
       const { latitude, longitude } = pos.coords;
-      if (userMarker) map.removeLayer(userMarker);
       const icon = L.divIcon({
         className: '',
         html: '<div class="user-dot"></div>',
         iconSize: [16, 16],
         iconAnchor: [8, 8]
       });
-      userMarker = L.marker([latitude, longitude], { icon, zIndexOffset: 1000 }).addTo(map);
-      map.flyTo([latitude, longitude], 16, { duration: 0.6 });
+      L.marker([latitude, longitude], { icon, zIndexOffset: 1000 }).addTo(map);
+      // não move a câmera automaticamente — só mostra o ponto, sem tirar
+      // o usuário do centro do mapa que ele já está vendo
     },
     (err) => {
-      if (triggerEl) triggerEl.innerHTML = originalText;
-      console.warn('Falha ao obter localização:', err);
-      if (err.code === err.PERMISSION_DENIED){
-        alert('Permissão de localização negada. Para usar este recurso, libere o acesso à localização para este site nas configurações do navegador.');
-      } else {
-        alert('Não foi possível obter sua localização agora. Tente novamente em instantes.');
-      }
+      console.warn('Localização não disponível:', err);
     },
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
   );
@@ -720,21 +687,23 @@ function fitHeroText(){
   const available = heroTitle.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
   if (available <= 0) return;
 
-  const baseline = 200; // px sample size to measure natural text proportions
-  heroH1.style.fontSize = baseline + 'px';
-  heroDateEl.style.fontSize = baseline + 'px';
+  let size = 200; // px sample size to measure natural text proportions
+  heroH1.style.fontSize = size + 'px';
+  heroDateEl.style.fontSize = size + 'px';
 
-  const h1Width = heroH1.scrollWidth;
-  const dateWidth = heroDateEl.scrollWidth;
-  if (!h1Width || !dateWidth) return;
-
-  // fit both to the same size (title and date must match) — use whichever
-  // line is relatively widest so nothing overflows past the margins
-  const scale = Math.min(available / h1Width, available / dateWidth) * 0.97;
-  const finalSize = Math.round(baseline * scale);
-
-  heroH1.style.fontSize = finalSize + 'px';
-  heroDateEl.style.fontSize = finalSize + 'px';
+  // iterate a few times: each pass re-measures the *actual* rendered width at
+  // the currently-applied size, so it self-corrects even if the webfont
+  // (Instrument Serif) finishes loading/swapping in between passes and
+  // shifts the text metrics from what the first guess assumed.
+  for (let i = 0; i < 6; i++){
+    const widest = Math.max(heroH1.scrollWidth, heroDateEl.scrollWidth);
+    if (!widest) return;
+    const nextSize = Math.max(10, (available / widest) * size * 0.96);
+    if (Math.abs(nextSize - size) < 0.5) { size = nextSize; break; }
+    size = nextSize;
+    heroH1.style.fontSize = size + 'px';
+    heroDateEl.style.fontSize = size + 'px';
+  }
 }
 
 function shrinkHero(){
@@ -749,11 +718,18 @@ document.addEventListener('pointerdown', shrinkHero, { once:true, passive:true }
 document.addEventListener('wheel', shrinkHero, { once:true, passive:true });
 document.addEventListener('keydown', shrinkHero, { once:true });
 
+// run the fit at a few checkpoints — immediately, once the browser reports
+// fonts ready, and a couple of delayed safety nets — since font-swap timing
+// is inconsistent across mobile browsers and a stale measurement is what
+// causes the text to overflow past the screen edge.
+fitHeroText();
 if (document.fonts && document.fonts.ready){
   document.fonts.ready.then(fitHeroText).catch(() => {});
 }
-fitHeroText();
+setTimeout(fitHeroText, 300);
+setTimeout(fitHeroText, 1000);
 window.addEventListener('resize', () => { if (!heroShrunk) fitHeroText(); });
+window.addEventListener('orientationchange', () => { if (!heroShrunk) setTimeout(fitHeroText, 100); });
 
 // ---------------- view switch (mapa / lista) ----------------
 const listOverlay = document.getElementById('list-overlay');
