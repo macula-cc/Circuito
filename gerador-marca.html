@@ -46,7 +46,7 @@
         padding:0.6rem 0.9rem; cursor:pointer; border-radius:0; transition:background 0.15s ease, color 0.15s ease; }
   .btn:hover{ background:var(--ink); color:#fff; }
   .btn.active{ background:var(--ink); color:#fff; }
-  .btn.primary{ background:var(--ink); color:#fff; width:100%; padding:0.85rem; font-size:0.83rem; }
+  .btn.primary{ background:var(--ink); color:#fff; flex:1; padding:0.85rem; font-size:0.83rem; }
   .btn.primary:hover{ opacity:0.8; }
   .btn:disabled{ opacity:0.35; cursor:default; pointer-events:none; }
 
@@ -81,7 +81,7 @@
     </div>
 
     <h1>Gerador de<br>Marca</h1>
-    <div class="sub">Circuito Paralelo — Ateliês do Centro do Rio</div>
+    <div class="sub">Circuito Paralelo — Ateliês do Centro do Rio · vetorial (SVG)</div>
 
     <div class="field">
       <label>Cores</label>
@@ -104,8 +104,9 @@
     <div class="field">
       <label>Exportar</label>
       <div class="row-btns">
-        <button class="btn primary" id="btn-download-png" style="flex:1;">baixar PNG</button>
-        <button class="btn primary" id="btn-download-pdf" style="flex:1;">baixar PDF</button>
+        <button class="btn primary" id="btn-download-svg">SVG</button>
+        <button class="btn primary" id="btn-download-png">PNG</button>
+        <button class="btn primary" id="btn-download-pdf">PDF</button>
       </div>
       <div class="status" id="status"></div>
     </div>
@@ -113,7 +114,7 @@
 
   <div class="stage">
     <div class="canvas-frame" id="canvas-frame">
-      <canvas id="art" width="1000" height="1000"></canvas>
+      <svg id="art" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg"></svg>
     </div>
   </div>
 </div>
@@ -124,6 +125,8 @@
    ============================================================ */
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
 const EVENT_TITLE = 'Circuito Paralelo Ateliês do Centro do Rio';
+const LOGICAL = 1000;
+const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap";
 
 function parseCSV(text){
   const rows = []; let row = []; let field = ''; let inQuotes = false;
@@ -175,9 +178,8 @@ async function loadLocationsFromSheet(){
 }
 
 /* ============================================================
-   posiciona os pontos de acordo com as coordenadas reais — sem
-   desenhar nenhum mapa, só a geometria (projeção mercator
-   normalizada) encaixada no quadro com uma margem
+   posiciona os pontos de acordo com as coordenadas reais — só
+   geometria, sem nenhum mapa desenhado
    ============================================================ */
 function project(lat, lon){
   const x = (lon + 180) / 360;
@@ -191,11 +193,11 @@ function expandBounds(b, factor){
   const spanLng = Math.max((b.maxLng-b.minLng)*factor, 0.002);
   return { minLat:cLat-spanLat/2, maxLat:cLat+spanLat/2, minLng:cLng-spanLng/2, maxLng:cLng+spanLng/2 };
 }
-let proj = null; // { p1, scale, offsetX, offsetY }
+let proj = null;
 function computeProjection(bounds, W, H, margin, padFactor){
   const expanded = expandBounds(bounds, padFactor);
-  const p1 = project(expanded.maxLat, expanded.minLng); // canto superior-esquerdo
-  const p2 = project(expanded.minLat, expanded.maxLng); // canto inferior-direito
+  const p1 = project(expanded.maxLat, expanded.minLng);
+  const p2 = project(expanded.minLat, expanded.maxLng);
   const worldW = p2.x - p1.x, worldH = p2.y - p1.y;
   const scale = Math.min((W - margin*2)/worldW, (H - margin*2)/worldH);
   const offsetX = (W - worldW*scale)/2, offsetY = (H - worldH*scale)/2;
@@ -207,9 +209,7 @@ function pixelOf(lat, lon){
 }
 
 /* ============================================================
-   gera o caminho de um trecho entre dois pontos — às vezes reto,
-   às vezes uma curva suave (bezier quadrática deslocada pra um
-   lado aleatório)
+   caminho reto/curvo entre dois pontos
    ============================================================ */
 function buildLegPath(a, b){
   const dx = b.x - a.x, dy = b.y - a.y;
@@ -234,7 +234,6 @@ function buildLegPath(a, b){
   }
   return pts;
 }
-
 function pathLength(points){
   let len = 0;
   for (let i=1;i<points.length;i++) len += Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
@@ -258,50 +257,59 @@ function pointAtDistance(points, dist){
   return { x:last.x, y:last.y, angle:0 };
 }
 
-function drawRibbonSegment(points, dStart, dEnd, width, color){
-  const STEPS = 4;
-  const start = Math.max(0, dStart - 2);
-  ctx.save();
-  ctx.lineCap = 'butt';
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = width;
-  ctx.strokeStyle = color;
-  ctx.beginPath();
-  for (let s = 0; s <= STEPS; s++){
-    const dd = start + (dEnd - start) * s / STEPS;
-    const pt = pointAtDistance(points, dd);
-    if (s === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
-  }
-  ctx.stroke();
-  ctx.restore();
+/* ============================================================
+   medição de largura de caractere — usa um canvas escondido só
+   como "régua" (nunca é desenhado nem exportado); o resultado
+   final continua sendo texto SVG de verdade, vetorial
+   ============================================================ */
+const measureCanvas = document.createElement('canvas');
+const measureCtx = measureCanvas.getContext('2d');
+function charWidth(ch, fontSize){
+  measureCtx.font = `${fontSize}px 'Instrument Serif', Georgia, serif`;
+  return measureCtx.measureText(ch).width;
 }
 
-function drawRibbonAndText(text, points, fontSize, ribbonWidth, ribbonColor, textColor){
-  if (points.length < 2) return;
+function escapeXML(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ============================================================
+   fita + texto — gera marcação SVG (path curto + <text>) por
+   caractere, sempre na ordem do caminho, pra que trechos mais
+   novos cubram os mais antigos nos cruzamentos
+   ============================================================ */
+function buildRibbonAndTextSVG(text, points, fontSize, ribbonWidth, ribbonColor, textColor){
+  if (points.length < 2) return '';
   const total = pathLength(points);
-  if (total < 4) return;
-  ctx.font = `${fontSize}px 'Instrument Serif', Georgia, serif`;
+  if (total < 4) return '';
   const unit = text + '   ·   ';
+  let out = '';
   let d = 0, safety = 0;
   while (d < total && safety < 6000){
     for (const ch of unit){
       if (d >= total) break;
-      const w = ctx.measureText(ch).width;
+      const w = charWidth(ch, fontSize);
       const dEnd = Math.min(d + w, total);
-      drawRibbonSegment(points, d, dEnd, ribbonWidth, ribbonColor);
+
+      const start = Math.max(0, d - 2);
+      const STEPS = 4;
+      let pathD = '';
+      for (let s = 0; s <= STEPS; s++){
+        const dd = start + (dEnd - start) * s / STEPS;
+        const pt = pointAtDistance(points, dd);
+        pathD += (s === 0 ? 'M' : 'L') + pt.x.toFixed(2) + ' ' + pt.y.toFixed(2) + ' ';
+      }
+      out += `<path d="${pathD}" fill="none" stroke="${ribbonColor}" stroke-width="${ribbonWidth}" stroke-linecap="butt" stroke-linejoin="round"/>`;
+
       const pt = pointAtDistance(points, d);
-      ctx.save();
-      ctx.translate(pt.x, pt.y);
-      ctx.rotate(pt.angle);
-      ctx.fillStyle = textColor;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(ch, 0, 0);
-      ctx.restore();
+      const angleDeg = (pt.angle * 180 / Math.PI).toFixed(2);
+      out += `<text x="0" y="0" transform="translate(${pt.x.toFixed(2)} ${pt.y.toFixed(2)}) rotate(${angleDeg})" font-family="'Instrument Serif', Georgia, serif" font-size="${fontSize}" fill="${textColor}" text-anchor="start" dominant-baseline="middle">${escapeXML(ch)}</text>`;
+
       d = dEnd;
       safety++;
     }
   }
+  return out;
 }
 
 /* ============================================================
@@ -319,15 +327,7 @@ let currentTheme = 'claro';
 let LOCATIONS = [];
 let PTS = [];
 let alphaNum = {};
-const canvas = document.getElementById('art');
-const ctx = canvas.getContext('2d');
-const LOGICAL = 1000;
-const DPR = Math.min(window.devicePixelRatio || 1, 3);
-canvas.width = LOGICAL * DPR;
-canvas.height = LOGICAL * DPR;
-ctx.scale(DPR, DPR);
-const W = LOGICAL, H = LOGICAL;
-
+const svgEl = document.getElementById('art');
 const checklistEl = document.getElementById('checklist');
 const countNote = document.getElementById('count-note');
 const statusEl = document.getElementById('status');
@@ -404,72 +404,108 @@ document.getElementById('btn-clear').addEventListener('click', () => {
 });
 
 /* ============================================================
-   desenho — só o resultado final, sem animação, sem mapa
+   desenho — monta marcação SVG (texto e formas vetoriais de
+   verdade, não pixel) e injeta no <svg> da tela
    ============================================================ */
-function draw(){
+function buildContentSVG(){
   const theme = THEMES[currentTheme];
-  ctx.clearRect(0,0,W,H);
-  ctx.fillStyle = theme.bg;
-  ctx.fillRect(0,0,W,H);
+  let s = '';
+  s += `<rect x="0" y="0" width="${LOGICAL}" height="${LOGICAL}" fill="${theme.bg}"/>`;
+  s += `<rect x="0.5" y="0.5" width="${LOGICAL-1}" height="${LOGICAL-1}" fill="none" stroke="${currentTheme==='claro' ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)'}" stroke-width="1"/>`;
 
-  ctx.strokeStyle = currentTheme === 'claro' ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(0.5,0.5,W-1,H-1);
-
-  // todos os pontos, sempre visíveis, numerados em ordem alfabética
-  PTS.forEach((p) => {
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 15, 0, Math.PI*2);
-    ctx.fillStyle = theme.pin;
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = theme.pinRing;
-    ctx.stroke();
-    ctx.fillStyle = theme.pinText;
-    ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(String(alphaNum[p.loc.id]).padStart(2,'0'), p.x, p.y + 0.5);
-    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  PTS.forEach(p => {
+    s += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="15" fill="${theme.pin}" stroke="${theme.pinRing}" stroke-width="2"/>`;
+    s += `<text x="${p.x.toFixed(2)}" y="${(p.y+0.5).toFixed(2)}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="${theme.pinText}" text-anchor="middle" dominant-baseline="middle">${String(alphaNum[p.loc.id]).padStart(2,'0')}</text>`;
   });
 
-  // a fita: liga os pontos selecionados, na ordem escolhida, misturando
-  // trechos retos e curvos aleatoriamente
   if (selectedOrder.length >= 2){
     const selPts = selectedOrder.map(id => PTS.find(p => p.loc.id === id)).filter(Boolean);
     const trail = [ { x: selPts[0].x, y: selPts[0].y } ];
     for (let i = 1; i < selPts.length; i++){
       buildLegPath(selPts[i-1], selPts[i]).slice(1).forEach(pt => trail.push(pt));
     }
-    drawRibbonAndText(EVENT_TITLE, trail, 24, 38, theme.ribbon, theme.text);
+    s += buildRibbonAndTextSVG(EVENT_TITLE, trail, 24, 38, theme.ribbon, theme.text);
   }
+  return s;
+}
+
+function draw(){
+  svgEl.innerHTML = buildContentSVG();
+}
+
+function buildFullSVGString(){
+  const content = buildContentSVG();
+  return `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LOGICAL} ${LOGICAL}" width="${LOGICAL}" height="${LOGICAL}">` +
+    `<defs><style>@import url('${FONT_IMPORT.replace(/&/g,'&amp;')}');</style></defs>` +
+    content +
+    `</svg>`;
 }
 
 /* ============================================================
-   exportação
+   exportação — SVG (vetorial de verdade), PNG e PDF
+   (PNG/PDF são rasterizados a partir do SVG, em alta resolução)
    ============================================================ */
-document.getElementById('btn-download-png').addEventListener('click', () => {
+document.getElementById('btn-download-svg').addEventListener('click', () => {
   setStatus('');
-  canvas.toBlob(blob => {
-    if (!blob){ setStatus('Não foi possível gerar o PNG.', true); return; }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'circuito-paralelo-marca.png';
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-  }, 'image/png');
+  const blob = new Blob([buildFullSVGString()], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'circuito-paralelo-marca.svg';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 });
 
-document.getElementById('btn-download-pdf').addEventListener('click', () => {
-  setStatus('');
+function rasterizeSVG(scale){
+  return new Promise((resolve, reject) => {
+    const svgBlob = new Blob([buildFullSVGString()], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = LOGICAL * scale;
+      c.height = LOGICAL * scale;
+      const cctx = c.getContext('2d');
+      cctx.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c);
+    };
+    img.onerror = (err) => { URL.revokeObjectURL(url); reject(err); };
+    img.src = url;
+  });
+}
+
+document.getElementById('btn-download-png').addEventListener('click', async () => {
+  setStatus('gerando PNG em alta resolução…');
   try{
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: 'px', format: [LOGICAL, LOGICAL] });
-    const imgData = canvas.toDataURL('image/png');
-    doc.addImage(imgData, 'PNG', 0, 0, LOGICAL, LOGICAL);
-    doc.save('circuito-paralelo-marca.pdf');
+    const c = await rasterizeSVG(3); // 3000x3000 — nítido mesmo impresso grande
+    c.toBlob(blob => {
+      if (!blob){ setStatus('Não foi possível gerar o PNG.', true); return; }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'circuito-paralelo-marca.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      setStatus('');
+    }, 'image/png');
   } catch(err){
     console.error(err);
-    setStatus('Não foi possível gerar o PDF agora — tente o PNG.', true);
+    setStatus('Não foi possível gerar o PNG agora.', true);
+  }
+});
+
+document.getElementById('btn-download-pdf').addEventListener('click', async () => {
+  setStatus('gerando PDF…');
+  try{
+    const c = await rasterizeSVG(3);
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'px', format: [LOGICAL, LOGICAL] });
+    doc.addImage(c.toDataURL('image/png'), 'PNG', 0, 0, LOGICAL, LOGICAL);
+    doc.save('circuito-paralelo-marca.pdf');
+    setStatus('');
+  } catch(err){
+    console.error(err);
+    setStatus('Não foi possível gerar o PDF agora — tente o SVG ou o PNG.', true);
   }
 });
 
@@ -497,7 +533,7 @@ async function boot(){
     minLng: Math.min(...withCoords.map(l=>l.lng)),
     maxLng: Math.max(...withCoords.map(l=>l.lng)),
   };
-  proj = computeProjection(bounds, W, H, 60, 1.0);
+  proj = computeProjection(bounds, LOGICAL, LOGICAL, 60, 1.0);
 
   PTS = withCoords.map(loc => {
     const { x, y } = pixelOf(loc.lat, loc.lng);
