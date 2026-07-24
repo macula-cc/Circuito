@@ -464,14 +464,15 @@ function pointAtDistance(points, dist){
 // bem trechos curvos
 function drawRibbonSegment(points, dStart, dEnd, width){
   const STEPS = 4;
+  const start = Math.max(0, dStart - 2); // pequena sobreposição, evita frestas entre segmentos
   ctx.save();
-  ctx.lineCap = 'round';
+  ctx.lineCap = 'butt'; // reta — 'round' fazia a ponta do próximo segmento cobrir o caractere anterior inteiro
   ctx.lineJoin = 'round';
   ctx.lineWidth = width;
   ctx.strokeStyle = '#111';
   ctx.beginPath();
   for (let s = 0; s <= STEPS; s++){
-    const dd = dStart + (dEnd - dStart) * s / STEPS;
+    const dd = start + (dEnd - start) * s / STEPS;
     const pt = pointAtDistance(points, dd);
     if (s === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
   }
