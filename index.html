@@ -33,12 +33,32 @@
         filter: grayscale(1) contrast(1.05) brightness(1.03); }
   .leaflet-container{ background:#e9e9e9; font-family:var(--sans); }
 
-  .hero-title{ position:absolute; top:0; left:0;
+  .hero-title{ position:absolute; top:0; left:0; right:0;
                padding:calc(1.6rem + env(safe-area-inset-top)) 1.6rem 0 calc(1.6rem + env(safe-area-inset-left));
-               z-index:200; pointer-events:none; }
-  .hero-title h1{ font-family:var(--serif); font-weight:400; font-size:clamp(1.43rem, 3.3vw, 2.09rem);
-                  line-height:1.25; margin:0; max-width:14ch; letter-spacing:-0.01em; }
-  .hero-meta{ font-family:var(--mono); font-size:0.79rem; color:var(--gray); margin-top:0.4rem; }
+               z-index:200; pointer-events:none;
+               transition:padding-top 0.75s cubic-bezier(.16,1,.3,1); }
+  .hero-title h1{ font-family:var(--serif); font-weight:400; color:var(--ink);
+                  font-size:clamp(3.8rem, 12vw, 9.5rem);
+                  line-height:0.94; margin:0; max-width:20ch; letter-spacing:-0.01em;
+                  transition:font-size 0.75s cubic-bezier(.16,1,.3,1), line-height 0.75s cubic-bezier(.16,1,.3,1); }
+  .hero-date{ font-family:var(--serif); font-weight:400; color:var(--gray);
+              font-size:clamp(3.8rem, 12vw, 9.5rem);
+              line-height:0.94; margin-top:0.05em;
+              transition:font-size 0.75s cubic-bezier(.16,1,.3,1), margin-top 0.75s cubic-bezier(.16,1,.3,1); }
+
+  .hero-title.shrunk h1{ font-size:clamp(1.43rem, 3.3vw, 2.09rem); line-height:1.25; max-width:14ch; }
+  .hero-title.shrunk .hero-date{ font-size:clamp(1.43rem, 3.3vw, 2.09rem); margin-top:0.2rem; }
+
+  /* Mobile: narrower viewports have far less horizontal room, so the switcher pill
+     sits much closer to where big text would land. We handle this with vertical
+     clearance (padding-top pushes the whole block below the toggle's row) rather
+     than shrinking the type too aggressively, so it can still read as "huge". */
+  @media (max-width:780px){
+    .hero-title{ padding-top:calc(4.8rem + env(safe-area-inset-top)); }
+    .hero-title.shrunk{ padding-top:calc(1.6rem + env(safe-area-inset-top)); }
+    .hero-title h1{ font-size:clamp(2.6rem, 15vw, 4.2rem); }
+    .hero-date{ font-size:clamp(2.6rem, 15vw, 4.2rem); }
+  }
 
   .hero-count{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:calc(1.6rem + env(safe-area-inset-left)); z-index:200;
                font-family:var(--mono); font-size:0.79rem; color:var(--gray); pointer-events:none; }
@@ -224,9 +244,9 @@
 
 <div class="hero">
   <div id="map"></div>
-  <div class="hero-title">
-    <h1>Circuito de Arte<br>do Centro do Rio de Janeiro</h1>
-    <div class="hero-meta">Edição 0 — 18–19 de setembro</div>
+  <div class="hero-title" id="hero-title">
+    <h1>Circuito Paralelo<br>Ateliês do Centro</h1>
+    <div class="hero-date">18 – 19 de Setembro</div>
   </div>
   <div class="hero-count" id="hero-count">— endereços · — artistas</div>
 </div>
@@ -619,6 +639,18 @@ function goToLocation(loc){
   }
   openDrawer(loc.id);
 }
+
+// ---------------- hero title: starts large, shrinks to the corner on first interaction ----------------
+const heroTitle = document.getElementById('hero-title');
+let heroShrunk = false;
+function shrinkHero(){
+  if (heroShrunk) return;
+  heroShrunk = true;
+  heroTitle.classList.add('shrunk');
+}
+document.addEventListener('pointerdown', shrinkHero, { once:true, passive:true });
+document.addEventListener('wheel', shrinkHero, { once:true, passive:true });
+document.addEventListener('keydown', shrinkHero, { once:true });
 
 // ---------------- view switch (mapa / lista) ----------------
 const listOverlay = document.getElementById('list-overlay');
