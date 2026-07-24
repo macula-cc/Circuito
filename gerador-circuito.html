@@ -202,29 +202,42 @@ function expandBounds(b, factor){
   return { minLat:cLat-spanLat/2, maxLat:cLat+spanLat/2, minLng:cLng-spanLng/2, maxLng:cLng+spanLng/2 };
 }
 
-let proj = null; // { zoom, originX, originY }
+let proj = null; // { zoom, originX, originY, tile } — tile = tamanho efetivo do tile em px (com escala fracionária)
 function pixelOf(lat, lon){
   const p = project(lat, lon, proj.zoom);
-  return { x: (p.x - proj.originX) * TILE_SIZE, y: (p.y - proj.originY) * TILE_SIZE };
+  return { x: (p.x - proj.originX) * proj.tile, y: (p.y - proj.originY) * proj.tile };
 }
 
 const SUBS = ['a','b','c','d'];
 async function buildBasemap(bounds, W, H, margin){
   const expanded = expandBounds(bounds, 1.0);
   const zoom = fitZoom(expanded, W, H, margin);
+
+  // zoom é um número inteiro (tiles só existem em potências de 2), mas isso
+  // quase sempre deixa uma folga em volta da área — para o enquadramento
+  // realmente preencher o quadro de ponta a ponta, calculamos uma escala
+  // fracionária extra por cima do zoom inteiro escolhido (mesmo princípio do
+  // zoomSnap:0 do Leaflet, só que feito manualmente aqui)
+  const p1 = project(expanded.maxLat, expanded.minLng, zoom);
+  const p2 = project(expanded.minLat, expanded.maxLng, zoom);
+  const pxW = (p2.x - p1.x) * TILE_SIZE;
+  const pxH = (p2.y - p1.y) * TILE_SIZE;
+  const scale = Math.min(8, Math.max(1, Math.min((W - margin*2)/pxW, (H - margin*2)/pxH)));
+  const tile = TILE_SIZE * scale;
+
   const cLat = (expanded.minLat+expanded.maxLat)/2, cLng = (expanded.minLng+expanded.maxLng)/2;
   const center = project(cLat, cLng, zoom);
-  const originX = center.x - (W/2)/TILE_SIZE;
-  const originY = center.y - (H/2)/TILE_SIZE;
-  proj = { zoom, originX, originY };
+  const originX = center.x - (W/2)/tile;
+  const originY = center.y - (H/2)/tile;
+  proj = { zoom, originX, originY, tile };
 
   const off = document.createElement('canvas');
   off.width = W; off.height = H;
   const octx = off.getContext('2d');
   octx.fillStyle = '#e9e9e9'; octx.fillRect(0,0,W,H);
 
-  const txStart = Math.floor(originX), txEnd = Math.floor(originX + W/TILE_SIZE);
-  const tyStart = Math.floor(originY), tyEnd = Math.floor(originY + H/TILE_SIZE);
+  const txStart = Math.floor(originX), txEnd = Math.floor(originX + W/tile);
+  const tyStart = Math.floor(originY), tyEnd = Math.floor(originY + H/tile);
   const maxTile = Math.pow(2, zoom);
 
   const jobs = [];
@@ -234,12 +247,12 @@ async function buildBasemap(bounds, W, H, margin){
       const wrappedX = ((tx % maxTile) + maxTile) % maxTile;
       const sub = SUBS[Math.abs(tx+ty) % SUBS.length];
       const url = TILE_URL(zoom, wrappedX, ty, sub);
-      const px = (tx - originX) * TILE_SIZE;
-      const py = (ty - originY) * TILE_SIZE;
+      const px = (tx - originX) * tile;
+      const py = (ty - originY) * tile;
       jobs.push(new Promise(resolve => {
         const img = new Image();
         img.crossOrigin = 'anonymous';
-        img.onload = () => { try{ octx.drawImage(img, px, py, TILE_SIZE, TILE_SIZE); }catch(e){} resolve(); };
+        img.onload = () => { try{ octx.drawImage(img, px, py, tile, tile); }catch(e){} resolve(); };
         img.onerror = () => resolve();
         img.src = url;
       }));
@@ -681,7 +694,7 @@ async function boot(){
 
   setStatus('carregando mapa…');
   try{
-    basemapCanvas = await buildBasemap(bounds, W, H, 25);
+    basemapCanvas = await buildBasemap(bounds, W, H, 15);
   } catch(err){
     console.warn('Mapa indisponível, seguindo com fundo neutro:', err);
   }
