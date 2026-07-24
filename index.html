@@ -170,13 +170,17 @@
            backdrop-filter:blur(32px) saturate(180%);
            -webkit-backdrop-filter:blur(32px) saturate(180%);
            border:1px solid rgba(255,255,255,0.6);
+           border-radius:10px;
            box-shadow:0 24px 70px rgba(0,0,0,0.25); }
   @media (min-width:781px){
-    .drawer{ top:0; right:0; bottom:0; width:440px; transform:translateX(100%); }
+    .drawer{ top:calc(1rem + env(safe-area-inset-top)); right:calc(1rem + env(safe-area-inset-right));
+             bottom:calc(1rem + env(safe-area-inset-bottom)); width:440px;
+             transform:translateX(calc(100% + 2rem)); }
     .drawer.open{ transform:translateX(0); }
   }
   @media (max-width:780px){
-    .drawer{ left:0; right:0; bottom:0; max-height:82vh; transform:translateY(100%); }
+    .drawer{ left:0; right:0; bottom:0; max-height:82vh; transform:translateY(100%);
+             border-bottom-left-radius:0; border-bottom-right-radius:0; }
     .drawer.open{ transform:translateY(0); }
   }
 
