@@ -210,7 +210,7 @@ function pixelOf(lat, lon){
 
 const SUBS = ['a','b','c','d'];
 async function buildBasemap(bounds, W, H, margin){
-  const expanded = expandBounds(bounds, 1.08);
+  const expanded = expandBounds(bounds, 1.0);
   const zoom = fitZoom(expanded, W, H, margin);
   const cLat = (expanded.minLat+expanded.maxLat)/2, cLng = (expanded.minLng+expanded.maxLng)/2;
   const center = project(cLat, cLng, zoom);
@@ -267,7 +267,8 @@ async function buildBasemap(bounds, W, H, margin){
    estado
    ============================================================ */
 let LOCATIONS = [];
-let PTS = []; // { loc, x, y }
+let PTS = [];
+let alphaNum = {}; // loc.id -> número na ordem alfabética (mesma numeração em todo lugar)
 let basemapCanvas = null;
 const canvas = document.getElementById('art');
 const ctx = canvas.getContext('2d');
@@ -440,8 +441,7 @@ function roundRect(x,y,w,h,r){
 
 function drawCard(loc){
   if (!loc) return;
-  const idx = visitedIdx.indexOf(PTS.findIndex(p => p.loc.id === loc.id));
-  const num = String((idx > -1 ? idx : 0) + 1).padStart(2,'0');
+  const num = String(alphaNum[loc.id] || 0).padStart(2,'0');
   const artistas = loc.artistas || [];
   const rows = Math.ceil(artistas.length / 2);
   const cardX = 50, cardY = 50, cardW = 560;
@@ -523,20 +523,22 @@ function drawFrame(){
     ctx.fill();
   }
 
-  // todos os pontos dos ateliês já ficam visíveis desde o início,
-  // igual ao mapa do site — a cobrinha só escolhe o caminho entre eles
+  // todos os pontos dos ateliês já ficam visíveis desde o início, com o
+  // mesmo visual de pino do site — numerados em ordem alfabética, sempre
+  // com o mesmo número (não é a ordem em que a cobrinha visita)
   PTS.forEach((p) => {
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 5, 0, Math.PI*2);
-    ctx.fillStyle = '#fff';
+    ctx.arc(p.x, p.y, 15, 0, Math.PI*2);
+    ctx.fillStyle = '#111';
     ctx.fill();
-    ctx.lineWidth = 1.4;
-    ctx.strokeStyle = 'rgba(17,17,17,0.75)';
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#fff';
     ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 2, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(17,17,17,0.75)';
-    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(alphaNum[p.loc.id]).padStart(2,'0'), p.x, p.y + 0.5);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   });
 
   if (activeCardLoc) drawCard(activeCardLoc);
@@ -574,10 +576,12 @@ function buildStaticRoute(targetLocId){
    ============================================================ */
 function renderLocSelect(){
   locSelect.innerHTML = '';
-  PTS.forEach((p) => {
+  const sorted = [...PTS].sort((a,b) =>
+    (a.loc.local||a.loc.endereco).localeCompare(b.loc.local||b.loc.endereco, 'pt-BR', {sensitivity:'base'}));
+  sorted.forEach((p) => {
     const opt = document.createElement('option');
     opt.value = p.loc.id;
-    opt.textContent = p.loc.local || p.loc.endereco;
+    opt.textContent = `${String(alphaNum[p.loc.id]).padStart(2,'0')} — ${p.loc.local || p.loc.endereco}`;
     locSelect.appendChild(opt);
   });
 }
@@ -677,7 +681,7 @@ async function boot(){
 
   setStatus('carregando mapa…');
   try{
-    basemapCanvas = await buildBasemap(bounds, W, H, 45);
+    basemapCanvas = await buildBasemap(bounds, W, H, 25);
   } catch(err){
     console.warn('Mapa indisponível, seguindo com fundo neutro:', err);
   }
@@ -687,6 +691,11 @@ async function boot(){
     const { x, y } = pixelOf(loc.lat, loc.lng);
     return { loc, x, y };
   });
+
+  const sortedForNum = [...withCoords].sort((a,b) =>
+    (a.local||a.endereco).localeCompare(b.local||b.endereco, 'pt-BR', {sensitivity:'base'}));
+  alphaNum = {};
+  sortedForNum.forEach((loc,i) => { alphaNum[loc.id] = i+1; });
 
   renderLocSelect();
   startTour();
