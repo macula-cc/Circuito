@@ -454,12 +454,11 @@ function roundRect(x,y,w,h,r){
 
 function drawCard(loc){
   if (!loc) return;
-  const num = String(alphaNum[loc.id] || 0).padStart(2,'0');
   const artistas = loc.artistas || [];
   const rows = Math.ceil(artistas.length / 2);
   const cardX = 60, cardY = 60, cardW = 620, radius = 22;
-  const headerH = 232;
-  const rowH = 40;
+  const headerH = 210;
+  const rowH = 46;
   const cardH = artistas.length ? headerH + rows*rowH + 30 : headerH - 20;
 
   // fundo desfocado, igual ao efeito glass do drawer/lightbox do index.html
@@ -494,37 +493,32 @@ function drawCard(loc){
   const px = cardX + 40;
   let y = cardY + 76;
 
+  // nome do espaço — mesma família e proporção do .drawer-title do site
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = '#111';
-  ctx.font = "20px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-  const numW = ctx.measureText(num).width;
-  ctx.fillText(num, px, y);
-
   ctx.font = "46px 'Instrument Serif', Georgia, serif";
-  ctx.fillText(loc.local || loc.endereco, px + numW + 16, y);
+  ctx.fillText(loc.local || loc.endereco, px, y);
 
-  y += 46;
+  // endereço, direto embaixo do nome — mono e cinza, igual ao .drawer-addr
+  y += 38;
   ctx.fillStyle = '#6b6b6b';
-  ctx.font = "16px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-  ctx.fillText('Endereço', px, y);
-  y += 28;
-  ctx.fillStyle = '#111';
-  ctx.font = "20px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+  ctx.font = "20px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
   ctx.fillText(loc.endereco, px, y);
 
   if (artistas.length){
-    y += 56;
+    y += 62;
     ctx.fillStyle = '#111';
     ctx.font = "32px 'Instrument Serif', Georgia, serif";
     ctx.fillText('Artistas', px, y);
-    y += 36;
+    y += 42;
     const col2X = px + (cardW - 80)/2;
     artistas.forEach((nome, i) => {
       const col = i % 2, rowN = Math.floor(i/2);
       const x = col === 0 ? px : col2X;
       const ry = y + rowN*rowH;
       ctx.fillStyle = '#111';
-      ctx.font = "19px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+      // nomes dos artistas — família serif do site (.artist-name), bem maior
+      ctx.font = "27px 'Instrument Serif', Georgia, serif";
       ctx.fillText(nome, x, ry);
     });
   }
