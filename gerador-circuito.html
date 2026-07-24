@@ -210,7 +210,7 @@ function pixelOf(lat, lon){
 
 const SUBS = ['a','b','c','d'];
 async function buildBasemap(bounds, W, H, margin){
-  const expanded = expandBounds(bounds, 1.15);
+  const expanded = expandBounds(bounds, 1.08);
   const zoom = fitZoom(expanded, W, H, margin);
   const cLat = (expanded.minLat+expanded.maxLat)/2, cLng = (expanded.minLng+expanded.maxLng)/2;
   const center = project(cLat, cLng, zoom);
@@ -299,7 +299,7 @@ let rafId = null;
 let lastTs = null;
 const SPEED = 230; // px por segundo
 const SAMPLE_DIST = 5;
-const PAUSE_MS = 1500;
+const PAUSE_MS = 2800;
 
 let mediaRecorder = null;
 let recordedChunks = [];
@@ -523,14 +523,19 @@ function drawFrame(){
     ctx.fill();
   }
 
-  // pontos já visitados / alvo atual, discretos
-  PTS.forEach((p, i) => {
-    const isVisited = visitedIdx.includes(i);
-    const isTarget = mode === 'moving' && tourOrder[targetIdx] === i;
-    if (!isVisited && !isTarget) return;
+  // todos os pontos dos ateliês já ficam visíveis desde o início,
+  // igual ao mapa do site — a cobrinha só escolhe o caminho entre eles
+  PTS.forEach((p) => {
     ctx.beginPath();
-    ctx.arc(p.x, p.y, isTarget ? 7 : 4, 0, Math.PI*2);
-    ctx.fillStyle = isTarget ? '#c0392b' : 'rgba(17,17,17,0.6)';
+    ctx.arc(p.x, p.y, 5, 0, Math.PI*2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = 'rgba(17,17,17,0.75)';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(17,17,17,0.75)';
     ctx.fill();
   });
 
@@ -672,7 +677,7 @@ async function boot(){
 
   setStatus('carregando mapa…');
   try{
-    basemapCanvas = await buildBasemap(bounds, W, H, 55);
+    basemapCanvas = await buildBasemap(bounds, W, H, 45);
   } catch(err){
     console.warn('Mapa indisponível, seguindo com fundo neutro:', err);
   }
