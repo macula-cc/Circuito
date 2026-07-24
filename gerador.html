@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Gerador de Marca — Circuito Paralelo</title>
+<title>Gerador de Máscara — Circuito Paralelo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -13,16 +13,18 @@
     --serif: 'Instrument Serif', Georgia, 'Iowan Old Style', 'Times New Roman', ui-serif, serif;
     --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    --ink:#111;
-    --line: rgba(0,0,0,0.15);
-    --gray: #6b6b6b;
-    --hover: #f0f0f0;
-    --paper:#fff;
+    --ink:#111; --line: rgba(0,0,0,0.15); --gray:#6b6b6b; --hover:#f0f0f0; --paper:#fff;
   }
   *{ box-sizing:border-box; }
   body{ margin:0; color:var(--ink); font-family:var(--sans); background:var(--paper); }
-  a{ color:inherit; }
+  a{ color:inherit; text-decoration:none; }
   button, select{ font:inherit; touch-action:manipulation; }
+
+  .nav{ display:flex; gap:2px; font-family:var(--mono); font-size:0.75rem;
+        background:#f4f4f4; border:1px solid var(--line); border-radius:999px; padding:3px; width:max-content; margin-bottom:1.6rem; }
+  .nav a{ padding:0.5rem 0.9rem; border-radius:999px; color:var(--gray); }
+  .nav a.active{ background:#111; color:#fff; }
+  .nav a:not(.active):hover{ background:var(--hover); color:var(--ink); }
 
   .wrap{ display:grid; grid-template-columns:400px 1fr; min-height:100vh; }
   @media (max-width:900px){ .wrap{ grid-template-columns:1fr; } }
@@ -45,12 +47,11 @@
         padding:0.6rem 0.9rem; cursor:pointer; border-radius:0; transition:background 0.15s ease, color 0.15s ease; }
   .btn:hover{ background:var(--ink); color:#fff; }
   .btn.primary{ background:var(--ink); color:#fff; width:100%; padding:0.85rem; font-size:0.83rem; }
-  .btn.primary:hover{ opacity:0.8; background:var(--ink); }
+  .btn.primary:hover{ opacity:0.8; }
   .btn:disabled{ opacity:0.35; cursor:default; pointer-events:none; }
 
-  .checklist{ max-height:260px; overflow-y:auto; border:1px solid var(--line); }
-  .check-row{ display:flex; align-items:baseline; gap:0.6rem; padding:0.55rem 0.7rem; border-bottom:1px solid var(--line);
-              cursor:pointer; }
+  .checklist{ max-height:230px; overflow-y:auto; border:1px solid var(--line); }
+  .check-row{ display:flex; align-items:baseline; gap:0.6rem; padding:0.55rem 0.7rem; border-bottom:1px solid var(--line); cursor:pointer; }
   .check-row:last-child{ border-bottom:none; }
   .check-row:hover{ background:var(--hover); }
   .check-row input{ margin-top:0.15rem; accent-color:var(--ink); }
@@ -58,7 +59,7 @@
   .check-row .cname small{ display:block; font-family:var(--mono); font-size:0.68rem; color:var(--gray); margin-top:0.1rem; }
   .check-order{ font-family:var(--mono); font-size:0.68rem; color:var(--gray); margin-left:auto; flex-shrink:0; }
 
-  .count-note{ font-family:var(--mono); font-size:0.73rem; color:var(--gray); margin-top:0.5rem; }
+  .count-note{ font-family:var(--mono); font-size:0.73rem; color:var(--gray); margin-top:0.5rem; line-height:1.4; }
   .status{ font-family:var(--mono); font-size:0.75rem; color:var(--gray); margin-top:0.9rem; min-height:1.2em; }
   .status.error{ color:#9A3324; }
 
@@ -72,8 +73,14 @@
 
 <div class="wrap">
   <div class="panel">
-    <h1>Gerador de<br>Marca</h1>
-    <div class="sub">Circuito Paralelo — Ateliês do Centro</div>
+    <div class="nav">
+      <a href="ferramentas.html">ferramentas</a>
+      <a href="gerador-marca.html">marca</a>
+      <a href="gerador-mascara.html" class="active">máscara</a>
+    </div>
+
+    <h1>Gerador de<br>Máscara</h1>
+    <div class="sub">Circuito Paralelo — Ateliês do Centro do Rio</div>
 
     <div class="field">
       <label for="artist-select">Artista</label>
@@ -81,9 +88,9 @@
     </div>
 
     <div class="field">
-      <label>Pontos do desenho</label>
+      <label>Pontos da janela colorida</label>
       <div class="checklist" id="checklist"></div>
-      <div class="count-note" id="count-note">selecione ao menos 3 ateliês para formar uma máscara fechada</div>
+      <div class="count-note" id="count-note"></div>
       <div class="row-btns" style="margin-top:0.7rem;">
         <button class="btn" id="btn-shuffle">sortear pontos</button>
         <button class="btn" id="btn-clear">limpar</button>
@@ -105,7 +112,14 @@
 
 <script>
 /* ============================================================
-   mesma fonte de dados do site principal do circuito
+   Lógica da máscara:
+   a foto inteira é SEMPRE desenhada, cobrindo toda a área — em
+   tom de cinza, igual ao mapa do site. Os pontos selecionados
+   só recortam uma "janela" onde a mesma foto aparece em cor
+   cheia por cima. Ou seja: a geometia nunca esconde a imagem,
+   ela só marca uma região de destaque. Por isso a foto está
+   sempre visível por inteiro, não importa quais pontos ou
+   quantos forem escolhidos.
    ============================================================ */
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
 const EVENT_TITLE = 'CIRCUITO PARALELO';
@@ -136,11 +150,9 @@ async function loadLocationsFromSheet(){
   const text = await res.text();
   const table = parseCSV(text).filter(r => r.some(c => c !== undefined && c.trim() !== ''));
   if (table.length < 2) throw new Error('planilha vazia');
-
   const headers = table[0].map(h => h.trim());
   const hIdx = {}; headers.forEach((h,i)=>hIdx[h]=i);
   const get = (row, name) => { const i = hIdx[name]; return (i!=null && row[i]!=null) ? row[i].trim() : ''; };
-
   const locMap = {}; const order = [];
   table.slice(1).forEach(row => {
     const local = get(row,'Local / Coletivo');
@@ -173,16 +185,12 @@ function initials(name){
   return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
 }
 
-/* ============================================================
-   estado
-   ============================================================ */
 let LOCATIONS = [];
-let FLAT_ARTISTS = [];      // { nome, instagram, foto, loc }
-let bounds = null;          // { minLat, maxLat, minLng, maxLng }
-let selectedOrder = [];     // array de loc.id na ordem em que foram marcados
+let FLAT_ARTISTS = [];
+let bounds = null;
+let selectedOrder = [];
 let currentArtist = null;
-let loadedImg = null;       // Image() do artista atual
-let imgFailed = false;
+let loadedImg = null;
 
 const canvas = document.getElementById('art');
 const ctx = canvas.getContext('2d');
@@ -197,16 +205,12 @@ function setStatus(msg, isError){
   statusEl.classList.toggle('error', !!isError);
 }
 
-/* ============================================================
-   ui: checklist de ateliês
-   ============================================================ */
 function renderChecklist(){
   checklistEl.innerHTML = '';
   const sorted = [...LOCATIONS].sort((a,b) =>
     (a.local||a.endereco).localeCompare(b.local||b.endereco, 'pt-BR', {sensitivity:'base'}));
-
   sorted.forEach(loc => {
-    if (loc.lat == null || loc.lng == null) return; // sem coordenada, não entra no desenho
+    if (loc.lat == null || loc.lng == null) return;
     const row = document.createElement('label');
     row.className = 'check-row';
     const cb = document.createElement('input');
@@ -233,15 +237,14 @@ function renderChecklist(){
     }
     checklistEl.appendChild(row);
   });
-
   countNote.textContent = selectedOrder.length < 3
-    ? `${selectedOrder.length} selecionado(s) — mínimo de 3 para fechar a máscara`
-    : `${selectedOrder.length} pontos conectados, nesta ordem`;
+    ? `a foto inteira sempre aparece — com 3+ pontos, uma janela em cor cheia se abre sobre o cinza`
+    : `${selectedOrder.length} pontos abrindo a janela colorida`;
 }
 
 document.getElementById('btn-shuffle').addEventListener('click', () => {
   const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
-  const n = Math.min(withCoords.length, 4 + Math.floor(Math.random()*4)); // 4 a 7
+  const n = Math.min(withCoords.length, 4 + Math.floor(Math.random()*4));
   const shuffled = [...withCoords].sort(() => Math.random()-0.5).slice(0, n);
   selectedOrder = shuffled.map(l => l.id);
   renderChecklist();
@@ -253,9 +256,6 @@ document.getElementById('btn-clear').addEventListener('click', () => {
   draw();
 });
 
-/* ============================================================
-   ui: seleção de artista
-   ============================================================ */
 function renderArtistSelect(){
   artistSelect.innerHTML = '';
   FLAT_ARTISTS.forEach((a, i) => {
@@ -264,31 +264,22 @@ function renderArtistSelect(){
     opt.textContent = `${a.nome} — ${a.loc.local || a.loc.endereco}`;
     artistSelect.appendChild(opt);
   });
-  if (FLAT_ARTISTS.length){
-    artistSelect.value = 0;
-    setArtist(0);
-  }
+  if (FLAT_ARTISTS.length){ artistSelect.value = 0; setArtist(0); }
 }
-
 function setArtist(idx){
   currentArtist = FLAT_ARTISTS[idx];
-  imgFailed = false;
   loadedImg = null;
   if (currentArtist && currentArtist.foto){
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => { loadedImg = img; draw(); };
-    img.onerror = () => { imgFailed = true; loadedImg = null; draw(); };
+    img.onerror = () => { loadedImg = null; draw(); };
     img.src = currentArtist.foto;
   }
   draw();
 }
 artistSelect.addEventListener('change', () => setArtist(parseInt(artistSelect.value, 10)));
 
-/* ============================================================
-   geometria: mapeia lat/lng dos pontos selecionados para a área
-   quadrada da foto (com margem interna)
-   ============================================================ */
 function projectPoints(box){
   if (!bounds) return [];
   const { minLat, maxLat, minLng, maxLng } = bounds;
@@ -298,146 +289,93 @@ function projectPoints(box){
     const loc = LOCATIONS.find(l => l.id === id);
     if (!loc) return null;
     const nx = (loc.lng - minLng) / spanLng;
-    const ny = (maxLat - loc.lat) / spanLat; // norte para cima
+    const ny = (maxLat - loc.lat) / spanLat;
     return { x: box.x + nx * box.w, y: box.y + ny * box.h };
   }).filter(Boolean);
 }
 
-function pathLength(points){
-  let len = 0;
-  for (let i = 1; i < points.length; i++){
-    len += Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
-  }
-  return len;
-}
-function pointAtDistance(points, dist){
-  let d = 0;
-  for (let i = 1; i < points.length; i++){
-    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
-    if (d + seg >= dist){
-      const t = seg === 0 ? 0 : (dist - d) / seg;
-      const x = points[i-1].x + (points[i].x-points[i-1].x) * t;
-      const y = points[i-1].y + (points[i].y-points[i-1].y) * t;
-      const angle = Math.atan2(points[i].y-points[i-1].y, points[i].x-points[i-1].x);
-      return { x, y, angle };
-    }
-    d += seg;
-  }
-  const last = points[points.length-1];
-  return { x:last.x, y:last.y, angle:0 };
+function drawCoverImage(ctx, img, box, filter){
+  const ir = img.width / img.height;
+  const br = box.w / box.h;
+  let dw, dh, dx, dy;
+  if (ir > br){ dh = box.h; dw = dh * ir; dx = box.x - (dw-box.w)/2; dy = box.y; }
+  else { dw = box.w; dh = dw / ir; dx = box.x; dy = box.y - (dh-box.h)/2; }
+  ctx.filter = filter || 'none';
+  ctx.drawImage(img, dx, dy, dw, dh);
+  ctx.filter = 'none';
 }
 
-function drawTextAlongPath(ctx, text, points, fontSize, color){
-  const total = pathLength(points);
-  if (total < fontSize * 2) return;
-  ctx.font = `${fontSize}px var(--mono), ui-monospace, monospace`;
-  ctx.font = `${fontSize}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
-  ctx.fillStyle = color;
-  const unit = text + '   ·   ';
-  let d = 0;
-  let safety = 0;
-  while (d < total && safety < 2000){
-    for (const ch of unit){
-      if (d >= total) break;
-      const w = ctx.measureText(ch).width;
-      const pt = pointAtDistance(points, d);
-      ctx.save();
-      ctx.translate(pt.x, pt.y);
-      ctx.rotate(pt.angle);
-      ctx.fillText(ch, 0, 0);
-      ctx.restore();
-      d += w;
-      safety++;
-    }
-  }
-}
-
-/* ============================================================
-   desenho principal
-   ============================================================ */
 async function draw(){
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0,0,W,H);
-
-  // moldura fina
   ctx.strokeStyle = 'rgba(0,0,0,0.15)';
   ctx.lineWidth = 1;
   ctx.strokeRect(0.5,0.5,W-1,H-1);
 
   const margin = 60;
   const photoBox = { x: margin, y: margin, w: W - margin*2, h: 600 };
-
   const pts = projectPoints(photoBox);
-  const canMask = pts.length >= 3;
+  const canWindow = pts.length >= 3;
 
   ctx.save();
   ctx.beginPath();
   ctx.rect(photoBox.x, photoBox.y, photoBox.w, photoBox.h);
   ctx.clip();
 
-  if (canMask){
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
-    ctx.closePath();
-    ctx.clip();
-  }
-
+  // camada 1: a foto inteira, sempre visível, em tom de cinza
   if (loadedImg){
-    // cover-fit dentro do retângulo da foto
-    const ir = loadedImg.width / loadedImg.height;
-    const br = photoBox.w / photoBox.h;
-    let dw, dh, dx, dy;
-    if (ir > br){ dh = photoBox.h; dw = dh * ir; dx = photoBox.x - (dw-photoBox.w)/2; dy = photoBox.y; }
-    else { dw = photoBox.w; dh = dw / ir; dx = photoBox.x; dy = photoBox.y - (dh-photoBox.h)/2; }
-    ctx.filter = 'grayscale(1) contrast(1.05) brightness(1.03)';
-    ctx.drawImage(loadedImg, dx, dy, dw, dh);
-    ctx.filter = 'none';
+    drawCoverImage(ctx, loadedImg, photoBox, 'grayscale(1) contrast(1.05) brightness(1.03)');
   } else {
     ctx.fillStyle = '#e4e4e4';
     ctx.fillRect(photoBox.x, photoBox.y, photoBox.w, photoBox.h);
     ctx.fillStyle = '#6b6b6b';
     ctx.font = '48px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(currentArtist ? initials(currentArtist.nome) : '—', photoBox.x+photoBox.w/2, photoBox.y+photoBox.h/2);
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   }
-  ctx.restore();
 
-  // linhas de conexão + pontos, por cima da foto
-  if (pts.length >= 2){
+  // camada 2: a mesma foto em cor cheia, só dentro da janela geométrica
+  if (canWindow && loadedImg){
     ctx.save();
-    ctx.beginPath();
-    ctx.rect(photoBox.x, photoBox.y, photoBox.w, photoBox.h);
-    ctx.clip();
-
-    ctx.strokeStyle = 'rgba(17,17,17,0.75)';
-    ctx.lineWidth = 1.4;
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
-    ctx.stroke();
-
-    pts.forEach(p => {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
-      ctx.fillStyle = '#fff';
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
-      ctx.strokeStyle = '#111';
-      ctx.lineWidth = 1.4;
-      ctx.stroke();
-    });
-
-    drawTextAlongPath(ctx, EVENT_TITLE, pts, 15, 'rgba(17,17,17,0.9)');
+    ctx.closePath();
+    ctx.clip();
+    drawCoverImage(ctx, loadedImg, photoBox, 'none');
     ctx.restore();
   }
 
-  // divisória
+  // linhas de conexão + pontos, sempre visíveis por cima
+  if (pts.length >= 2){
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
+    if (canWindow) ctx.closePath();
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(17,17,17,0.9)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
+    if (canWindow) ctx.closePath();
+    ctx.stroke();
+
+    pts.forEach(p => {
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+      ctx.fillStyle = '#fff'; ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+      ctx.strokeStyle = '#111'; ctx.lineWidth = 1.4; ctx.stroke();
+    });
+  }
+  ctx.restore();
+
   const textY = photoBox.y + photoBox.h + 40;
   ctx.strokeStyle = 'rgba(0,0,0,0.15)';
   ctx.lineWidth = 1;
@@ -460,9 +398,6 @@ async function draw(){
   ctx.fillText(addrLine, margin, textY + 92);
 }
 
-/* ============================================================
-   download
-   ============================================================ */
 downloadBtn.addEventListener('click', () => {
   setStatus('');
   try{
@@ -470,26 +405,20 @@ downloadBtn.addEventListener('click', () => {
       if (!blob){ setStatus('Não foi possível gerar o PNG.', true); return; }
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      const slug = (currentArtist ? currentArtist.nome : 'marca').toLowerCase()
+      const slug = (currentArtist ? currentArtist.nome : 'mascara').toLowerCase()
         .normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
-      a.href = url; a.download = `circuito-paralelo-${slug || 'marca'}.png`;
+      a.href = url; a.download = `circuito-paralelo-${slug || 'mascara'}.png`;
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
     }, 'image/png');
   } catch(err){
     console.error(err);
-    setStatus('A foto deste artista bloqueia a exportação (restrição de CORS da origem da imagem). Tente selecionar outro artista, ou salve a arte por print da tela.', true);
+    setStatus('A foto deste artista bloqueia a exportação (restrição de CORS da origem da imagem). Tente outro artista, ou salve por print da tela.', true);
   }
 });
 
-/* ============================================================
-   boot
-   ============================================================ */
 async function boot(){
-  try{
-    await document.fonts.load("52px 'Instrument Serif'");
-  } catch(e){ /* segue mesmo se a fonte não carregar a tempo */ }
-
+  try{ await document.fonts.load("52px 'Instrument Serif'"); } catch(e){}
   try{
     LOCATIONS = await loadLocationsFromSheet();
   } catch(err){
@@ -498,7 +427,6 @@ async function boot(){
     downloadBtn.disabled = true;
     return;
   }
-
   const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
   if (withCoords.length){
     bounds = {
@@ -508,7 +436,6 @@ async function boot(){
       maxLng: Math.max(...withCoords.map(l=>l.lng)),
     };
   }
-
   LOCATIONS.forEach(loc => loc.artistas.forEach(art => {
     if (art.nome) FLAT_ARTISTS.push({ ...art, loc });
   }));
