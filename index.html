@@ -56,8 +56,12 @@
   @media (max-width:780px){
     .hero-title{ padding-top:calc(4.8rem + env(safe-area-inset-top)); }
     .hero-title.shrunk{ padding-top:calc(1.6rem + env(safe-area-inset-top)); }
-    .hero-title h1{ font-size:clamp(2.6rem, 15vw, 4.2rem); }
-    .hero-date{ font-size:clamp(2.6rem, 15vw, 4.2rem); }
+    .hero-title h1{ font-size:clamp(2rem, 10vw, 3.4rem); }
+    .hero-date{ font-size:clamp(2rem, 10vw, 3.4rem); white-space:nowrap; }
+  }
+  @media (max-width:380px){
+    .hero-title h1{ font-size:clamp(1.7rem, 9vw, 2.6rem); }
+    .hero-date{ font-size:clamp(1.7rem, 9vw, 2.6rem); }
   }
 
   .hero-count{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:calc(1.6rem + env(safe-area-inset-left)); z-index:200;
