@@ -209,47 +209,6 @@ function pixelOf(lat, lon){
 }
 
 const SUBS = ['a','b','c','d'];
-const OSRM_URL = 'https://routing.openstreetmap.de/routed-foot/route/v1/foot/';
-
-// busca a rota real a pé entre dois ateliês via OSRM (servidor de demonstração
-// público); se falhar ou estiver fora do ar, cai de volta pra linha reta
-// nesse trecho, sem travar o resto do percurso
-// suaviza os cantos de uma rota real (que segue esquinas em ângulo reto)
-// sem se afastar muito do trajeto de fato — deixa o traço mais gracioso
-function chaikinSmooth(points, iterations){
-  let pts = points;
-  for (let it = 0; it < iterations; it++){
-    if (pts.length < 3) break;
-    const next = [pts[0]];
-    for (let i = 0; i < pts.length - 1; i++){
-      const p0 = pts[i], p1 = pts[i+1];
-      next.push({ x: p0.x*0.8 + p1.x*0.2, y: p0.y*0.8 + p1.y*0.2 });
-      next.push({ x: p0.x*0.2 + p1.x*0.8, y: p0.y*0.2 + p1.y*0.8 });
-    }
-    next.push(pts[pts.length-1]);
-    pts = next;
-  }
-  return pts;
-}
-
-async function fetchRoute(locA, locB){
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 6000);
-  try{
-    const url = `${OSRM_URL}${locA.lng},${locA.lat};${locB.lng},${locB.lat}?overview=full&geometries=geojson`;
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    if (!data.routes || !data.routes.length) throw new Error('sem rota retornada');
-    const raw = data.routes[0].geometry.coordinates.map(([lon,lat]) => pixelOf(lat, lon));
-    return chaikinSmooth(raw, 2);
-  } catch(err){
-    clearTimeout(timeoutId);
-    console.warn('Rota indisponível para este trecho, usando linha reta:', err);
-    return [pixelOf(locA.lat, locA.lng), pixelOf(locB.lat, locB.lng)];
-  }
-}
 async function buildBasemap(bounds, W, H, margin){
   const expanded = expandBounds(bounds, 1.0);
   const zoom = fitZoom(expanded, W, H, margin);
@@ -343,13 +302,12 @@ function setStatus(msg, isError){
 
 /* ---- state machine da cobrinha ---- */
 let tourOrder = [];
-let legRoutes = []; // legRoutes[i] = pontos (px) da rota até tourOrder[i]
-let fetchingLegs = new Set();
+let legPaths = []; // legPaths[i] = pontos do trecho até tourOrder[i] (reto ou curvo)
 let visitedIdx = [];
 let trail = [];
 let head = { x:0, y:0 };
 let targetIdx = 0;
-let subIdx = 1; // próximo waypoint dentro de legRoutes[targetIdx]
+let subIdx = 1; // próximo waypoint dentro de legPaths[targetIdx]
 let mode = 'idle'; // idle | moving | paused | finished | static
 let pauseUntil = 0;
 let activeCardLoc = null;
@@ -368,32 +326,47 @@ function shuffledIndices(n){
   return arr;
 }
 
-// busca a rota do trecho i em segundo plano, sem bloquear a animação —
-// chamado com um trecho de folga, enquanto a cobrinha ainda está andando
-// no trecho anterior
-function ensureLegFetching(i){
-  if (i >= tourOrder.length || legRoutes[i] || fetchingLegs.has(i)) return;
-  fetchingLegs.add(i);
-  const locA = PTS[tourOrder[i-1]].loc;
-  const locB = PTS[tourOrder[i]].loc;
-  fetchRoute(locA, locB).then(route => { legRoutes[i] = route; fetchingLegs.delete(i); });
+// gera o caminho de um trecho entre dois pontos — às vezes reto, às vezes
+// uma curva suave (bezier quadrática com um ponto de controle deslocado
+// aleatoriamente pra um dos lados) — sem depender de nenhuma rede, é só
+// geometria local. É isso que dá a variação "reta e curva" no traçado.
+function buildLegPath(a, b){
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  if (Math.random() < 0.3 || len < 60){
+    return [ { x:a.x, y:a.y }, { x:b.x, y:b.y } ];
+  }
+  const nx = -dy/len, ny = dx/len; // normal unitário
+  const side = Math.random() < 0.5 ? 1 : -1;
+  const offset = len * (0.14 + Math.random()*0.26) * side;
+  const mx = (a.x+b.x)/2 + nx*offset;
+  const my = (a.y+b.y)/2 + ny*offset;
+  const N = Math.max(18, Math.round(len/16));
+  const pts = [];
+  for (let i=0;i<=N;i++){
+    const t = i/N;
+    const it = 1-t;
+    pts.push({
+      x: it*it*a.x + 2*it*t*mx + t*t*b.x,
+      y: it*it*a.y + 2*it*t*my + t*t*b.y
+    });
+  }
+  return pts;
 }
 
-async function startTour(){
+function startTour(){
   if (PTS.length < 2){ setStatus('não há ateliês suficientes com coordenadas.', true); return; }
   tourOrder = shuffledIndices(PTS.length);
   visitedIdx = [];
-  legRoutes = [];
-  fetchingLegs = new Set();
   activeCardLoc = null;
 
   // a cobrinha sempre entra pela margem inferior do quadro — lado da
-  // Marina da Glória — esse primeiro trecho não tem rota real, então é
-  // sempre reto e já está pronto de cara; a próxima rota é buscada em
-  // segundo plano enquanto ela já está andando, sem tela de espera
+  // Marina da Glória, de onde as pessoas chegam — não por cima de um ateliê
   const spawn = { x: W/2, y: H + 30 };
-  legRoutes[0] = [ { ...spawn }, { x: PTS[tourOrder[0]].x, y: PTS[tourOrder[0]].y } ];
-  ensureLegFetching(1);
+  legPaths = [ buildLegPath(spawn, PTS[tourOrder[0]]) ];
+  for (let i = 1; i < tourOrder.length; i++){
+    legPaths.push(buildLegPath(PTS[tourOrder[i-1]], PTS[tourOrder[i]]));
+  }
 
   trail = [{ ...spawn }];
   head = { ...spawn };
@@ -420,14 +393,6 @@ function loop(ts){
         activeCardLoc = null;
         if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
       } else {
-        if (!legRoutes[targetIdx]){
-          // a rota real ainda não chegou — segue de linha reta nesse trecho
-          // pra não travar a animação esperando
-          const locA = PTS[tourOrder[targetIdx-1]].loc;
-          const locB = PTS[tourOrder[targetIdx]].loc;
-          legRoutes[targetIdx] = [pixelOf(locA.lat, locA.lng), pixelOf(locB.lat, locB.lng)];
-        }
-        ensureLegFetching(targetIdx + 1);
         mode = 'moving';
         activeCardLoc = null;
       }
@@ -437,18 +402,17 @@ function loop(ts){
   }
 
   if (mode === 'moving'){
-    const route = legRoutes[targetIdx];
-    const wp = route[subIdx];
+    const path = legPaths[targetIdx];
+    const wp = path[subIdx];
     const dx = wp.x - head.x, dy = wp.y - head.y;
     const dist = Math.hypot(dx, dy);
     const step = SPEED * dt;
     if (dist <= step || dist < 0.5){
       head = { x: wp.x, y: wp.y };
       trail.push({ ...head });
-      if (subIdx < route.length - 1){
+      if (subIdx < path.length - 1){
         subIdx++;
       } else {
-        // chegou no ateliê — fim deste trecho
         visitedIdx.push(tourOrder[targetIdx]);
         activeCardLoc = PTS[tourOrder[targetIdx]].loc;
         mode = 'paused';
@@ -616,8 +580,26 @@ function drawFrame(){
   ctx.lineWidth = 1;
   ctx.strokeRect(0.5,0.5,W-1,H-1);
 
+  // a fita: um traço grosso e sólido seguindo o rastro inteiro. Por ser um
+  // único traçado contínuo (não duas fitas separadas), as sobreposições
+  // acontecem naturalmente onde o caminho cruza com ele mesmo — como uma
+  // fita real embolada no chão
+  const RIBBON_WIDTH = 46;
+  if (trail.length >= 2){
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = RIBBON_WIDTH;
+    ctx.strokeStyle = '#111';
+    ctx.beginPath();
+    ctx.moveTo(trail[0].x, trail[0].y);
+    for (let i=1;i<trail.length;i++) ctx.lineTo(trail[i].x, trail[i].y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   const fadeZone = mode === 'moving' ? 60 : 0;
-  drawTextAlongPath(EVENT_TITLE, trail, 30, 'rgba(17,17,17,0.92)', fadeZone);
+  drawTextAlongPath(EVENT_TITLE, trail, 30, 'rgba(255,255,255,0.95)', fadeZone);
 
   // marca da "cabeça" — reforça a sensação de que algo está andando,
   // não só um texto se desenhando sozinho
@@ -625,11 +607,11 @@ function drawFrame(){
     const pulse = 1 + Math.sin(performance.now()/260) * 0.18;
     ctx.beginPath();
     ctx.arc(head.x, head.y, 11*pulse, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(17,17,17,0.10)';
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
     ctx.fill();
     ctx.beginPath();
     ctx.arc(head.x, head.y, 5.5, 0, Math.PI*2);
-    ctx.fillStyle = '#111';
+    ctx.fillStyle = '#fff';
     ctx.fill();
   }
 
@@ -657,24 +639,19 @@ function drawFrame(){
 /* ============================================================
    imagem estática de um espaço específico
    ============================================================ */
-async function buildStaticRoute(targetLocId){
+function buildStaticRoute(targetLocId){
   const targetPtIdx = PTS.findIndex(p => p.loc.id === targetLocId);
   if (targetPtIdx < 0) return;
   const others = shuffledIndices(PTS.length).filter(i => i !== targetPtIdx);
   const n = Math.min(others.length, 3 + Math.floor(Math.random()*3)); // 3 a 5 antes do alvo
   const route = [...others.slice(0, n), targetPtIdx];
 
-  setStatus('calculando o caminho pelas ruas…');
   const spawn = { x: W/2, y: H + 30 };
-  const segments = [[ { ...spawn }, { x: PTS[route[0]].x, y: PTS[route[0]].y } ]];
-  const fetches = [];
-  for (let i = 1; i < route.length; i++){
-    fetches.push(fetchRoute(PTS[route[i-1]].loc, PTS[route[i]].loc).then(r => { segments[i] = r; }));
-  }
-  await Promise.all(fetches);
-
   trail = [];
-  segments.forEach(seg => { seg.forEach(p => trail.push({ ...p })); });
+  buildLegPath(spawn, PTS[route[0]]).forEach(p => trail.push({ ...p }));
+  for (let i = 1; i < route.length; i++){
+    buildLegPath(PTS[route[i-1]], PTS[route[i]]).forEach(p => trail.push({ ...p }));
+  }
   visitedIdx = route;
   activeCardLoc = PTS[targetPtIdx].loc;
   mode = 'static';
