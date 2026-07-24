@@ -459,10 +459,34 @@ function pointAtDistance(points, dist){
   const last = points[points.length-1];
   return { x:last.x, y:last.y, angle:0 };
 }
-function drawTextAlongPath(text, points, fontSize, color, fadeZone){
+// desenha um pedaço curto da fita (o fundo preto) entre duas distâncias
+// ao longo do caminho — amostra alguns pontos intermediários pra acompanhar
+// bem trechos curvos
+function drawRibbonSegment(points, dStart, dEnd, width){
+  const STEPS = 4;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = width;
+  ctx.strokeStyle = '#111';
+  ctx.beginPath();
+  for (let s = 0; s <= STEPS; s++){
+    const dd = dStart + (dEnd - dStart) * s / STEPS;
+    const pt = pointAtDistance(points, dd);
+    if (s === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// fita + texto desenhados juntos, caractere por caractere, sempre na ordem
+// em que o caminho foi percorrido — assim, onde a fita se cruza com ela
+// mesma, o trecho mais novo é desenhado por cima e cobre fisicamente o
+// texto mais antigo que estiver embaixo, como uma fita real embolada
+function drawRibbonAndText(text, points, fontSize, ribbonWidth, fadeZone){
   if (points.length < 2) return;
   const total = pathLength(points);
-  if (total < fontSize) return;
+  if (total < 4) return;
   ctx.font = `${fontSize}px 'Instrument Serif', Georgia, serif`;
   const unit = text + '   ·   ';
   let d = 0, safety = 0;
@@ -470,19 +494,23 @@ function drawTextAlongPath(text, points, fontSize, color, fadeZone){
     for (const ch of unit){
       if (d >= total) break;
       const w = ctx.measureText(ch).width;
-      const dEnd = d + w;
+      const dEnd = Math.min(d + w, total);
+
+      drawRibbonSegment(points, d, dEnd, ribbonWidth);
+
       let alpha = 1;
-      if (fadeZone > 0){
-        alpha = Math.max(0, Math.min(1, (total - d) / fadeZone));
-      }
+      if (fadeZone > 0) alpha = Math.max(0, Math.min(1, (total - d) / fadeZone));
       const pt = pointAtDistance(points, d);
       ctx.save();
       ctx.translate(pt.x, pt.y);
       ctx.rotate(pt.angle);
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = color;
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle'; // centraliza o texto na altura da fita
       ctx.fillText(ch, 0, 0);
       ctx.restore();
+
       d = dEnd;
       safety++;
     }
@@ -580,26 +608,11 @@ function drawFrame(){
   ctx.lineWidth = 1;
   ctx.strokeRect(0.5,0.5,W-1,H-1);
 
-  // a fita: um traço grosso e sólido seguindo o rastro inteiro. Por ser um
-  // único traçado contínuo (não duas fitas separadas), as sobreposições
-  // acontecem naturalmente onde o caminho cruza com ele mesmo — como uma
-  // fita real embolada no chão
-  const RIBBON_WIDTH = 46;
-  if (trail.length >= 2){
-    ctx.save();
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = RIBBON_WIDTH;
-    ctx.strokeStyle = '#111';
-    ctx.beginPath();
-    ctx.moveTo(trail[0].x, trail[0].y);
-    for (let i=1;i<trail.length;i++) ctx.lineTo(trail[i].x, trail[i].y);
-    ctx.stroke();
-    ctx.restore();
-  }
-
+  // fita + texto, desenhados juntos e na ordem cronológica do percurso —
+  // isso é o que faz um trecho mais novo cobrir fisicamente um mais antigo
+  // onde a fita cruza com ela mesma
   const fadeZone = mode === 'moving' ? 60 : 0;
-  drawTextAlongPath(EVENT_TITLE, trail, 30, 'rgba(255,255,255,0.95)', fadeZone);
+  drawRibbonAndText(EVENT_TITLE, trail, 24, 38, fadeZone);
 
   // marca da "cabeça" — reforça a sensação de que algo está andando,
   // não só um texto se desenhando sozinho
@@ -741,7 +754,7 @@ btnRecord.addEventListener('click', () => {
 async function boot(){
   try{
     await Promise.all([
-      document.fonts.load("30px 'Instrument Serif'"),
+      document.fonts.load("24px 'Instrument Serif'"),
       document.fonts.load("34px 'Instrument Serif'")
     ]);
   } catch(e){}
