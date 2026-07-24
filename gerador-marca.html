@@ -61,6 +61,10 @@
   .status{ font-family:var(--mono); font-size:0.75rem; color:var(--gray); margin-top:0.9rem; min-height:1.2em; }
   .status.error{ color:#9A3324; }
 
+  .swatches{ display:flex; gap:0.5rem; }
+  .swatch{ width:34px; height:34px; padding:0; border:1px solid var(--ink); cursor:pointer; border-radius:0; }
+  .swatch.active{ outline:2px solid var(--ink); outline-offset:2px; }
+
   .stage{ display:flex; align-items:center; justify-content:center; padding:2.4rem; }
   .canvas-frame{ width:min(74vh, 100%); max-width:640px; aspect-ratio:1/1; border:1px solid var(--line);
                  box-shadow:0 12px 40px rgba(0,0,0,0.08); background:#fff; }
@@ -83,11 +87,16 @@
     <div class="field">
       <label>Pontos do desenho</label>
       <div class="checklist" id="checklist"></div>
-      <div class="count-note" id="count-note">selecione ao menos 2 ateliês — o título corre sobre a linha entre eles</div>
+      <div class="count-note" id="count-note">selecione ao menos 2 ateliês — cada um vira um ponto numerado, com o endereço na legenda abaixo</div>
       <div class="row-btns" style="margin-top:0.7rem;">
         <button class="btn" id="btn-shuffle">sortear pontos</button>
         <button class="btn" id="btn-clear">limpar</button>
       </div>
+    </div>
+
+    <div class="field">
+      <label>Fundo</label>
+      <div class="swatches" id="swatches"></div>
     </div>
 
     <div class="field">
@@ -107,7 +116,9 @@
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
 const EVENT_TITLE = 'Circuito Paralelo Ateliês do Centro do Rio';
 const EVENT_DATES = '18 – 19 de Setembro';
-const TITLE_SIZE = 44; // tamanho usado tanto no título correndo pela linha quanto na data abaixo
+const TITLE_SIZE = 44; // tamanho usado tanto no título quanto na data, no bloco final
+const BG_PALETTE = ['#ffffff', '#f2f2f0', '#e6e6e4', '#d8d8d6', '#c6c6c4'];
+let bgColor = BG_PALETTE[1];
 
 function parseCSV(text){
   const rows = []; let row = []; let field = ''; let inQuotes = false;
@@ -168,6 +179,19 @@ const checklistEl = document.getElementById('checklist');
 const countNote = document.getElementById('count-note');
 const statusEl = document.getElementById('status');
 const downloadBtn = document.getElementById('btn-download');
+const swatchesEl = document.getElementById('swatches');
+
+function renderSwatches(){
+  swatchesEl.innerHTML = '';
+  BG_PALETTE.forEach(color => {
+    const b = document.createElement('button');
+    b.className = 'swatch' + (color === bgColor ? ' active' : '');
+    b.style.background = color;
+    b.setAttribute('aria-label', color);
+    b.addEventListener('click', () => { bgColor = color; renderSwatches(); draw(); });
+    swatchesEl.appendChild(b);
+  });
+}
 
 function setStatus(msg, isError){
   statusEl.textContent = msg || '';
@@ -207,8 +231,8 @@ function renderChecklist(){
     checklistEl.appendChild(row);
   });
   countNote.textContent = selectedOrder.length < 2
-    ? `${selectedOrder.length} selecionado(s) — mínimo de 2 para o título correr entre eles`
-    : `${selectedOrder.length} pontos conectados, nesta ordem`;
+    ? `${selectedOrder.length} selecionado(s) — mínimo de 2 pontos`
+    : `${selectedOrder.length} pontos numerados, com legenda de endereços`;
 }
 
 document.getElementById('btn-shuffle').addEventListener('click', () => {
@@ -283,43 +307,81 @@ function drawTextAlongPath(ctx, text, points, fontSize, color, fontFamily){
   }
 }
 
+function computeLayout(count){
+  const W = 1000, H = 1000, MARGIN = 70;
+  const TITLE_Y = 858;                    // linha de base do título fixo
+  const DATE_Y = TITLE_Y + TITLE_SIZE * 0.92;
+  const legendFont = count <= 6 ? 15 : (count <= 10 ? 13 : 11);
+  const legendLineH = legendFont + 9;
+  const legendBottom = TITLE_Y - TITLE_SIZE - 40;
+  const legendHeight = count * legendLineH;
+  const legendTop = legendBottom - legendHeight;
+  const boxBottom = legendTop - 30;
+  const box = { x: MARGIN, y: MARGIN, w: W - MARGIN*2, h: Math.max(200, boxBottom - MARGIN) };
+  return { W, H, MARGIN, box, legendTop, legendBottom, legendFont, legendLineH, TITLE_Y, DATE_Y };
+}
+
 async function draw(){
-  const W = canvas.width, H = canvas.height;
+  const layout = computeLayout(selectedOrder.length);
+  const { W, H, MARGIN, box } = layout;
+
   ctx.clearRect(0,0,W,H);
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = bgColor;
   ctx.fillRect(0,0,W,H);
   ctx.strokeStyle = 'rgba(0,0,0,0.15)';
   ctx.lineWidth = 1;
   ctx.strokeRect(0.5,0.5,W-1,H-1);
 
-  const margin = 90;
-  const box = { x: margin, y: margin, w: W - margin*2, h: 600 };
   const pts = projectPoints(box);
 
   if (pts.length >= 2){
-    // sem traçado — só os pontos marcam os ateliês, o desenho da linha
-    // é lido através do próprio texto que corre sobre ela
-    pts.forEach(p => {
-      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
-      ctx.fillStyle = 'rgba(17,17,17,0.5)'; ctx.fill();
-    });
-
+    // o texto corre por cima da linha entre os pontos — quando o
+    // caminho muda de direção o texto vira junto, de propósito
     drawTextAlongPath(ctx, EVENT_TITLE, pts, TITLE_SIZE, '#111', "'Instrument Serif', Georgia, serif");
+
+    // pontos numerados na ordem em que foram escolhidos
+    pts.forEach((p, i) => {
+      ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI*2);
+      ctx.fillStyle = bgColor; ctx.fill();
+      ctx.lineWidth = 1.3; ctx.strokeStyle = '#111'; ctx.stroke();
+      ctx.fillStyle = '#111';
+      ctx.font = "10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(i+1).padStart(2,'0'), p.x, p.y+0.5);
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    });
   } else {
     ctx.fillStyle = '#6b6b6b';
     ctx.font = '16px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('selecione pontos ao lado', W/2, H/2);
+    ctx.fillText('selecione pontos ao lado', W/2, box.y + box.h/2);
     ctx.textAlign = 'left';
   }
 
-  // data: mesma família e mesmo tamanho do título, em cinza — igual ao
-  // par hero-title / hero-date do index.html
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#6b6b6b';
-  ctx.font = `${TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
-  ctx.fillText(EVENT_DATES, W/2, box.y + box.h + 110);
+  // legenda: número + endereço de cada ponto selecionado, na mesma ordem
+  if (selectedOrder.length){
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.font = `${layout.legendFont}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+    selectedOrder.forEach((id, i) => {
+      const loc = LOCATIONS.find(l => l.id === id);
+      if (!loc) return;
+      const y = layout.legendTop + i*layout.legendLineH + layout.legendFont;
+      ctx.fillStyle = '#6b6b6b';
+      ctx.fillText(String(i+1).padStart(2,'0'), MARGIN, y);
+      ctx.fillStyle = '#111';
+      const label = loc.local ? `${loc.local} — ${loc.endereco}` : loc.endereco;
+      ctx.fillText(label, MARGIN + 34, y);
+    });
+  }
+
+  // bloco fixo: título e data, mesma família e tamanho, título em tinta
+  // e data em cinza — igual ao par hero-title / hero-date do index.html
   ctx.textAlign = 'left';
+  ctx.fillStyle = '#111';
+  ctx.font = `${TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
+  ctx.fillText(EVENT_TITLE, MARGIN, layout.TITLE_Y);
+  ctx.fillStyle = '#6b6b6b';
+  ctx.fillText(EVENT_DATES, MARGIN, layout.DATE_Y);
 }
 
 downloadBtn.addEventListener('click', () => {
@@ -353,6 +415,7 @@ async function boot(){
       maxLng: Math.max(...withCoords.map(l=>l.lng)),
     };
   }
+  renderSwatches();
   renderChecklist();
   draw();
 }
