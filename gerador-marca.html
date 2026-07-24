@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
   :root{
@@ -40,15 +41,16 @@
   .field label{ display:block; font-family:var(--mono); font-size:0.73rem; text-transform:uppercase;
                 letter-spacing:0.04em; color:var(--gray); margin-bottom:0.5rem; }
 
-  .row-btns{ display:flex; gap:0.5rem; }
+  .row-btns{ display:flex; gap:0.5rem; flex-wrap:wrap; }
   .btn{ font-family:var(--mono); font-size:0.79rem; background:#fff; color:var(--ink); border:1px solid var(--ink);
         padding:0.6rem 0.9rem; cursor:pointer; border-radius:0; transition:background 0.15s ease, color 0.15s ease; }
   .btn:hover{ background:var(--ink); color:#fff; }
+  .btn.active{ background:var(--ink); color:#fff; }
   .btn.primary{ background:var(--ink); color:#fff; width:100%; padding:0.85rem; font-size:0.83rem; }
   .btn.primary:hover{ opacity:0.8; }
   .btn:disabled{ opacity:0.35; cursor:default; pointer-events:none; }
 
-  .checklist{ max-height:340px; overflow-y:auto; border:1px solid var(--line); }
+  .checklist{ max-height:360px; overflow-y:auto; border:1px solid var(--line); }
   .check-row{ display:flex; align-items:baseline; gap:0.6rem; padding:0.55rem 0.7rem; border-bottom:1px solid var(--line); cursor:pointer; }
   .check-row:last-child{ border-bottom:none; }
   .check-row:hover{ background:var(--hover); }
@@ -58,12 +60,8 @@
   .check-order{ font-family:var(--mono); font-size:0.68rem; color:var(--gray); margin-left:auto; flex-shrink:0; }
 
   .count-note{ font-family:var(--mono); font-size:0.73rem; color:var(--gray); margin-top:0.5rem; line-height:1.4; }
-  .status{ font-family:var(--mono); font-size:0.75rem; color:var(--gray); margin-top:0.9rem; min-height:1.2em; }
+  .status{ font-family:var(--mono); font-size:0.75rem; color:var(--gray); margin-top:0.9rem; min-height:1.2em; line-height:1.4; }
   .status.error{ color:#9A3324; }
-
-  .swatches{ display:flex; gap:0.5rem; }
-  .swatch{ width:34px; height:34px; padding:0; border:1px solid var(--ink); cursor:pointer; border-radius:0; }
-  .swatch.active{ outline:2px solid var(--ink); outline-offset:2px; }
 
   .stage{ display:flex; align-items:center; justify-content:center; padding:2.4rem; }
   .canvas-frame{ width:min(74vh, 100%); max-width:640px; aspect-ratio:1/1; border:1px solid var(--line);
@@ -86,9 +84,17 @@
     <div class="sub">Circuito Paralelo — Ateliês do Centro do Rio</div>
 
     <div class="field">
-      <label>Pontos do desenho</label>
+      <label>Cores</label>
+      <div class="row-btns">
+        <button class="btn active" id="theme-claro">fita preta · texto branco</button>
+        <button class="btn" id="theme-escuro">fita branca · texto preto</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Pontos a conectar</label>
       <div class="checklist" id="checklist"></div>
-      <div class="count-note" id="count-note">selecione ao menos 2 ateliês — cada um vira um ponto numerado, com o endereço na legenda abaixo</div>
+      <div class="count-note" id="count-note"></div>
       <div class="row-btns" style="margin-top:0.7rem;">
         <button class="btn" id="btn-shuffle">sortear pontos</button>
         <button class="btn" id="btn-clear">limpar</button>
@@ -96,30 +102,28 @@
     </div>
 
     <div class="field">
-      <label>Fundo</label>
-      <div class="swatches" id="swatches"></div>
-    </div>
-
-    <div class="field">
-      <button class="btn primary" id="btn-download">baixar PNG</button>
+      <label>Exportar</label>
+      <div class="row-btns">
+        <button class="btn primary" id="btn-download-png" style="flex:1;">baixar PNG</button>
+        <button class="btn primary" id="btn-download-pdf" style="flex:1;">baixar PDF</button>
+      </div>
       <div class="status" id="status"></div>
     </div>
   </div>
 
   <div class="stage">
-    <div class="canvas-frame">
+    <div class="canvas-frame" id="canvas-frame">
       <canvas id="art" width="1000" height="1000"></canvas>
     </div>
   </div>
 </div>
 
 <script>
+/* ============================================================
+   dados
+   ============================================================ */
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
 const EVENT_TITLE = 'Circuito Paralelo Ateliês do Centro do Rio';
-const EVENT_DATES = '18 – 19 de Setembro';
-const TITLE_SIZE = 44; // tamanho usado tanto no título quanto na data, no bloco final
-const BG_PALETTE = ['#ffffff', '#f2f2f0', '#e6e6e4', '#d8d8d6', '#c6c6c4'];
-let bgColor = BG_PALETTE[1];
 
 function parseCSV(text){
   const rows = []; let row = []; let field = ''; let inQuotes = false;
@@ -170,34 +174,183 @@ async function loadLocationsFromSheet(){
   return order.map(k => locMap[k]);
 }
 
-let LOCATIONS = [];
-let bounds = null;
-let selectedOrder = [];
+/* ============================================================
+   posiciona os pontos de acordo com as coordenadas reais — sem
+   desenhar nenhum mapa, só a geometria (projeção mercator
+   normalizada) encaixada no quadro com uma margem
+   ============================================================ */
+function project(lat, lon){
+  const x = (lon + 180) / 360;
+  const rad = lat * Math.PI/180;
+  const y = (1 - Math.log(Math.tan(rad) + 1/Math.cos(rad)) / Math.PI) / 2;
+  return { x, y };
+}
+function expandBounds(b, factor){
+  const cLat = (b.minLat+b.maxLat)/2, cLng = (b.minLng+b.maxLng)/2;
+  const spanLat = Math.max((b.maxLat-b.minLat)*factor, 0.002);
+  const spanLng = Math.max((b.maxLng-b.minLng)*factor, 0.002);
+  return { minLat:cLat-spanLat/2, maxLat:cLat+spanLat/2, minLng:cLng-spanLng/2, maxLng:cLng+spanLng/2 };
+}
+let proj = null; // { p1, scale, offsetX, offsetY }
+function computeProjection(bounds, W, H, margin, padFactor){
+  const expanded = expandBounds(bounds, padFactor);
+  const p1 = project(expanded.maxLat, expanded.minLng); // canto superior-esquerdo
+  const p2 = project(expanded.minLat, expanded.maxLng); // canto inferior-direito
+  const worldW = p2.x - p1.x, worldH = p2.y - p1.y;
+  const scale = Math.min((W - margin*2)/worldW, (H - margin*2)/worldH);
+  const offsetX = (W - worldW*scale)/2, offsetY = (H - worldH*scale)/2;
+  return { p1, scale, offsetX, offsetY };
+}
+function pixelOf(lat, lon){
+  const p = project(lat, lon);
+  return { x: proj.offsetX + (p.x - proj.p1.x)*proj.scale, y: proj.offsetY + (p.y - proj.p1.y)*proj.scale };
+}
 
+/* ============================================================
+   gera o caminho de um trecho entre dois pontos — às vezes reto,
+   às vezes uma curva suave (bezier quadrática deslocada pra um
+   lado aleatório)
+   ============================================================ */
+function buildLegPath(a, b){
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  if (Math.random() < 0.3 || len < 60){
+    return [ { x:a.x, y:a.y }, { x:b.x, y:b.y } ];
+  }
+  const nx = -dy/len, ny = dx/len;
+  const side = Math.random() < 0.5 ? 1 : -1;
+  const offset = len * (0.14 + Math.random()*0.26) * side;
+  const mx = (a.x+b.x)/2 + nx*offset;
+  const my = (a.y+b.y)/2 + ny*offset;
+  const N = Math.max(18, Math.round(len/16));
+  const pts = [];
+  for (let i=0;i<=N;i++){
+    const t = i/N;
+    const it = 1-t;
+    pts.push({
+      x: it*it*a.x + 2*it*t*mx + t*t*b.x,
+      y: it*it*a.y + 2*it*t*my + t*t*b.y
+    });
+  }
+  return pts;
+}
+
+function pathLength(points){
+  let len = 0;
+  for (let i=1;i<points.length;i++) len += Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+  return len;
+}
+function pointAtDistance(points, dist){
+  let d = 0;
+  for (let i=1;i<points.length;i++){
+    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+    if (d+seg >= dist){
+      const t = seg === 0 ? 0 : (dist-d)/seg;
+      return {
+        x: points[i-1].x + (points[i].x-points[i-1].x)*t,
+        y: points[i-1].y + (points[i].y-points[i-1].y)*t,
+        angle: Math.atan2(points[i].y-points[i-1].y, points[i].x-points[i-1].x)
+      };
+    }
+    d += seg;
+  }
+  const last = points[points.length-1];
+  return { x:last.x, y:last.y, angle:0 };
+}
+
+function drawRibbonSegment(points, dStart, dEnd, width, color){
+  const STEPS = 4;
+  const start = Math.max(0, dStart - 2);
+  ctx.save();
+  ctx.lineCap = 'butt';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = width;
+  ctx.strokeStyle = color;
+  ctx.beginPath();
+  for (let s = 0; s <= STEPS; s++){
+    const dd = start + (dEnd - start) * s / STEPS;
+    const pt = pointAtDistance(points, dd);
+    if (s === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawRibbonAndText(text, points, fontSize, ribbonWidth, ribbonColor, textColor){
+  if (points.length < 2) return;
+  const total = pathLength(points);
+  if (total < 4) return;
+  ctx.font = `${fontSize}px 'Instrument Serif', Georgia, serif`;
+  const unit = text + '   ·   ';
+  let d = 0, safety = 0;
+  while (d < total && safety < 6000){
+    for (const ch of unit){
+      if (d >= total) break;
+      const w = ctx.measureText(ch).width;
+      const dEnd = Math.min(d + w, total);
+      drawRibbonSegment(points, d, dEnd, ribbonWidth, ribbonColor);
+      const pt = pointAtDistance(points, d);
+      ctx.save();
+      ctx.translate(pt.x, pt.y);
+      ctx.rotate(pt.angle);
+      ctx.fillStyle = textColor;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(ch, 0, 0);
+      ctx.restore();
+      d = dEnd;
+      safety++;
+    }
+  }
+}
+
+/* ============================================================
+   temas de cor
+   ============================================================ */
+const THEMES = {
+  claro: { bg:'#ffffff', pin:'#111111', pinRing:'#ffffff', pinText:'#ffffff', ribbon:'#111111', text:'rgba(255,255,255,0.95)' },
+  escuro:{ bg:'#111111', pin:'#ffffff', pinRing:'#111111', pinText:'#111111', ribbon:'#ffffff', text:'rgba(17,17,17,0.95)' }
+};
+let currentTheme = 'claro';
+
+/* ============================================================
+   estado
+   ============================================================ */
+let LOCATIONS = [];
+let PTS = [];
+let alphaNum = {};
 const canvas = document.getElementById('art');
 const ctx = canvas.getContext('2d');
+const LOGICAL = 1000;
+const DPR = Math.min(window.devicePixelRatio || 1, 3);
+canvas.width = LOGICAL * DPR;
+canvas.height = LOGICAL * DPR;
+ctx.scale(DPR, DPR);
+const W = LOGICAL, H = LOGICAL;
+
 const checklistEl = document.getElementById('checklist');
 const countNote = document.getElementById('count-note');
 const statusEl = document.getElementById('status');
-const downloadBtn = document.getElementById('btn-download');
-const swatchesEl = document.getElementById('swatches');
+const canvasFrame = document.getElementById('canvas-frame');
+const themeClaroBtn = document.getElementById('theme-claro');
+const themeEscuroBtn = document.getElementById('theme-escuro');
 
-function renderSwatches(){
-  swatchesEl.innerHTML = '';
-  BG_PALETTE.forEach(color => {
-    const b = document.createElement('button');
-    b.className = 'swatch' + (color === bgColor ? ' active' : '');
-    b.style.background = color;
-    b.setAttribute('aria-label', color);
-    b.addEventListener('click', () => { bgColor = color; renderSwatches(); draw(); });
-    swatchesEl.appendChild(b);
-  });
-}
+let selectedOrder = [];
 
 function setStatus(msg, isError){
   statusEl.textContent = msg || '';
   statusEl.classList.toggle('error', !!isError);
 }
+
+function setTheme(t){
+  currentTheme = t;
+  themeClaroBtn.classList.toggle('active', t === 'claro');
+  themeEscuroBtn.classList.toggle('active', t === 'escuro');
+  canvasFrame.style.background = THEMES[t].bg;
+  draw();
+}
+themeClaroBtn.addEventListener('click', () => setTheme('claro'));
+themeEscuroBtn.addEventListener('click', () => setTheme('escuro'));
 
 function renderChecklist(){
   checklistEl.innerHTML = '';
@@ -219,7 +372,7 @@ function renderChecklist(){
     });
     const name = document.createElement('span');
     name.className = 'cname';
-    name.innerHTML = `${loc.local || loc.endereco}${loc.local ? `<small>${loc.endereco}</small>` : ''}`;
+    name.innerHTML = `${String(alphaNum[loc.id]).padStart(2,'0')} ${loc.local || loc.endereco}${loc.local ? `<small>${loc.endereco}</small>` : ''}`;
     row.appendChild(cb);
     row.appendChild(name);
     const orderIdx = selectedOrder.indexOf(loc.id);
@@ -233,7 +386,7 @@ function renderChecklist(){
   });
   countNote.textContent = selectedOrder.length < 2
     ? `${selectedOrder.length} selecionado(s) — mínimo de 2 pontos`
-    : `${selectedOrder.length} pontos numerados, com legenda de endereços`;
+    : `${selectedOrder.length} pontos conectados, nesta ordem`;
 }
 
 document.getElementById('btn-shuffle').addEventListener('click', () => {
@@ -250,173 +403,112 @@ document.getElementById('btn-clear').addEventListener('click', () => {
   draw();
 });
 
-function projectPoints(box){
-  if (!bounds) return [];
-  const { minLat, maxLat, minLng, maxLng } = bounds;
-  const spanLat = (maxLat - minLat) || 1;
-  const spanLng = (maxLng - minLng) || 1;
-  return selectedOrder.map(id => {
-    const loc = LOCATIONS.find(l => l.id === id);
-    if (!loc) return null;
-    const nx = (loc.lng - minLng) / spanLng;
-    const ny = (maxLat - loc.lat) / spanLat;
-    return { x: box.x + nx * box.w, y: box.y + ny * box.h };
-  }).filter(Boolean);
-}
-
-function pathLength(points){
-  let len = 0;
-  for (let i = 1; i < points.length; i++) len += Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
-  return len;
-}
-function pointAtDistance(points, dist){
-  let d = 0;
-  for (let i = 1; i < points.length; i++){
-    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
-    if (d + seg >= dist){
-      const t = seg === 0 ? 0 : (dist - d) / seg;
-      const x = points[i-1].x + (points[i].x-points[i-1].x) * t;
-      const y = points[i-1].y + (points[i].y-points[i-1].y) * t;
-      const angle = Math.atan2(points[i].y-points[i-1].y, points[i].x-points[i-1].x);
-      return { x, y, angle };
-    }
-    d += seg;
-  }
-  const last = points[points.length-1];
-  return { x:last.x, y:last.y, angle:0 };
-}
-function drawTextAlongPath(ctx, text, points, fontSize, color, fontFamily){
-  const total = pathLength(points);
-  if (total < fontSize * 2) return;
-  ctx.font = `${fontSize}px ${fontFamily}`;
-  ctx.fillStyle = color;
-  const unit = text + '   ·   ';
-  let d = 0, safety = 0;
-  while (d < total && safety < 3000){
-    for (const ch of unit){
-      if (d >= total) break;
-      const w = ctx.measureText(ch).width;
-      const pt = pointAtDistance(points, d);
-      ctx.save();
-      ctx.translate(pt.x, pt.y);
-      ctx.rotate(pt.angle);
-      ctx.fillText(ch, 0, 0);
-      ctx.restore();
-      d += w;
-      safety++;
-    }
-  }
-}
-
-function computeLayout(count){
-  const W = 1000, H = 1000, MARGIN = 70;
-  const TITLE_Y = 858;                    // linha de base do título fixo
-  const DATE_Y = TITLE_Y + TITLE_SIZE * 0.92;
-  const legendFont = count <= 6 ? 15 : (count <= 10 ? 13 : 11);
-  const legendLineH = legendFont + 9;
-  const legendBottom = TITLE_Y - TITLE_SIZE - 40;
-  const legendHeight = count * legendLineH;
-  const legendTop = legendBottom - legendHeight;
-  const boxBottom = legendTop - 30;
-  const box = { x: MARGIN, y: MARGIN, w: W - MARGIN*2, h: Math.max(200, boxBottom - MARGIN) };
-  return { W, H, MARGIN, box, legendTop, legendBottom, legendFont, legendLineH, TITLE_Y, DATE_Y };
-}
-
-async function draw(){
-  const layout = computeLayout(selectedOrder.length);
-  const { W, H, MARGIN, box } = layout;
-
+/* ============================================================
+   desenho — só o resultado final, sem animação, sem mapa
+   ============================================================ */
+function draw(){
+  const theme = THEMES[currentTheme];
   ctx.clearRect(0,0,W,H);
-  ctx.fillStyle = bgColor;
+  ctx.fillStyle = theme.bg;
   ctx.fillRect(0,0,W,H);
-  ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+
+  ctx.strokeStyle = currentTheme === 'claro' ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)';
   ctx.lineWidth = 1;
   ctx.strokeRect(0.5,0.5,W-1,H-1);
 
-  const pts = projectPoints(box);
-
-  if (pts.length >= 2){
-    // o texto corre por cima da linha entre os pontos — quando o
-    // caminho muda de direção o texto vira junto, de propósito
-    drawTextAlongPath(ctx, EVENT_TITLE, pts, TITLE_SIZE, '#111', "'Instrument Serif', Georgia, serif");
-
-    // pontos numerados na ordem em que foram escolhidos
-    pts.forEach((p, i) => {
-      ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI*2);
-      ctx.fillStyle = bgColor; ctx.fill();
-      ctx.lineWidth = 1.3; ctx.strokeStyle = '#111'; ctx.stroke();
-      ctx.fillStyle = '#111';
-      ctx.font = "10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(String(i+1).padStart(2,'0'), p.x, p.y+0.5);
-      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-    });
-  } else {
-    ctx.fillStyle = '#6b6b6b';
-    ctx.font = '16px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('selecione pontos ao lado', W/2, box.y + box.h/2);
-    ctx.textAlign = 'left';
-  }
-
-  // legenda: número + endereço de cada ponto selecionado, na mesma ordem
-  if (selectedOrder.length){
+  // todos os pontos, sempre visíveis, numerados em ordem alfabética
+  PTS.forEach((p) => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 15, 0, Math.PI*2);
+    ctx.fillStyle = theme.pin;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = theme.pinRing;
+    ctx.stroke();
+    ctx.fillStyle = theme.pinText;
+    ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(alphaNum[p.loc.id]).padStart(2,'0'), p.x, p.y + 0.5);
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-    ctx.font = `${layout.legendFont}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
-    selectedOrder.forEach((id, i) => {
-      const loc = LOCATIONS.find(l => l.id === id);
-      if (!loc) return;
-      const y = layout.legendTop + i*layout.legendLineH + layout.legendFont;
-      ctx.fillStyle = '#6b6b6b';
-      ctx.fillText(String(i+1).padStart(2,'0'), MARGIN, y);
-      ctx.fillStyle = '#111';
-      const label = loc.local ? `${loc.local} — ${loc.endereco}` : loc.endereco;
-      ctx.fillText(label, MARGIN + 34, y);
-    });
-  }
+  });
 
-  // bloco fixo: título e data, mesma família e tamanho, título em tinta
-  // e data em cinza — igual ao par hero-title / hero-date do index.html
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#111';
-  ctx.font = `${TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
-  ctx.fillText(EVENT_TITLE, MARGIN, layout.TITLE_Y);
-  ctx.fillStyle = '#6b6b6b';
-  ctx.fillText(EVENT_DATES, MARGIN, layout.DATE_Y);
+  // a fita: liga os pontos selecionados, na ordem escolhida, misturando
+  // trechos retos e curvos aleatoriamente
+  if (selectedOrder.length >= 2){
+    const selPts = selectedOrder.map(id => PTS.find(p => p.loc.id === id)).filter(Boolean);
+    const trail = [ { x: selPts[0].x, y: selPts[0].y } ];
+    for (let i = 1; i < selPts.length; i++){
+      buildLegPath(selPts[i-1], selPts[i]).slice(1).forEach(pt => trail.push(pt));
+    }
+    drawRibbonAndText(EVENT_TITLE, trail, 24, 38, theme.ribbon, theme.text);
+  }
 }
 
-downloadBtn.addEventListener('click', () => {
+/* ============================================================
+   exportação
+   ============================================================ */
+document.getElementById('btn-download-png').addEventListener('click', () => {
   setStatus('');
   canvas.toBlob(blob => {
     if (!blob){ setStatus('Não foi possível gerar o PNG.', true); return; }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `circuito-paralelo-marca.png`;
+    a.href = url; a.download = 'circuito-paralelo-marca.png';
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
   }, 'image/png');
 });
 
+document.getElementById('btn-download-pdf').addEventListener('click', () => {
+  setStatus('');
+  try{
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'px', format: [LOGICAL, LOGICAL] });
+    const imgData = canvas.toDataURL('image/png');
+    doc.addImage(imgData, 'PNG', 0, 0, LOGICAL, LOGICAL);
+    doc.save('circuito-paralelo-marca.pdf');
+  } catch(err){
+    console.error(err);
+    setStatus('Não foi possível gerar o PDF agora — tente o PNG.', true);
+  }
+});
+
+/* ============================================================
+   boot
+   ============================================================ */
 async function boot(){
-  try{ await document.fonts.load(`${TITLE_SIZE}px 'Instrument Serif'`); } catch(e){}
+  try{ await document.fonts.load("24px 'Instrument Serif'"); } catch(e){}
   try{
     LOCATIONS = await loadLocationsFromSheet();
   } catch(err){
     console.error(err);
     setStatus('Não foi possível carregar os dados da planilha agora. Recarregue a página em instantes.', true);
-    downloadBtn.disabled = true;
     return;
   }
+
   const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
-  if (withCoords.length){
-    bounds = {
-      minLat: Math.min(...withCoords.map(l=>l.lat)),
-      maxLat: Math.max(...withCoords.map(l=>l.lat)),
-      minLng: Math.min(...withCoords.map(l=>l.lng)),
-      maxLng: Math.max(...withCoords.map(l=>l.lng)),
-    };
+  if (withCoords.length < 2){
+    setStatus('poucos ateliês com coordenadas preenchidas ainda.', true);
+    return;
   }
-  renderSwatches();
+  const bounds = {
+    minLat: Math.min(...withCoords.map(l=>l.lat)),
+    maxLat: Math.max(...withCoords.map(l=>l.lat)),
+    minLng: Math.min(...withCoords.map(l=>l.lng)),
+    maxLng: Math.max(...withCoords.map(l=>l.lng)),
+  };
+  proj = computeProjection(bounds, W, H, 60, 1.0);
+
+  PTS = withCoords.map(loc => {
+    const { x, y } = pixelOf(loc.lat, loc.lng);
+    return { loc, x, y };
+  });
+
+  const sortedForNum = [...withCoords].sort((a,b) =>
+    (a.local||a.endereco).localeCompare(b.local||b.endereco, 'pt-BR', {sensitivity:'base'}));
+  alphaNum = {};
+  sortedForNum.forEach((loc,i) => { alphaNum[loc.id] = i+1; });
+
   renderChecklist();
   draw();
 }
