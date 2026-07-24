@@ -210,7 +210,7 @@ function pixelOf(lat, lon){
 
 const SUBS = ['a','b','c','d'];
 async function buildBasemap(bounds, W, H, margin){
-  const expanded = expandBounds(bounds, 1.7);
+  const expanded = expandBounds(bounds, 1.15);
   const zoom = fitZoom(expanded, W, H, margin);
   const cLat = (expanded.minLat+expanded.maxLat)/2, cLng = (expanded.minLng+expanded.maxLng)/2;
   const center = project(cLat, cLng, zoom);
@@ -398,25 +398,31 @@ function pointAtDistance(points, dist){
   const last = points[points.length-1];
   return { x:last.x, y:last.y, angle:0 };
 }
-function drawTextAlongPath(text, points, fontSize, color){
+function drawTextAlongPath(text, points, fontSize, color, fadeZone){
   if (points.length < 2) return;
   const total = pathLength(points);
   if (total < fontSize) return;
   ctx.font = `${fontSize}px 'Instrument Serif', Georgia, serif`;
-  ctx.fillStyle = color;
   const unit = text + '   ·   ';
   let d = 0, safety = 0;
   while (d < total && safety < 4000){
     for (const ch of unit){
       if (d >= total) break;
       const w = ctx.measureText(ch).width;
+      const dEnd = d + w;
+      let alpha = 1;
+      if (fadeZone > 0){
+        alpha = Math.max(0, Math.min(1, (total - d) / fadeZone));
+      }
       const pt = pointAtDistance(points, d);
       ctx.save();
       ctx.translate(pt.x, pt.y);
       ctx.rotate(pt.angle);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
       ctx.fillText(ch, 0, 0);
       ctx.restore();
-      d += w;
+      d = dEnd;
       safety++;
     }
   }
@@ -500,7 +506,22 @@ function drawFrame(){
   ctx.lineWidth = 1;
   ctx.strokeRect(0.5,0.5,W-1,H-1);
 
-  drawTextAlongPath(EVENT_TITLE, trail, 30, 'rgba(17,17,17,0.92)');
+  const fadeZone = mode === 'moving' ? 60 : 0;
+  drawTextAlongPath(EVENT_TITLE, trail, 30, 'rgba(17,17,17,0.92)', fadeZone);
+
+  // marca da "cabeça" — reforça a sensação de que algo está andando,
+  // não só um texto se desenhando sozinho
+  if (mode === 'moving' || mode === 'paused'){
+    const pulse = 1 + Math.sin(performance.now()/260) * 0.18;
+    ctx.beginPath();
+    ctx.arc(head.x, head.y, 11*pulse, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(17,17,17,0.10)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(head.x, head.y, 5.5, 0, Math.PI*2);
+    ctx.fillStyle = '#111';
+    ctx.fill();
+  }
 
   // pontos já visitados / alvo atual, discretos
   PTS.forEach((p, i) => {
@@ -651,7 +672,7 @@ async function boot(){
 
   setStatus('carregando mapa…');
   try{
-    basemapCanvas = await buildBasemap(bounds, W, H, 90);
+    basemapCanvas = await buildBasemap(bounds, W, H, 55);
   } catch(err){
     console.warn('Mapa indisponível, seguindo com fundo neutro:', err);
   }
