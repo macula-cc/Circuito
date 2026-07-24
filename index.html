@@ -49,13 +49,23 @@
   .hero-title.shrunk h1{ font-size:clamp(1.43rem, 3.3vw, 2.09rem) !important; line-height:1.25; max-width:14ch; white-space:normal; }
   .hero-title.shrunk .hero-date{ font-size:clamp(1.43rem, 3.3vw, 2.09rem) !important; margin-top:0.2rem; }
 
-  /* Mobile: the switcher pill sits close to the top-right corner, so on narrow
-     screens we push the whole title block below its row (vertical clearance)
-     rather than fight over horizontal space. Actual font size is computed in
-     JS to exactly fill the available width with symmetric margins. */
+  /* Mobile: fixed sizes per breakpoint, calculated conservatively against the
+     longest line ("18 – 19 de Setembro") so it never wraps or overflows, even
+     accounting for Instrument Serif's wider letterforms. Vertical clearance
+     (padding-top) keeps the block below the mapa/lista toggle. */
   @media (max-width:780px){
     .hero-title{ padding-top:calc(4.8rem + env(safe-area-inset-top)); }
     .hero-title.shrunk{ padding-top:calc(1.6rem + env(safe-area-inset-top)); }
+    .hero-title h1{ font-size:2rem; white-space:normal; }
+    .hero-date{ font-size:2rem; }
+  }
+  @media (max-width:430px){
+    .hero-title h1{ font-size:1.7rem; }
+    .hero-date{ font-size:1.7rem; }
+  }
+  @media (max-width:380px){
+    .hero-title h1{ font-size:1.5rem; }
+    .hero-date{ font-size:1.5rem; }
   }
 
   .hero-count{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:calc(1.6rem + env(safe-area-inset-left)); z-index:200;
@@ -675,61 +685,18 @@ function goToLocation(loc){
   openDrawer(loc.id);
 }
 
-// ---------------- hero title: starts large, fitted to fill the width, shrinks to the corner on first interaction ----------------
+// ---------------- hero title: starts large (fixed CSS breakpoint sizes), shrinks to the corner on first interaction ----------------
 const heroTitle = document.getElementById('hero-title');
-const heroH1 = heroTitle.querySelector('h1');
-const heroDateEl = heroTitle.querySelector('.hero-date');
 let heroShrunk = false;
-
-function fitHeroText(){
-  if (heroShrunk) return;
-  const style = getComputedStyle(heroTitle);
-  const available = heroTitle.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-  if (available <= 0) return;
-
-  let size = 200; // px sample size to measure natural text proportions
-  heroH1.style.fontSize = size + 'px';
-  heroDateEl.style.fontSize = size + 'px';
-
-  // iterate a few times: each pass re-measures the *actual* rendered width at
-  // the currently-applied size, so it self-corrects even if the webfont
-  // (Instrument Serif) finishes loading/swapping in between passes and
-  // shifts the text metrics from what the first guess assumed.
-  for (let i = 0; i < 6; i++){
-    const widest = Math.max(heroH1.scrollWidth, heroDateEl.scrollWidth);
-    if (!widest) return;
-    const nextSize = Math.max(10, (available / widest) * size * 0.96);
-    if (Math.abs(nextSize - size) < 0.5) { size = nextSize; break; }
-    size = nextSize;
-    heroH1.style.fontSize = size + 'px';
-    heroDateEl.style.fontSize = size + 'px';
-  }
-}
 
 function shrinkHero(){
   if (heroShrunk) return;
   heroShrunk = true;
   heroTitle.classList.add('shrunk');
-  // hand control back to the CSS clamp() rules for the small state
-  heroH1.style.fontSize = '';
-  heroDateEl.style.fontSize = '';
 }
 document.addEventListener('pointerdown', shrinkHero, { once:true, passive:true });
 document.addEventListener('wheel', shrinkHero, { once:true, passive:true });
 document.addEventListener('keydown', shrinkHero, { once:true });
-
-// run the fit at a few checkpoints — immediately, once the browser reports
-// fonts ready, and a couple of delayed safety nets — since font-swap timing
-// is inconsistent across mobile browsers and a stale measurement is what
-// causes the text to overflow past the screen edge.
-fitHeroText();
-if (document.fonts && document.fonts.ready){
-  document.fonts.ready.then(fitHeroText).catch(() => {});
-}
-setTimeout(fitHeroText, 300);
-setTimeout(fitHeroText, 1000);
-window.addEventListener('resize', () => { if (!heroShrunk) fitHeroText(); });
-window.addEventListener('orientationchange', () => { if (!heroShrunk) setTimeout(fitHeroText, 100); });
 
 // ---------------- view switch (mapa / lista) ----------------
 const listOverlay = document.getElementById('list-overlay');
