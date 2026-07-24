@@ -209,6 +209,24 @@ function pixelOf(lat, lon){
 }
 
 const SUBS = ['a','b','c','d'];
+const OSRM_URL = 'https://router.project-osrm.org/route/v1/foot/';
+
+// busca a rota real a pé entre dois ateliês via OSRM (servidor de demonstração
+// público); se falhar ou estiver fora do ar, cai de volta pra linha reta
+// nesse trecho, sem travar o resto do percurso
+async function fetchRoute(locA, locB){
+  try{
+    const url = `${OSRM_URL}${locA.lng},${locA.lat};${locB.lng},${locB.lat}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!data.routes || !data.routes.length) throw new Error('sem rota retornada');
+    return data.routes[0].geometry.coordinates.map(([lon,lat]) => pixelOf(lat, lon));
+  } catch(err){
+    console.warn('Rota indisponível para este trecho, usando linha reta:', err);
+    return [pixelOf(locA.lat, locA.lng), pixelOf(locB.lat, locB.lng)];
+  }
+}
 async function buildBasemap(bounds, W, H, margin){
   const expanded = expandBounds(bounds, 1.0);
   const zoom = fitZoom(expanded, W, H, margin);
@@ -302,11 +320,13 @@ function setStatus(msg, isError){
 
 /* ---- state machine da cobrinha ---- */
 let tourOrder = [];
+let legRoutes = []; // legRoutes[i] = pontos (px) da rota até tourOrder[i]
 let visitedIdx = [];
 let trail = [];
 let head = { x:0, y:0 };
 let targetIdx = 0;
-let mode = 'idle'; // idle | moving | paused | finished | static
+let subIdx = 1; // próximo waypoint dentro de legRoutes[targetIdx]
+let mode = 'idle'; // idle | loading | moving | paused | finished | static
 let pauseUntil = 0;
 let activeCardLoc = null;
 let rafId = null;
@@ -324,17 +344,36 @@ function shuffledIndices(n){
   return arr;
 }
 
-function startTour(){
+async function startTour(){
   if (PTS.length < 2){ setStatus('não há ateliês suficientes com coordenadas.', true); return; }
   tourOrder = shuffledIndices(PTS.length);
   visitedIdx = [];
+  trail = [];
+  activeCardLoc = null;
+  mode = 'loading';
+  drawFrame();
+  setStatus('calculando o caminho pelas ruas…');
+
   // a cobrinha sempre entra pela margem inferior do quadro — lado da
-  // Marina da Glória, de onde as pessoas chegam — não por cima de um ateliê
+  // Marina da Glória, de onde as pessoas chegam — não por cima de um ateliê;
+  // esse primeiro trecho não tem rota real (não é um endereço de verdade),
+  // então é sempre reta
   const spawn = { x: W/2, y: H + 30 };
+  legRoutes = [[ { ...spawn }, { x: PTS[tourOrder[0]].x, y: PTS[tourOrder[0]].y } ]];
+
+  const fetches = [];
+  for (let i = 1; i < tourOrder.length; i++){
+    const locA = PTS[tourOrder[i-1]].loc;
+    const locB = PTS[tourOrder[i]].loc;
+    fetches.push(fetchRoute(locA, locB).then(route => { legRoutes[i] = route; }));
+  }
+  await Promise.all(fetches);
+
+  setStatus('');
   trail = [{ ...spawn }];
   head = { ...spawn };
   targetIdx = 0;
-  activeCardLoc = null;
+  subIdx = 1;
   mode = 'moving';
   pauseUntil = 0;
   lastTs = null;
@@ -343,7 +382,7 @@ function startTour(){
 
 function loop(ts){
   rafId = requestAnimationFrame(loop);
-  if (mode === 'static' || mode === 'idle') return;
+  if (mode === 'static' || mode === 'idle' || mode === 'loading') return;
   if (lastTs == null) lastTs = ts;
   const dt = (ts - lastTs) / 1000;
   lastTs = ts;
@@ -364,18 +403,25 @@ function loop(ts){
   }
 
   if (mode === 'moving'){
-    const target = PTS[tourOrder[targetIdx]];
-    const dx = target.x - head.x, dy = target.y - head.y;
+    const route = legRoutes[targetIdx];
+    const wp = route[subIdx];
+    const dx = wp.x - head.x, dy = wp.y - head.y;
     const dist = Math.hypot(dx, dy);
     const step = SPEED * dt;
     if (dist <= step || dist < 0.5){
-      head = { x: target.x, y: target.y };
+      head = { x: wp.x, y: wp.y };
       trail.push({ ...head });
-      visitedIdx.push(tourOrder[targetIdx]);
-      activeCardLoc = target.loc;
-      mode = 'paused';
-      pauseUntil = ts + PAUSE_MS;
-      targetIdx++;
+      if (subIdx < route.length - 1){
+        subIdx++;
+      } else {
+        // chegou no ateliê — fim deste trecho
+        visitedIdx.push(tourOrder[targetIdx]);
+        activeCardLoc = PTS[tourOrder[targetIdx]].loc;
+        mode = 'paused';
+        pauseUntil = ts + PAUSE_MS;
+        targetIdx++;
+        subIdx = 1;
+      }
     } else {
       head = { x: head.x + dx/dist*step, y: head.y + dy/dist*step };
       const last = trail[trail.length-1];
@@ -577,27 +623,28 @@ function drawFrame(){
 /* ============================================================
    imagem estática de um espaço específico
    ============================================================ */
-function buildStaticRoute(targetLocId){
+async function buildStaticRoute(targetLocId){
   const targetPtIdx = PTS.findIndex(p => p.loc.id === targetLocId);
   if (targetPtIdx < 0) return;
   const others = shuffledIndices(PTS.length).filter(i => i !== targetPtIdx);
   const n = Math.min(others.length, 3 + Math.floor(Math.random()*3)); // 3 a 5 antes do alvo
   const route = [...others.slice(0, n), targetPtIdx];
 
+  setStatus('calculando o caminho pelas ruas…');
   const spawn = { x: W/2, y: H + 30 };
-  trail = [{ ...spawn }];
-  route.forEach((idx) => {
-    const p = PTS[idx];
-    const prev = trail[trail.length-1];
-    const dist = Math.hypot(p.x-prev.x, p.y-prev.y);
-    const steps = Math.max(1, Math.floor(dist/SAMPLE_DIST));
-    for (let s=1; s<=steps; s++){
-      trail.push({ x: prev.x + (p.x-prev.x)*s/steps, y: prev.y + (p.y-prev.y)*s/steps });
-    }
-  });
+  const segments = [[ { ...spawn }, { x: PTS[route[0]].x, y: PTS[route[0]].y } ]];
+  const fetches = [];
+  for (let i = 1; i < route.length; i++){
+    fetches.push(fetchRoute(PTS[route[i-1]].loc, PTS[route[i]].loc).then(r => { segments[i] = r; }));
+  }
+  await Promise.all(fetches);
+
+  trail = [];
+  segments.forEach(seg => { seg.forEach(p => trail.push({ ...p })); });
   visitedIdx = route;
   activeCardLoc = PTS[targetPtIdx].loc;
   mode = 'static';
+  setStatus('imagem estática gerada — use "baixar PNG" ao lado.');
   drawFrame();
 }
 
@@ -621,7 +668,6 @@ btnStatic.addEventListener('click', () => {
   if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
   recDot.classList.remove('on');
   buildStaticRoute(locSelect.value);
-  setStatus('imagem estática gerada — use "baixar PNG" ao lado.');
 });
 
 btnDownload.addEventListener('click', () => {
