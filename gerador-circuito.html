@@ -214,6 +214,24 @@ const OSRM_URL = 'https://routing.openstreetmap.de/routed-foot/route/v1/foot/';
 // busca a rota real a pé entre dois ateliês via OSRM (servidor de demonstração
 // público); se falhar ou estiver fora do ar, cai de volta pra linha reta
 // nesse trecho, sem travar o resto do percurso
+// suaviza os cantos de uma rota real (que segue esquinas em ângulo reto)
+// sem se afastar muito do trajeto de fato — deixa o traço mais gracioso
+function chaikinSmooth(points, iterations){
+  let pts = points;
+  for (let it = 0; it < iterations; it++){
+    if (pts.length < 3) break;
+    const next = [pts[0]];
+    for (let i = 0; i < pts.length - 1; i++){
+      const p0 = pts[i], p1 = pts[i+1];
+      next.push({ x: p0.x*0.8 + p1.x*0.2, y: p0.y*0.8 + p1.y*0.2 });
+      next.push({ x: p0.x*0.2 + p1.x*0.8, y: p0.y*0.2 + p1.y*0.8 });
+    }
+    next.push(pts[pts.length-1]);
+    pts = next;
+  }
+  return pts;
+}
+
 async function fetchRoute(locA, locB){
   try{
     const url = `${OSRM_URL}${locA.lng},${locA.lat};${locB.lng},${locB.lat}?overview=full&geometries=geojson`;
@@ -221,7 +239,8 @@ async function fetchRoute(locA, locB){
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (!data.routes || !data.routes.length) throw new Error('sem rota retornada');
-    return data.routes[0].geometry.coordinates.map(([lon,lat]) => pixelOf(lat, lon));
+    const raw = data.routes[0].geometry.coordinates.map(([lon,lat]) => pixelOf(lat, lon));
+    return chaikinSmooth(raw, 2);
   } catch(err){
     console.warn('Rota indisponível para este trecho, usando linha reta:', err);
     return [pixelOf(locA.lat, locA.lng), pixelOf(locB.lat, locB.lng)];
