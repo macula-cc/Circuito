@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Ferramentas — Circuito Paralelo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --serif: 'Instrument Serif', Georgia, 'Iowan Old Style', 'Times New Roman', ui-serif, serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --ink:#111; --line: rgba(0,0,0,0.15); --gray:#6b6b6b; --hover:#f0f0f0; --paper:#fff;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; min-height:100vh; color:var(--ink); font-family:var(--sans); background:var(--paper);
+        display:flex; flex-direction:column; }
+  a{ color:inherit; text-decoration:none; }
+
+  .head{ padding:calc(3rem + env(safe-area-inset-top)) 1.6rem 1rem; }
+  h1{ font-family:var(--serif); font-weight:400; font-size:clamp(2.4rem, 6vw, 4rem); line-height:1; margin:0 0 0.3rem; }
+  .sub{ font-family:var(--mono); font-size:0.85rem; color:var(--gray); }
+
+  .cards{ flex-grow:1; display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line);
+          border-top:1px solid var(--line); margin-top:1.6rem; }
+  @media (max-width:720px){ .cards{ grid-template-columns:1fr; } }
+
+  .card{ background:#fff; padding:2.4rem 1.8rem; display:flex; flex-direction:column; justify-content:flex-end;
+         min-height:46vh; transition:background 0.2s ease; position:relative; }
+  .card:hover{ background:var(--hover); }
+  .card .num{ font-family:var(--mono); font-size:0.79rem; color:var(--gray); position:absolute; top:1.8rem; left:1.8rem; }
+  .card h2{ font-family:var(--serif); font-weight:400; font-size:clamp(2rem, 5vw, 3rem); margin:0 0 0.5rem; line-height:1.02; }
+  .card p{ font-family:var(--sans); font-size:0.94rem; color:var(--gray); line-height:1.5; margin:0 0 1.2rem; max-width:34ch; }
+  .card .go{ font-family:var(--mono); font-size:0.79rem; text-decoration:underline; text-underline-offset:3px; }
+
+  .foot{ padding:1.2rem 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); font-family:var(--mono); font-size:0.75rem; color:var(--gray); }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>Ferramentas do<br>Circuito Paralelo</h1>
+  <div class="sub">Ateliês do Centro do Rio · 18–19 de Setembro</div>
+</div>
+
+<div class="cards">
+  <a class="card" href="gerador-marca.html">
+    <span class="num">01</span>
+    <h2>Gerar<br>Marca</h2>
+    <p>Conecte os ateliês no mapa e transforme as linhas em um traçado com o nome do evento correndo por cima.</p>
+    <span class="go">abrir ferramenta →</span>
+  </a>
+  <a class="card" href="gerador-mascara.html">
+    <span class="num">02</span>
+    <h2>Gerar<br>Máscara</h2>
+    <p>Escolha um artista e abra uma janela colorida sobre a foto, desenhada a partir das coordenadas dos ateliês.</p>
+    <span class="go">abrir ferramenta →</span>
+  </a>
+</div>
+
+<div class="foot">circuitoparalelo</div>
+
+</body>
+</html>
