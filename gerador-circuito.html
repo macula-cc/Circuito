@@ -232,7 +232,8 @@ async function buildBasemap(bounds, W, H, margin){
   proj = { zoom, originX, originY, tile };
 
   const off = document.createElement('canvas');
-  off.width = W; off.height = H;
+  off.width = W * DPR; off.height = H * DPR;
+  octx.scale(DPR, DPR);
   const octx = off.getContext('2d');
   octx.fillStyle = '#e9e9e9'; octx.fillRect(0,0,W,H);
 
@@ -262,7 +263,7 @@ async function buildBasemap(bounds, W, H, margin){
 
   // tom de cinza, igual ao tratamento do mapa no index.html
   try{
-    const imgData = octx.getImageData(0,0,W,H);
+    const imgData = octx.getImageData(0,0,off.width,off.height);
     const d = imgData.data;
     for (let i=0;i<d.length;i+=4){
       const v = d[i]*0.3 + d[i+1]*0.59 + d[i+2]*0.11;
@@ -285,7 +286,15 @@ let alphaNum = {}; // loc.id -> número na ordem alfabética (mesma numeração 
 let basemapCanvas = null;
 const canvas = document.getElementById('art');
 const ctx = canvas.getContext('2d');
-const W = canvas.width, H = canvas.height;
+// desenha na densidade real da tela (retina/alta resolução), não numa
+// grade fixa de 1000x1000 — evita o efeito de "imagem esticada"/sem
+// nitidez de vetor no texto e nas formas
+const LOGICAL = 1000;
+const DPR = Math.min(window.devicePixelRatio || 1, 3);
+canvas.width = LOGICAL * DPR;
+canvas.height = LOGICAL * DPR;
+ctx.scale(DPR, DPR);
+const W = LOGICAL, H = LOGICAL;
 
 const statusEl = document.getElementById('status');
 const locSelect = document.getElementById('loc-select');
@@ -602,7 +611,7 @@ function drawCard(loc){
 
 function drawFrame(){
   ctx.clearRect(0,0,W,H);
-  if (basemapCanvas) ctx.drawImage(basemapCanvas, 0, 0);
+  if (basemapCanvas) ctx.drawImage(basemapCanvas, 0, 0, W, H);
   else { ctx.fillStyle = '#e9e9e9'; ctx.fillRect(0,0,W,H); }
 
   ctx.strokeStyle = 'rgba(0,0,0,0.15)';
