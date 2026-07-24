@@ -233,15 +233,19 @@ function chaikinSmooth(points, iterations){
 }
 
 async function fetchRoute(locA, locB){
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 6000);
   try{
     const url = `${OSRM_URL}${locA.lng},${locA.lat};${locB.lng},${locB.lat}?overview=full&geometries=geojson`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (!data.routes || !data.routes.length) throw new Error('sem rota retornada');
     const raw = data.routes[0].geometry.coordinates.map(([lon,lat]) => pixelOf(lat, lon));
     return chaikinSmooth(raw, 2);
   } catch(err){
+    clearTimeout(timeoutId);
     console.warn('Rota indisponível para este trecho, usando linha reta:', err);
     return [pixelOf(locA.lat, locA.lng), pixelOf(locB.lat, locB.lng)];
   }
@@ -340,12 +344,13 @@ function setStatus(msg, isError){
 /* ---- state machine da cobrinha ---- */
 let tourOrder = [];
 let legRoutes = []; // legRoutes[i] = pontos (px) da rota até tourOrder[i]
+let fetchingLegs = new Set();
 let visitedIdx = [];
 let trail = [];
 let head = { x:0, y:0 };
 let targetIdx = 0;
 let subIdx = 1; // próximo waypoint dentro de legRoutes[targetIdx]
-let mode = 'idle'; // idle | loading | moving | paused | finished | static
+let mode = 'idle'; // idle | moving | paused | finished | static
 let pauseUntil = 0;
 let activeCardLoc = null;
 let rafId = null;
@@ -363,32 +368,33 @@ function shuffledIndices(n){
   return arr;
 }
 
+// busca a rota do trecho i em segundo plano, sem bloquear a animação —
+// chamado com um trecho de folga, enquanto a cobrinha ainda está andando
+// no trecho anterior
+function ensureLegFetching(i){
+  if (i >= tourOrder.length || legRoutes[i] || fetchingLegs.has(i)) return;
+  fetchingLegs.add(i);
+  const locA = PTS[tourOrder[i-1]].loc;
+  const locB = PTS[tourOrder[i]].loc;
+  fetchRoute(locA, locB).then(route => { legRoutes[i] = route; fetchingLegs.delete(i); });
+}
+
 async function startTour(){
   if (PTS.length < 2){ setStatus('não há ateliês suficientes com coordenadas.', true); return; }
   tourOrder = shuffledIndices(PTS.length);
   visitedIdx = [];
-  trail = [];
+  legRoutes = [];
+  fetchingLegs = new Set();
   activeCardLoc = null;
-  mode = 'loading';
-  drawFrame();
-  setStatus('calculando o caminho pelas ruas…');
 
   // a cobrinha sempre entra pela margem inferior do quadro — lado da
-  // Marina da Glória, de onde as pessoas chegam — não por cima de um ateliê;
-  // esse primeiro trecho não tem rota real (não é um endereço de verdade),
-  // então é sempre reta
+  // Marina da Glória — esse primeiro trecho não tem rota real, então é
+  // sempre reto e já está pronto de cara; a próxima rota é buscada em
+  // segundo plano enquanto ela já está andando, sem tela de espera
   const spawn = { x: W/2, y: H + 30 };
-  legRoutes = [[ { ...spawn }, { x: PTS[tourOrder[0]].x, y: PTS[tourOrder[0]].y } ]];
+  legRoutes[0] = [ { ...spawn }, { x: PTS[tourOrder[0]].x, y: PTS[tourOrder[0]].y } ];
+  ensureLegFetching(1);
 
-  const fetches = [];
-  for (let i = 1; i < tourOrder.length; i++){
-    const locA = PTS[tourOrder[i-1]].loc;
-    const locB = PTS[tourOrder[i]].loc;
-    fetches.push(fetchRoute(locA, locB).then(route => { legRoutes[i] = route; }));
-  }
-  await Promise.all(fetches);
-
-  setStatus('');
   trail = [{ ...spawn }];
   head = { ...spawn };
   targetIdx = 0;
@@ -396,12 +402,13 @@ async function startTour(){
   mode = 'moving';
   pauseUntil = 0;
   lastTs = null;
+  setStatus('');
   if (!rafId) rafId = requestAnimationFrame(loop);
 }
 
 function loop(ts){
   rafId = requestAnimationFrame(loop);
-  if (mode === 'static' || mode === 'idle' || mode === 'loading') return;
+  if (mode === 'static' || mode === 'idle') return;
   if (lastTs == null) lastTs = ts;
   const dt = (ts - lastTs) / 1000;
   lastTs = ts;
@@ -413,6 +420,14 @@ function loop(ts){
         activeCardLoc = null;
         if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
       } else {
+        if (!legRoutes[targetIdx]){
+          // a rota real ainda não chegou — segue de linha reta nesse trecho
+          // pra não travar a animação esperando
+          const locA = PTS[tourOrder[targetIdx-1]].loc;
+          const locB = PTS[tourOrder[targetIdx]].loc;
+          legRoutes[targetIdx] = [pixelOf(locA.lat, locA.lng), pixelOf(locB.lat, locB.lng)];
+        }
+        ensureLegFetching(targetIdx + 1);
         mode = 'moving';
         activeCardLoc = null;
       }
