@@ -410,16 +410,21 @@ function initials(name){
   return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
 }
 
-// Label shown on the map pin: initials of the space/collective name when one
-// exists, otherwise initials derived from the street address (with generic
-// prefixes like "Rua"/"Av." stripped so the letters are more distinctive).
-// Deliberately not a number — numbering would imply ranking between venues
-// that all have equal standing in the circuit.
+// Numbering shown on map pins: assigned once, in alphabetical order of the
+// space/collective name (falling back to the address when there's no name).
+// This is the exact same order used by the "por endereço" list, and the map
+// is populated once after data loads so every part of the UI agrees on the
+// same number for the same location.
+let locationNumberMap = {};
+function computeLocationNumbers(){
+  const sorted = LOCATIONS.slice()
+    .sort((a,b) => (a.local || a.endereco).localeCompare(b.local || b.endereco, 'pt-BR', { sensitivity:'base' }));
+  locationNumberMap = {};
+  sorted.forEach((loc, i) => { locationNumberMap[loc.id] = i + 1; });
+}
 function pinLabel(loc){
-  const source = loc.local && loc.local.trim()
-    ? loc.local
-    : loc.endereco.replace(/^(Rua|Av\.?|Avenida|Largo|Praça|Arco do)\s+/i, '');
-  return initials(source);
+  const n = locationNumberMap[loc.id];
+  return n ? String(n).padStart(2, '0') : '?';
 }
 
 function updateHeroCount(){
@@ -752,11 +757,11 @@ function renderRowsByEndereco(){
     .map((loc) => loc)
     .sort((a,b) => (a.local || a.endereco).localeCompare(b.local || b.endereco, 'pt-BR', { sensitivity:'base' }));
 
-  sorted.forEach((loc, i) => {
+  sorted.forEach((loc) => {
     const btn = document.createElement('button');
     btn.className = 'row' + (loc.lat == null ? ' pending' : '');
     btn.innerHTML = `
-      <span class="row-num">${String(i+1).padStart(2,'0')}</span>
+      <span class="row-num">${pinLabel(loc)}</span>
       <span class="row-main">
         <span class="row-title">${loc.local || loc.endereco}</span>
         ${loc.local ? `<span class="row-sub">${loc.endereco}</span>` : ''}
@@ -778,11 +783,10 @@ function renderRowsByArtista(){
   });
   flat.sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity:'base' }));
 
-  flat.forEach((entry, i) => {
+  flat.forEach((entry) => {
     const btn = document.createElement('button');
     btn.className = 'row' + (entry.loc.lat == null ? ' pending' : '');
     btn.innerHTML = `
-      <span class="row-num">${String(i+1).padStart(2,'0')}</span>
       <span class="row-main">
         <span class="row-title">${entry.nome}</span>
         <span class="row-sub">${entry.loc.local || entry.loc.endereco}</span>
@@ -811,6 +815,7 @@ async function boot(){
     return;
   }
   updateHeroCount();
+  computeLocationNumbers();
   initMap();
   resolveMissingCoordinates();
   renderRows();
