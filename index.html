@@ -101,6 +101,21 @@
                             border-radius:0 !important; font-family:var(--mono) !important; }
   .leaflet-control-attribution{ font-family:var(--mono); font-size:0.68rem !important; background:rgba(255,255,255,0.75) !important; }
 
+  .locate-control a{ background:#fff !important; color:#111 !important; border:1px solid var(--line) !important;
+                      border-radius:0 !important; font-size:1rem !important; line-height:26px !important;
+                      width:26px !important; height:26px !important; display:block; text-align:center;
+                      text-decoration:none !important; }
+  .locate-control a:hover{ background:var(--hover) !important; }
+
+  .user-dot{ position:relative; width:14px; height:14px; border-radius:50%; background:#3B82F6; border:2px solid #fff;
+             box-shadow:0 0 0 4px rgba(59,130,246,0.28); }
+  .user-dot::after{ content:''; position:absolute; inset:-8px; border-radius:50%;
+                     background:rgba(59,130,246,0.28); animation:user-dot-pulse 2.2s ease-out infinite; }
+  @keyframes user-dot-pulse{
+    0%{ transform:scale(0.4); opacity:0.8; }
+    100%{ transform:scale(1.6); opacity:0; }
+  }
+
   /* ---------------- List overlay (modal, same glass treatment as lightbox) ---------------- */
   .list-overlay{ position:fixed; inset:0; z-index:400;
                  background:transparent;
@@ -424,11 +439,66 @@ function initMap(){
     }).addTo(map);
 
     LOCATIONS.forEach((loc) => addMarkerForLocation(loc));
+
+    const LocateControl = L.Control.extend({
+      options: { position: 'bottomright' },
+      onAdd: function(){
+        const container = L.DomUtil.create('div', 'leaflet-bar locate-control');
+        const link = L.DomUtil.create('a', '', container);
+        link.href = '#';
+        link.title = 'Minha localização';
+        link.setAttribute('role', 'button');
+        link.setAttribute('aria-label', 'Mostrar minha localização no mapa');
+        link.innerHTML = '◎';
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.on(link, 'click', (e) => { e.preventDefault(); locateUser(link); });
+        return container;
+      }
+    });
+    new LocateControl().addTo(map);
   } catch(err){
     console.error('Mapa indisponível:', err);
     const mapEl = document.getElementById('map');
     mapEl.innerHTML = '<div class="map-error">Não foi possível carregar o mapa agora.<br>A lista de endereços continua disponível.</div>';
   }
+}
+
+// ---------------- "minha localização" ----------------
+let userMarker = null;
+function locateUser(triggerEl){
+  if (!map) return;
+  if (!navigator.geolocation){
+    alert('Este navegador não suporta geolocalização.');
+    return;
+  }
+  const originalText = triggerEl ? triggerEl.innerHTML : null;
+  if (triggerEl) triggerEl.innerHTML = '···';
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      if (triggerEl) triggerEl.innerHTML = originalText;
+      const { latitude, longitude } = pos.coords;
+      if (userMarker) map.removeLayer(userMarker);
+      const icon = L.divIcon({
+        className: '',
+        html: '<div class="user-dot"></div>',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+      });
+      userMarker = L.marker([latitude, longitude], { icon, zIndexOffset: 1000 }).addTo(map);
+      map.flyTo([latitude, longitude], 16, { duration: 0.6 });
+    },
+    (err) => {
+      if (triggerEl) triggerEl.innerHTML = originalText;
+      console.warn('Falha ao obter localização:', err);
+      if (err.code === err.PERMISSION_DENIED){
+        alert('Permissão de localização negada. Para usar este recurso, libere o acesso à localização para este site nas configurações do navegador.');
+      } else {
+        alert('Não foi possível obter sua localização agora. Tente novamente em instantes.');
+      }
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+  );
 }
 
 // ---------------- geocodificação automática (fallback) ----------------
