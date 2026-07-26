@@ -278,34 +278,40 @@ function escapeXML(s){
    caractere, sempre na ordem do caminho, pra que trechos mais
    novos cubram os mais antigos nos cruzamentos
    ============================================================ */
-function buildRibbonAndTextSVG(text, points, fontSize, ribbonWidth, ribbonColor, textColor){
-  if (points.length < 2) return '';
-  const total = pathLength(points);
-  if (total < 4) return '';
-
-  // a fita inteira é um único traço contínuo — sem costuras, sem
-  // caixinhas por letra
-  let pathD = 'M' + points[0].x.toFixed(2) + ' ' + points[0].y.toFixed(2) + ' ';
-  for (let i = 1; i < points.length; i++){
-    pathD += 'L' + points[i].x.toFixed(2) + ' ' + points[i].y.toFixed(2) + ' ';
-  }
-  let out = `<path d="${pathD}" fill="none" stroke="${ribbonColor}" stroke-width="${ribbonWidth}" stroke-linecap="round" stroke-linejoin="round"/>`;
-
-  // o texto é só escrito em cima, seguindo o caminho — sem nenhuma
-  // fita extra por trás de cada letra
+function buildRibbonAndTextSVG(text, legs, fontSize, ribbonWidth, ribbonColor, textColor){
   const unit = text + '   ·   ';
-  let d = 0, safety = 0;
-  while (d < total && safety < 6000){
-    for (const ch of unit){
-      if (d >= total) break;
+  let out = '';
+  let charPos = 0; // continua entre pernas, pra frase não reiniciar a cada trecho
+
+  legs.forEach(points => {
+    if (points.length < 2) return;
+    const total = pathLength(points);
+    if (total < 4) return;
+
+    // a fita desse trecho é um traço único e contínuo — sem costuras.
+    // Pernas são desenhadas em ordem, então uma perna mais nova cobre
+    // fisicamente uma mais antiga onde elas se cruzam — a sensação de
+    // fita se enrolando em si mesma
+    let pathD = 'M' + points[0].x.toFixed(2) + ' ' + points[0].y.toFixed(2) + ' ';
+    for (let i = 1; i < points.length; i++){
+      pathD += 'L' + points[i].x.toFixed(2) + ' ' + points[i].y.toFixed(2) + ' ';
+    }
+    out += `<path d="${pathD}" fill="none" stroke="${ribbonColor}" stroke-width="${ribbonWidth}" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+    let d = 0, safety = 0;
+    while (d < total && safety < 3000){
+      const ch = unit[charPos % unit.length];
       const w = charWidth(ch, fontSize);
+      if (d >= total) break;
       const pt = pointAtDistance(points, d);
       const angleDeg = (pt.angle * 180 / Math.PI).toFixed(2);
       out += `<text x="0" y="0" transform="translate(${pt.x.toFixed(2)} ${pt.y.toFixed(2)}) rotate(${angleDeg})" font-family="'Instrument Serif', Georgia, serif" font-size="${fontSize}" fill="${textColor}" text-anchor="start" dominant-baseline="middle">${escapeXML(ch)}</text>`;
       d += w;
+      charPos++;
       safety++;
     }
-  }
+  });
+
   return out;
 }
 
@@ -417,11 +423,11 @@ function buildContentSVG(){
 
   if (selectedOrder.length >= 2){
     const selPts = selectedOrder.map(id => PTS.find(p => p.loc.id === id)).filter(Boolean);
-    const trail = [ { x: selPts[0].x, y: selPts[0].y } ];
+    const legs = [];
     for (let i = 1; i < selPts.length; i++){
-      buildLegPath(selPts[i-1], selPts[i]).slice(1).forEach(pt => trail.push(pt));
+      legs.push(buildLegPath(selPts[i-1], selPts[i]));
     }
-    s += buildRibbonAndTextSVG(EVENT_TITLE, trail, 24, 38, theme.ribbon, theme.text);
+    s += buildRibbonAndTextSVG(EVENT_TITLE, legs, 24, 38, theme.ribbon, theme.text);
   }
   return s;
 }
