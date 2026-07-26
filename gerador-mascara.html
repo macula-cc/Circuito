@@ -136,8 +136,13 @@ const EVENT_TITLE = 'Circuito Paralelo Ateliês do Centro';
 const EVENT_DATES = '18 – 19 de Setembro';
 
 const MARGIN = 60;
-const PHOTO_BOX = { x: MARGIN, y: 210, w: LOGICAL - MARGIN*2, h: 560 };
-const MARK_BOX = { x: MARGIN, y: PHOTO_BOX.y + PHOTO_BOX.h + 60, w: 90, h: 90 };
+const NAME_Y = 110;      // nome bem mais pra cima, cap-height quase encostando na margem
+const ADDR_Y = 162;
+const MARK_BOX = { x: MARGIN, y: LOGICAL - MARGIN - 120, w: 120, h: 120 }; // bottom = LOGICAL - MARGIN
+const PHOTO_BOX = { x: MARGIN, y: ADDR_Y + 50, w: LOGICAL - MARGIN*2, h: MARK_BOX.y - 50 - (ADDR_Y + 50) };
+const NAME_SIZE = 64;
+const ADDR_SIZE = 24;
+const TITLE_SIZE = 36;
 
 function parseCSV(text){
   const rows = []; let row = []; let field = ''; let inQuotes = false;
@@ -449,11 +454,11 @@ function buildContentSVG(){
   s += `<rect x="0" y="0" width="${LOGICAL}" height="${LOGICAL}" fill="${theme.bg}"/>`;
 
   // nome do artista + endereço, no topo
-  s += `<text x="${MARGIN}" y="120" font-family="'Instrument Serif', Georgia, serif" font-size="54" fill="${theme.ink}">${escapeXML(currentArtist ? currentArtist.nome : '—')}</text>`;
+  s += `<text x="${MARGIN}" y="${NAME_Y}" font-family="'Instrument Serif', Georgia, serif" font-size="${NAME_SIZE}" fill="${theme.ink}">${escapeXML(currentArtist ? currentArtist.nome : '—')}</text>`;
   const addrLine = currentArtist
     ? (currentArtist.loc.local ? `${currentArtist.loc.local} — ${currentArtist.loc.endereco}` : currentArtist.loc.endereco)
     : '—';
-  s += `<text x="${MARGIN}" y="158" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="20" fill="${theme.sub}">${escapeXML(addrLine)}</text>`;
+  s += `<text x="${MARGIN}" y="${ADDR_Y}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="${ADDR_SIZE}" fill="${theme.sub}">${escapeXML(addrLine)}</text>`;
 
   // foto — com ou sem máscara
   const hasPhoto = currentArtist && currentArtist.foto && photoOk;
@@ -479,8 +484,8 @@ function buildContentSVG(){
     s += `<path d="${buildOpenPathD(markPoints)}" fill="none" stroke="${theme.mark}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
   }
   const textX = MARK_BOX.x + MARK_BOX.w + 26;
-  s += `<text x="${textX}" y="${MARK_BOX.y+38}" font-family="'Instrument Serif', Georgia, serif" font-size="32" fill="${theme.ink}">${escapeXML(EVENT_TITLE)}</text>`;
-  s += `<text x="${textX}" y="${MARK_BOX.y+76}" font-family="'Instrument Serif', Georgia, serif" font-size="32" fill="${theme.sub}">${escapeXML(EVENT_DATES)}</text>`;
+  s += `<text x="${textX}" y="${MARK_BOX.y+52}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE}" fill="${theme.ink}">${escapeXML(EVENT_TITLE)}</text>`;
+  s += `<text x="${textX}" y="${MARK_BOX.y+98}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE}" fill="${theme.sub}">${escapeXML(EVENT_DATES)}</text>`;
 
   return s;
 }
@@ -573,7 +578,7 @@ document.getElementById('btn-download-pdf').addEventListener('click', async () =
    boot
    ============================================================ */
 async function boot(){
-  try{ await document.fonts.load("54px 'Instrument Serif'"); } catch(e){}
+  try{ await document.fonts.load(`${NAME_SIZE}px 'Instrument Serif'`); } catch(e){}
   try{
     LOCATIONS = await loadLocationsFromSheet();
   } catch(err){
