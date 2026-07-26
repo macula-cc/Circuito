@@ -340,6 +340,33 @@ function chaikinSmoothClosed(points, iterations){
   return pts;
 }
 
+// desloca cada aresta do fecho convexo levemente pra fora (nunca pra
+// dentro), pra dar uma variação orgânica sem arriscar auto-interseção
+function bulgeHullOutward(hull){
+  const cx = hull.reduce((s,p)=>s+p.x,0) / hull.length;
+  const cy = hull.reduce((s,p)=>s+p.y,0) / hull.length;
+  const pts = [];
+  for (let i = 0; i < hull.length; i++){
+    const a = hull[i], b = hull[(i+1) % hull.length];
+    pts.push({ x:a.x, y:a.y });
+    if (Math.random() < 0.7){
+      const mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
+      let nx = mx - cx, ny = my - cy;
+      const nlen = Math.hypot(nx, ny) || 1;
+      nx /= nlen; ny /= nlen;
+      const edgeLen = Math.hypot(b.x-a.x, b.y-a.y);
+      const bulge = edgeLen * (0.05 + Math.random()*0.12);
+      const cxp = mx + nx*bulge, cyp = my + ny*bulge;
+      const N = 8;
+      for (let s = 1; s < N; s++){
+        const t = s/N, it = 1-t;
+        pts.push({ x: it*it*a.x + 2*it*t*cxp + t*t*b.x, y: it*it*a.y + 2*it*t*cyp + t*t*b.y });
+      }
+    }
+  }
+  return pts;
+}
+
 function generateNewShape(){
   const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
   const order = [...withCoords].sort(() => Math.random()-0.5);
@@ -351,9 +378,16 @@ function generateNewShape(){
     buildLegPath(closed[i-1], closed[i]).slice(1).forEach(pt => pts.push(pt));
   }
   shapePoints = pts;
-  // a máscara de verdade é só o contorno externo desse traçado, suavizado —
-  // nunca tem "buraco" porque é sempre um polígono simples
-  maskPoints = chaikinSmoothClosed(convexHull(shapePoints), 3);
+
+  // a máscara usa só um recorte aleatório dos pontos (não todos) pra
+  // gerar fechos convexos diferentes a cada vez, com bordas levemente
+  // infladas pra fora — sempre um polígono simples, então sempre sólido
+  const withCoordsPts = PTS.slice();
+  const fraction = 0.55 + Math.random()*0.3; // 55% a 85% dos pontos
+  const n = Math.max(4, Math.round(withCoordsPts.length * fraction));
+  const subset = [...withCoordsPts].sort(() => Math.random()-0.5).slice(0, n);
+  const hull = convexHull(subset);
+  maskPoints = chaikinSmoothClosed(bulgeHullOutward(hull), 2);
   draw();
 }
 document.getElementById('btn-shuffle').addEventListener('click', generateNewShape);
