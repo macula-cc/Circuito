@@ -54,11 +54,12 @@
 
   .status{ font-family:var(--mono); font-size:0.75rem; color:var(--gray); margin-top:0.9rem; min-height:1.2em; line-height:1.4; }
   .status.error{ color:#9A3324; }
+  .note{ font-family:var(--mono); font-size:0.73rem; color:var(--gray); line-height:1.4; }
 
   .stage{ display:flex; align-items:center; justify-content:center; padding:2.4rem; }
   .canvas-frame{ width:min(74vh, 100%); max-width:640px; aspect-ratio:1/1; border:1px solid var(--line);
-                 box-shadow:0 12px 40px rgba(0,0,0,0.08); background:#fff; }
-  #art{ width:100%; height:100%; display:block; }
+                 box-shadow:0 12px 40px rgba(0,0,0,0.08); background:#fff; position:relative; }
+  #art, #event-canvas{ width:100%; height:100%; display:block; }
 </style>
 </head>
 <body>
@@ -75,22 +76,67 @@
     <div class="sub">Circuito de Ateliês do Centro</div>
 
     <div class="field">
-      <label for="artist-select">Artista</label>
-      <select id="artist-select"><option>carregando…</option></select>
-    </div>
-
-    <div class="field">
-      <label>Foto</label>
-      <div class="count-note" style="font-family:var(--mono); font-size:0.73rem; color:var(--gray);">foto do artista, sempre em retângulo</div>
-    </div>
-
-    <div class="field">
-      <label>Marca (abaixo da foto)</label>
+      <label>Tipo de post</label>
       <div class="row-btns">
-        <button class="btn" id="btn-new-mark" style="flex:1;">gerar nova marca</button>
+        <button class="btn active" id="mode-artista">post do artista</button>
+        <button class="btn" id="mode-evento">post do evento</button>
       </div>
-      <div class="row-btns" style="margin-top:0.5rem;">
-        <button class="btn primary" id="btn-mark-video" style="flex:1;">gerar vídeo do post (~10s)</button>
+    </div>
+
+    <!-- ===== campos: post do artista ===== -->
+    <div id="artist-fields">
+      <div class="field">
+        <label for="artist-select">Artista</label>
+        <select id="artist-select"><option>carregando…</option></select>
+      </div>
+
+      <div class="field">
+        <label>Foto</label>
+        <div class="note">foto do artista, sempre em retângulo</div>
+      </div>
+
+      <div class="field">
+        <label>Marca (abaixo da foto)</label>
+        <div class="row-btns">
+          <button class="btn" id="btn-new-mark" style="flex:1;">gerar nova marca</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== campos: post do evento ===== -->
+    <div id="event-fields" style="display:none;">
+      <div class="field">
+        <label>Mapa</label>
+        <div class="row-btns">
+          <button class="btn" id="evt-map-on">mostrar mapa</button>
+          <button class="btn active" id="evt-map-off">esconder mapa</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Pontos dos ateliês</label>
+        <div class="row-btns">
+          <button class="btn" id="evt-pins-on">mostrar</button>
+          <button class="btn active" id="evt-pins-off">esconder</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Marca</label>
+        <div class="row-btns">
+          <button class="btn active" id="evt-mark-static">imagem estática</button>
+          <button class="btn" id="evt-mark-video">vídeo</button>
+        </div>
+        <div class="row-btns" style="margin-top:0.5rem;" id="evt-static-row">
+          <button class="btn" id="btn-evt-new-mark" style="flex:1;">gerar nova marca</button>
+        </div>
+        <div class="row-btns" style="margin-top:0.5rem; display:none;" id="evt-video-row">
+          <button class="btn primary" id="btn-evt-video" style="flex:1;">gerar vídeo</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="note" id="evt-stats-note">carregando dados da planilha…</div>
       </div>
     </div>
 
@@ -117,7 +163,7 @@
   <div class="stage">
     <div class="canvas-frame" id="canvas-frame">
       <svg id="art" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg"></svg>
-      <canvas id="video-canvas" width="1000" height="1000" style="width:100%;height:100%;display:none;"></canvas>
+      <canvas id="event-canvas" width="1000" height="1000" style="display:none; position:absolute; inset:0;"></canvas>
     </div>
   </div>
 </div>
@@ -132,14 +178,27 @@ const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Instrument+Serif:i
 const EVENT_TITLE = 'Circuito de Ateliês do Centro';
 const EVENT_DATES = '18 – 19 de Setembro';
 
+// layout — post do artista
 const MARGIN = 60;
-const NAME_Y = 110;      // nome bem mais pra cima, cap-height quase encostando na margem
+const NAME_Y = 110;
 const ADDR_Y = 162;
-const MARK_BOX = { x: MARGIN, y: LOGICAL - MARGIN - 120, w: 120, h: 120 }; // bottom = LOGICAL - MARGIN
+const MARK_BOX = { x: MARGIN, y: LOGICAL - MARGIN - 120, w: 120, h: 120 };
 const PHOTO_BOX = { x: MARGIN, y: ADDR_Y + 50, w: LOGICAL - MARGIN*2, h: MARK_BOX.y - 50 - (ADDR_Y + 50) };
 const NAME_SIZE = 64;
 const ADDR_SIZE = 24;
 const TITLE_SIZE = 36;
+
+// layout — post do evento
+const EVT_TITLE_L1 = 'Circuito de';
+const EVT_TITLE_L2 = 'Ateliês do Centro';
+const EVT_TITLE_SIZE = 72;
+const EVT_TITLE_Y1 = 136;
+const EVT_TITLE_Y2 = 208;
+const EVT_MAP_BOX = { x: MARGIN, y: 240, w: LOGICAL - MARGIN*2, h: 560 };
+const EVT_STATS_SIZE = 40;
+const EVT_STATS_Y1 = 878;
+const EVT_STATS_Y2 = 924;
+const EVT_DATE_Y = 901;
 
 function parseCSV(text){
   const rows = []; let row = []; let field = ''; let inQuotes = false;
@@ -202,9 +261,8 @@ function initials(name){
 }
 
 /* ============================================================
-   geometria — projeta as coordenadas reais num referencial livre
-   (não preso a nenhuma caixa específica); cada uso (máscara, marca)
-   encaixa esse mesmo formato relativo na caixa que precisar
+   geometria genérica (sem mapa) — usada no post do artista pra
+   posicionar os pontos da marca pequena
    ============================================================ */
 function project(lat, lon){
   const x = (lon + 180) / 360;
@@ -232,9 +290,6 @@ function pixelOf(lat, lon){
   const p = project(lat, lon);
   return { x: proj.offsetX + (p.x - proj.p1.x)*proj.scale, y: proj.offsetY + (p.y - proj.p1.y)*proj.scale };
 }
-
-// encaixa qualquer nuvem de pontos numa caixa alvo, centralizada, ocupando
-// a fração informada da caixa — usado tanto pra máscara quanto pra marca
 function fitPointsToBox(points, box, fillFraction){
   const xs = points.map(p=>p.x), ys = points.map(p=>p.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
@@ -247,7 +302,102 @@ function fitPointsToBox(points, box, fillFraction){
 }
 
 /* ============================================================
-   caminho reto/curvo entre dois pontos
+   geometria com mapa real (mercator + tiles) — usada no post do
+   evento, pra que a posição dos pontos faça sentido geograficamente
+   ============================================================ */
+const TILE_SIZE = 256;
+const TILE_URL = (z,x,y,s) => `https://${s}.basemaps.cartocdn.com/light_all/${z}/${x}/${y}.png`;
+const SUBS_EVT = ['a','b','c','d'];
+
+function mercProject(lat, lon, zoom){
+  const scale = Math.pow(2, zoom);
+  const x = (lon + 180) / 360 * scale;
+  const rad = lat * Math.PI/180;
+  const y = (1 - Math.log(Math.tan(rad) + 1/Math.cos(rad)) / Math.PI) / 2 * scale;
+  return { x, y };
+}
+function fitZoomEvt(bounds, boxW, boxH, margin){
+  for (let z = 19; z >= 2; z--){
+    const p1 = mercProject(bounds.maxLat, bounds.minLng, z);
+    const p2 = mercProject(bounds.minLat, bounds.maxLng, z);
+    const pxW = (p2.x - p1.x) * TILE_SIZE;
+    const pxH = (p2.y - p1.y) * TILE_SIZE;
+    if (pxW <= (boxW - margin*2) && pxH <= (boxH - margin*2)) return z;
+  }
+  return 2;
+}
+let evtProj = null; // { zoom, originX, originY, tile }
+function computeEvtProjection(bounds){
+  const expanded = expandBounds(bounds, 1.0);
+  const zoom = fitZoomEvt(expanded, EVT_MAP_BOX.w, EVT_MAP_BOX.h, 20);
+  const p1 = mercProject(expanded.maxLat, expanded.minLng, zoom);
+  const p2 = mercProject(expanded.minLat, expanded.maxLng, zoom);
+  const pxW = (p2.x - p1.x) * TILE_SIZE;
+  const pxH = (p2.y - p1.y) * TILE_SIZE;
+  const scale = Math.min(8, Math.max(1, Math.min((EVT_MAP_BOX.w-40)/pxW, (EVT_MAP_BOX.h-40)/pxH)));
+  const tile = TILE_SIZE * scale;
+  const cLat = (expanded.minLat+expanded.maxLat)/2, cLng = (expanded.minLng+expanded.maxLng)/2;
+  const center = mercProject(cLat, cLng, zoom);
+  const originX = center.x - (EVT_MAP_BOX.w/2)/tile;
+  const originY = center.y - (EVT_MAP_BOX.h/2)/tile;
+  evtProj = { zoom, originX, originY, tile };
+}
+function pixelOfEvt(lat, lon){
+  const p = mercProject(lat, lon, evtProj.zoom);
+  return { x: EVT_MAP_BOX.x + (p.x - evtProj.originX)*evtProj.tile, y: EVT_MAP_BOX.y + (p.y - evtProj.originY)*evtProj.tile };
+}
+
+let evtBasemapCanvas = null;
+let evtBasemapLoading = false;
+async function fetchEvtBasemapTiles(){
+  if (evtBasemapCanvas || evtBasemapLoading) return;
+  evtBasemapLoading = true;
+  const { zoom, originX, originY, tile } = evtProj;
+  const off = document.createElement('canvas');
+  off.width = EVT_MAP_BOX.w; off.height = EVT_MAP_BOX.h;
+  const octx = off.getContext('2d');
+  octx.fillStyle = '#e9e9e9'; octx.fillRect(0,0,EVT_MAP_BOX.w,EVT_MAP_BOX.h);
+
+  const txStart = Math.floor(originX), txEnd = Math.floor(originX + EVT_MAP_BOX.w/tile);
+  const tyStart = Math.floor(originY), tyEnd = Math.floor(originY + EVT_MAP_BOX.h/tile);
+  const maxTile = Math.pow(2, zoom);
+  const jobs = [];
+  for (let tx = txStart; tx <= txEnd; tx++){
+    for (let ty = tyStart; ty <= tyEnd; ty++){
+      if (ty < 0 || ty >= maxTile) continue;
+      const wrappedX = ((tx % maxTile) + maxTile) % maxTile;
+      const sub = SUBS_EVT[Math.abs(tx+ty) % SUBS_EVT.length];
+      const url = TILE_URL(zoom, wrappedX, ty, sub);
+      const px = (tx - originX) * tile - EVT_MAP_BOX.x;
+      const py = (ty - originY) * tile - EVT_MAP_BOX.y;
+      jobs.push(new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => { try{ octx.drawImage(img, px + EVT_MAP_BOX.x, py + EVT_MAP_BOX.y, tile, tile); }catch(e){} resolve(); };
+        img.onerror = () => resolve();
+        img.src = url;
+      }));
+    }
+  }
+  await Promise.all(jobs);
+  try{
+    const imgData = octx.getImageData(0,0,EVT_MAP_BOX.w,EVT_MAP_BOX.h);
+    const d = imgData.data;
+    for (let i=0;i<d.length;i+=4){
+      const v = d[i]*0.3 + d[i+1]*0.59 + d[i+2]*0.11;
+      const c = Math.min(255, (v-128)*1.08+128*1.03);
+      d[i]=d[i+1]=d[i+2]=c;
+    }
+    octx.putImageData(imgData,0,0);
+  } catch(e){
+    console.warn('Não foi possível aplicar o tom de cinza (possível restrição de CORS dos tiles):', e);
+  }
+  evtBasemapCanvas = off;
+  evtBasemapLoading = false;
+}
+
+/* ============================================================
+   caminho reto/curvo entre dois pontos, comprimento, sub-trecho
    ============================================================ */
 function buildLegPath(a, b){
   const dx = b.x - a.x, dy = b.y - a.y;
@@ -272,14 +422,11 @@ function buildLegPath(a, b){
   }
   return pts;
 }
-
 function pathLength(points){
   let len = 0;
   for (let i=1;i<points.length;i++) len += Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
   return len;
 }
-// retorna os pontos do caminho até uma certa distância acumulada — usado
-// pra desenhar a marca progressivamente, quadro a quadro, no vídeo
 function subPathUpTo(points, dist){
   const out = [points[0]];
   let d = 0;
@@ -295,14 +442,12 @@ function subPathUpTo(points, dist){
   }
   return out;
 }
-
-
 function escapeXML(s){
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 /* ============================================================
-   temas de fundo — todas as cores dos elementos se adaptam
+   temas de cor
    ============================================================ */
 const THEMES = {
   branco: { bg:'#ffffff', ink:'#111111', sub:'#6b6b6b', mark:'#111111' },
@@ -312,37 +457,71 @@ const THEMES = {
 let currentTheme = 'branco';
 
 /* ============================================================
-   estado
+   estado geral
    ============================================================ */
 let LOCATIONS = [];
-let PTS = [];
+let PTS = [];        // post do artista (geometria livre)
+let PTS_EVT = [];    // post do evento (geometria real, mesma do mapa)
+let alphaNumEvt = {};
 let FLAT_ARTISTS = [];
 let currentArtist = null;
 let photoOk = false;
 let loadedImg = null;
-let markPoints = [];
+let markPoints = [];   // marca do post do artista
+let evtMarkPoints = []; // marca (estática) do post do evento
+let numAddresses = 0;
+let numArtists = 0;
+let mode = 'artista'; // artista | evento
+let showMapEvt = false;
+let showPinsEvt = false;
+let markModeEvt = 'estatica'; // estatica | video
 
 const svgEl = document.getElementById('art');
+const eventCanvas = document.getElementById('event-canvas');
+const ectx = eventCanvas.getContext('2d');
 const artistSelect = document.getElementById('artist-select');
 const statusEl = document.getElementById('status');
 const canvasFrame = document.getElementById('canvas-frame');
 const bgBtns = { branco: document.getElementById('bg-branco'), cinza: document.getElementById('bg-cinza'), preto: document.getElementById('bg-preto') };
+const artistFieldsEl = document.getElementById('artist-fields');
+const eventFieldsEl = document.getElementById('event-fields');
+const svgDownloadBtn = document.getElementById('btn-download-svg');
 
 function setStatus(msg, isError){
   statusEl.textContent = msg || '';
   statusEl.classList.toggle('error', !!isError);
 }
 
+/* ---- troca de modo ---- */
+const modeArtistaBtn = document.getElementById('mode-artista');
+const modeEventoBtn = document.getElementById('mode-evento');
+modeArtistaBtn.addEventListener('click', () => setMode('artista'));
+modeEventoBtn.addEventListener('click', () => setMode('evento'));
+function setMode(m){
+  mode = m;
+  modeArtistaBtn.classList.toggle('active', m === 'artista');
+  modeEventoBtn.classList.toggle('active', m === 'evento');
+  artistFieldsEl.style.display = m === 'artista' ? 'block' : 'none';
+  eventFieldsEl.style.display = m === 'evento' ? 'block' : 'none';
+  svgEl.style.display = m === 'artista' ? 'block' : 'none';
+  eventCanvas.style.display = m === 'evento' ? 'block' : 'none';
+  svgDownloadBtn.style.display = m === 'artista' ? 'inline-flex' : 'none';
+  if (m === 'artista') draw(); else redrawEvent();
+}
 
+/* ---- cores (compartilhado) ---- */
 Object.keys(bgBtns).forEach(key => {
   bgBtns[key].addEventListener('click', () => {
     currentTheme = key;
     Object.keys(bgBtns).forEach(k => bgBtns[k].classList.toggle('active', k === key));
     canvasFrame.style.background = THEMES[key].bg;
-    draw();
+    if (mode === 'artista') draw(); else redrawEvent();
   });
 });
 
+/* ============================================================
+   post do artista
+   ============================================================ */
 function renderArtistSelect(){
   artistSelect.innerHTML = '';
   FLAT_ARTISTS.forEach((a, i) => {
@@ -369,7 +548,6 @@ function setArtist(idx){
 }
 artistSelect.addEventListener('change', () => setArtist(parseInt(artistSelect.value, 10)));
 
-
 function generateNewMark(){
   const order = [...PTS].sort(() => Math.random()-0.5);
   const closed = [...order, order[0]];
@@ -382,151 +560,6 @@ function generateNewMark(){
 }
 document.getElementById('btn-new-mark').addEventListener('click', generateNewMark);
 
-/* ============================================================
-   video do post — o post inteiro (nome, endereco, foto, titulo,
-   data) fica igual ao estatico; so a marca se desenha, dando duas
-   voltas completas por todos os pontos, em ~10s. Gravado a partir
-   de um canvas dedicado (o SVG nao serve pra isso, precisa ser
-   canvas pra capturar video)
-   ============================================================ */
-const videoCanvas = document.getElementById('video-canvas');
-const vctx = videoCanvas.getContext('2d');
-const btnMarkVideo = document.getElementById('btn-mark-video');
-const DURATION_MS = 10000;
-
-function buildDoubleLapMarkPath(){
-  const pass1 = [...PTS].sort(() => Math.random()-0.5);
-  const pass2 = [...PTS].sort(() => Math.random()-0.5);
-  const order = [...pass1, ...pass2];
-  const raw = [ { x: order[0].x, y: order[0].y } ];
-  for (let i = 1; i < order.length; i++){
-    buildLegPath(order[i-1], order[i]).slice(1).forEach(p => raw.push(p));
-  }
-  return fitPointsToBox(raw, MARK_BOX, 0.9);
-}
-
-function drawCoverImage(ctx2d, img, box){
-  const ir = img.width / img.height;
-  const br = box.w / box.h;
-  let dw, dh, dx, dy;
-  if (ir > br){ dh = box.h; dw = dh * ir; dx = box.x - (dw-box.w)/2; dy = box.y; }
-  else { dw = box.w; dh = dw / ir; dx = box.x; dy = box.y - (dh-box.h)/2; }
-  ctx2d.drawImage(img, dx, dy, dw, dh);
-}
-
-// desenha um quadro completo do post no canvas — igual ao SVG estatico,
-// so que a marca so vai ate a distancia "dMark" (usada pra animar)
-function drawPostFrameToCanvas(ctx2d, dMark, markPath){
-  const theme = THEMES[currentTheme];
-  ctx2d.clearRect(0, 0, LOGICAL, LOGICAL);
-  ctx2d.fillStyle = theme.bg;
-  ctx2d.fillRect(0, 0, LOGICAL, LOGICAL);
-
-  ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'alphabetic';
-  ctx2d.fillStyle = theme.ink;
-  ctx2d.font = `${NAME_SIZE}px 'Instrument Serif', Georgia, serif`;
-  ctx2d.fillText(currentArtist ? currentArtist.nome : '—', MARGIN, NAME_Y);
-
-  const addrLine = currentArtist
-    ? (currentArtist.loc.local ? `${currentArtist.loc.local} — ${currentArtist.loc.endereco}` : currentArtist.loc.endereco)
-    : '—';
-  ctx2d.fillStyle = theme.sub;
-  ctx2d.font = "24px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-  ctx2d.fillText(addrLine, MARGIN, ADDR_Y);
-
-  if (loadedImg && photoOk){
-    ctx2d.save();
-    ctx2d.beginPath();
-    ctx2d.rect(PHOTO_BOX.x, PHOTO_BOX.y, PHOTO_BOX.w, PHOTO_BOX.h);
-    ctx2d.clip();
-    drawCoverImage(ctx2d, loadedImg, PHOTO_BOX);
-    ctx2d.restore();
-  } else {
-    ctx2d.fillStyle = currentTheme === 'preto' ? '#2a2a2a' : '#e4e4e4';
-    ctx2d.fillRect(PHOTO_BOX.x, PHOTO_BOX.y, PHOTO_BOX.w, PHOTO_BOX.h);
-    ctx2d.fillStyle = theme.sub;
-    ctx2d.font = "48px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-    ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'middle';
-    ctx2d.fillText(currentArtist ? initials(currentArtist.nome) : '—', PHOTO_BOX.x+PHOTO_BOX.w/2, PHOTO_BOX.y+PHOTO_BOX.h/2);
-    ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'alphabetic';
-  }
-
-  const sub = subPathUpTo(markPath, dMark);
-  ctx2d.strokeStyle = theme.mark;
-  ctx2d.lineWidth = 2.4;
-  ctx2d.lineCap = 'round';
-  ctx2d.lineJoin = 'round';
-  ctx2d.beginPath();
-  sub.forEach(function(p, i){ if (i === 0) ctx2d.moveTo(p.x, p.y); else ctx2d.lineTo(p.x, p.y); });
-  ctx2d.stroke();
-
-  const textX = MARK_BOX.x + MARK_BOX.w + 26;
-  ctx2d.fillStyle = theme.ink;
-  ctx2d.font = `${TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
-  ctx2d.fillText(EVENT_TITLE, textX, MARK_BOX.y+52);
-  ctx2d.fillStyle = theme.sub;
-  ctx2d.fillText(EVENT_DATES, textX, MARK_BOX.y+98);
-}
-
-btnMarkVideo.addEventListener('click', () => {
-  if (!('MediaRecorder' in window)){
-    setStatus('Este navegador nao suporta gravacao de video (tente no Chrome ou Firefox).', true);
-    return;
-  }
-  const markPath = buildDoubleLapMarkPath();
-  const totalLen = pathLength(markPath);
-  const speed = totalLen / (DURATION_MS/1000);
-
-  svgEl.style.display = 'none';
-  videoCanvas.style.display = 'block';
-
-  let stream, recorder;
-  try{
-    stream = videoCanvas.captureStream(30);
-    const mimeCandidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
-    const mimeType = mimeCandidates.find(m => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || '';
-    recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-  } catch(err){
-    setStatus('Nao foi possivel iniciar a gravacao neste navegador.', true);
-    svgEl.style.display = 'block';
-    videoCanvas.style.display = 'none';
-    return;
-  }
-
-  const chunks = [];
-  recorder.ondataavailable = function(e){ if (e.data && e.data.size) chunks.push(e.data); };
-  recorder.onstop = function(){
-    const blob = new Blob(chunks, { type: 'video/webm' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'circuito-post.webm';
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
-    svgEl.style.display = 'block';
-    videoCanvas.style.display = 'none';
-    setStatus('video pronto - download iniciado (.webm).');
-  };
-
-  setStatus('gravando o video do post...');
-  recorder.start();
-
-  let startTs = null;
-  function frame(ts){
-    if (startTs == null) startTs = ts;
-    const elapsed = (ts - startTs) / 1000;
-    const d = Math.min(totalLen, elapsed * speed);
-
-    drawPostFrameToCanvas(vctx, d, markPath);
-
-    if (elapsed < DURATION_MS/1000){
-      requestAnimationFrame(frame);
-    } else {
-      recorder.stop();
-    }
-  }
-  requestAnimationFrame(frame);
-});
-
 function buildOpenPathD(points){
   if (points.length < 2) return '';
   let d = 'M' + points[0].x.toFixed(2) + ' ' + points[0].y.toFixed(2) + ' ';
@@ -534,22 +567,17 @@ function buildOpenPathD(points){
   return d;
 }
 
-/* ============================================================
-   desenho
-   ============================================================ */
 function buildContentSVG(){
   const theme = THEMES[currentTheme];
   let s = '';
   s += `<rect x="0" y="0" width="${LOGICAL}" height="${LOGICAL}" fill="${theme.bg}"/>`;
 
-  // nome do artista + endereço, no topo
   s += `<text x="${MARGIN}" y="${NAME_Y}" font-family="'Instrument Serif', Georgia, serif" font-size="${NAME_SIZE}" fill="${theme.ink}">${escapeXML(currentArtist ? currentArtist.nome : '—')}</text>`;
   const addrLine = currentArtist
     ? (currentArtist.loc.local ? `${currentArtist.loc.local} — ${currentArtist.loc.endereco}` : currentArtist.loc.endereco)
     : '—';
   s += `<text x="${MARGIN}" y="${ADDR_Y}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="${ADDR_SIZE}" fill="${theme.sub}">${escapeXML(addrLine)}</text>`;
 
-  // foto — sempre em retângulo
   const hasPhoto = currentArtist && currentArtist.foto && photoOk;
   if (hasPhoto){
     s += `<image href="${currentArtist.foto}" x="${PHOTO_BOX.x}" y="${PHOTO_BOX.y}" width="${PHOTO_BOX.w}" height="${PHOTO_BOX.h}" preserveAspectRatio="xMidYMid slice"/>`;
@@ -558,7 +586,6 @@ function buildContentSVG(){
     s += `<text x="${PHOTO_BOX.x+PHOTO_BOX.w/2}" y="${PHOTO_BOX.y+PHOTO_BOX.h/2}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="48" fill="${theme.sub}" text-anchor="middle" dominant-baseline="middle">${currentArtist ? initials(currentArtist.nome) : '—'}</text>`;
   }
 
-  // marca (linha só, sem texto) + título/data do evento, lado a lado
   if (markPoints.length >= 2){
     s += `<path d="${buildOpenPathD(markPoints)}" fill="none" stroke="${theme.mark}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
   }
@@ -568,11 +595,9 @@ function buildContentSVG(){
 
   return s;
 }
-
 function draw(){
   svgEl.innerHTML = buildContentSVG();
 }
-
 function buildFullSVGString(){
   const content = buildContentSVG();
   return `<?xml version="1.0" encoding="UTF-8"?>\n` +
@@ -581,20 +606,6 @@ function buildFullSVGString(){
     content +
     `</svg>`;
 }
-
-/* ============================================================
-   exportação
-   ============================================================ */
-document.getElementById('btn-download-svg').addEventListener('click', () => {
-  setStatus('');
-  const blob = new Blob([buildFullSVGString()], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'circuito-paralelo-post.svg';
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
-});
-
 function rasterizeSVG(scale){
   return new Promise((resolve, reject) => {
     const svgBlob = new Blob([buildFullSVGString()], { type: 'image/svg+xml;charset=utf-8' });
@@ -619,37 +630,264 @@ function rasterizeSVG(scale){
   });
 }
 
+/* ============================================================
+   post do evento
+   ============================================================ */
+const evtMapOnBtn = document.getElementById('evt-map-on');
+const evtMapOffBtn = document.getElementById('evt-map-off');
+evtMapOnBtn.addEventListener('click', async () => {
+  showMapEvt = true;
+  evtMapOnBtn.classList.add('active'); evtMapOffBtn.classList.remove('active');
+  if (!evtBasemapCanvas){
+    setStatus('carregando mapa…');
+    await fetchEvtBasemapTiles();
+    setStatus('');
+  }
+  redrawEvent();
+});
+evtMapOffBtn.addEventListener('click', () => {
+  showMapEvt = false;
+  evtMapOffBtn.classList.add('active'); evtMapOnBtn.classList.remove('active');
+  redrawEvent();
+});
+
+const evtPinsOnBtn = document.getElementById('evt-pins-on');
+const evtPinsOffBtn = document.getElementById('evt-pins-off');
+evtPinsOnBtn.addEventListener('click', () => { showPinsEvt = true; evtPinsOnBtn.classList.add('active'); evtPinsOffBtn.classList.remove('active'); redrawEvent(); });
+evtPinsOffBtn.addEventListener('click', () => { showPinsEvt = false; evtPinsOffBtn.classList.add('active'); evtPinsOnBtn.classList.remove('active'); redrawEvent(); });
+
+const evtMarkStaticBtn = document.getElementById('evt-mark-static');
+const evtMarkVideoBtn = document.getElementById('evt-mark-video');
+const evtStaticRow = document.getElementById('evt-static-row');
+const evtVideoRow = document.getElementById('evt-video-row');
+evtMarkStaticBtn.addEventListener('click', () => {
+  markModeEvt = 'estatica';
+  evtMarkStaticBtn.classList.add('active'); evtMarkVideoBtn.classList.remove('active');
+  evtStaticRow.style.display = 'flex'; evtVideoRow.style.display = 'none';
+  redrawEvent();
+});
+evtMarkVideoBtn.addEventListener('click', () => {
+  markModeEvt = 'video';
+  evtMarkVideoBtn.classList.add('active'); evtMarkStaticBtn.classList.remove('active');
+  evtStaticRow.style.display = 'none'; evtVideoRow.style.display = 'flex';
+});
+
+function generateNewEventMark(){
+  const order = [...PTS_EVT].sort(() => Math.random()-0.5);
+  const closed = [...order, order[0]];
+  const pts = [ { x: closed[0].x, y: closed[0].y } ];
+  for (let i = 1; i < closed.length; i++){
+    buildLegPath(closed[i-1], closed[i]).slice(1).forEach(p => pts.push(p));
+  }
+  evtMarkPoints = fitPointsToBox(pts, EVT_MAP_BOX, 0.94);
+  redrawEvent();
+}
+document.getElementById('btn-evt-new-mark').addEventListener('click', generateNewEventMark);
+
+// desenha um quadro completo do post do evento — assume que o contexto
+// já tem a escala/transformação aplicada (pra funcionar tanto na prévia
+// em tela quanto na exportação em alta resolução)
+function drawEventFrame(ctx2d, dMark, markPath){
+  const theme = THEMES[currentTheme];
+  ctx2d.clearRect(0, 0, LOGICAL, LOGICAL);
+  ctx2d.fillStyle = theme.bg;
+  ctx2d.fillRect(0, 0, LOGICAL, LOGICAL);
+
+  if (showMapEvt && evtBasemapCanvas){
+    ctx2d.drawImage(evtBasemapCanvas, EVT_MAP_BOX.x, EVT_MAP_BOX.y, EVT_MAP_BOX.w, EVT_MAP_BOX.h);
+  }
+
+  ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'alphabetic';
+  ctx2d.fillStyle = theme.ink;
+  ctx2d.font = `${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
+  ctx2d.fillText(EVT_TITLE_L1, MARGIN, EVT_TITLE_Y1);
+  ctx2d.fillText(EVT_TITLE_L2, MARGIN, EVT_TITLE_Y2);
+
+  if (showPinsEvt){
+    PTS_EVT.forEach((p) => {
+      ctx2d.beginPath();
+      ctx2d.arc(p.x, p.y, 11, 0, Math.PI*2);
+      ctx2d.fillStyle = theme.mark;
+      ctx2d.fill();
+      ctx2d.lineWidth = 1.6;
+      ctx2d.strokeStyle = theme.bg;
+      ctx2d.stroke();
+      ctx2d.fillStyle = theme.bg;
+      ctx2d.font = "9px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+      ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'middle';
+      ctx2d.fillText(String(alphaNumEvt[p.id]).padStart(2,'0'), p.x, p.y+0.5);
+      ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'alphabetic';
+    });
+  }
+
+  if (markPath && markPath.length >= 2){
+    const sub = subPathUpTo(markPath, dMark);
+    ctx2d.strokeStyle = theme.mark;
+    ctx2d.lineWidth = 5;
+    ctx2d.lineCap = 'round';
+    ctx2d.lineJoin = 'round';
+    ctx2d.beginPath();
+    sub.forEach((p, i) => { if (i === 0) ctx2d.moveTo(p.x, p.y); else ctx2d.lineTo(p.x, p.y); });
+    ctx2d.stroke();
+  }
+
+  ctx2d.textAlign = 'left';
+  ctx2d.fillStyle = theme.ink;
+  ctx2d.font = `${EVT_STATS_SIZE}px 'Instrument Serif', Georgia, serif`;
+  ctx2d.fillText(`${numAddresses} Endereços`, MARGIN, EVT_STATS_Y1);
+  ctx2d.fillText(`${numArtists} Artistas`, MARGIN, EVT_STATS_Y2);
+
+  ctx2d.textAlign = 'right';
+  ctx2d.fillStyle = theme.sub;
+  ctx2d.fillText(EVENT_DATES, LOGICAL - MARGIN, EVT_DATE_Y);
+  ctx2d.textAlign = 'left';
+}
+
+function redrawEvent(){
+  const full = markPathForFrame();
+  drawEventFrame(ectx, full ? pathLength(full) : 0, full);
+}
+function markPathForFrame(){
+  return evtMarkPoints.length >= 2 ? evtMarkPoints : null;
+}
+
+/* ---- vídeo do post do evento: anda ponto a ponto, sem modais, uma
+   volta só, no ritmo real (sem duração fixa) ---- */
+const btnEvtVideo = document.getElementById('btn-evt-video');
+const EVT_SPEED = 260; // px por segundo
+
+btnEvtVideo.addEventListener('click', () => {
+  if (!('MediaRecorder' in window)){
+    setStatus('Este navegador não suporta gravação de vídeo (tente no Chrome ou Firefox).', true);
+    return;
+  }
+  const order = [...PTS_EVT].sort(() => Math.random()-0.5);
+  const raw = [ { x: order[0].x, y: order[0].y } ];
+  for (let i = 1; i < order.length; i++){
+    buildLegPath(order[i-1], order[i]).slice(1).forEach(p => raw.push(p));
+  }
+  const totalLen = pathLength(raw);
+  const durationSec = totalLen / EVT_SPEED;
+
+  let stream, recorder;
+  try{
+    stream = eventCanvas.captureStream(30);
+    const mimeCandidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+    const mimeType = mimeCandidates.find(m => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || '';
+    recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+  } catch(err){
+    setStatus('Não foi possível iniciar a gravação neste navegador.', true);
+    return;
+  }
+
+  const chunks = [];
+  recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'circuito-post-evento.webm';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    setStatus('vídeo pronto — download iniciado (.webm).');
+    redrawEvent();
+  };
+
+  setStatus('gravando o vídeo do evento…');
+  recorder.start();
+
+  let startTs = null;
+  function frame(ts){
+    if (startTs == null) startTs = ts;
+    const elapsed = (ts - startTs) / 1000;
+    const d = Math.min(totalLen, elapsed * EVT_SPEED);
+    drawEventFrame(ectx, d, raw);
+    if (elapsed < durationSec){
+      requestAnimationFrame(frame);
+    } else {
+      recorder.stop();
+    }
+  }
+  requestAnimationFrame(frame);
+});
+
+/* ============================================================
+   exportação (compartilhada — ramifica por modo)
+   ============================================================ */
+svgDownloadBtn.addEventListener('click', () => {
+  if (mode !== 'artista') return;
+  setStatus('');
+  const blob = new Blob([buildFullSVGString()], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'circuito-post-artista.svg';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+});
+
 document.getElementById('btn-download-png').addEventListener('click', async () => {
   setStatus('gerando PNG em alta resolução…');
   try{
-    const c = await rasterizeSVG(3);
-    c.toBlob(blob => {
-      if (!blob){ setStatus('Não foi possível gerar o PNG.', true); return; }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'circuito-paralelo-post.png';
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
-      setStatus('');
-    }, 'image/png');
+    if (mode === 'artista'){
+      const c = await rasterizeSVG(3);
+      c.toBlob(blob => {
+        if (!blob){ setStatus('Não foi possível gerar o PNG.', true); return; }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'circuito-post-artista.png';
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+        setStatus('');
+      }, 'image/png');
+    } else {
+      const scale = 3;
+      const c = document.createElement('canvas');
+      c.width = LOGICAL*scale; c.height = LOGICAL*scale;
+      const cctx = c.getContext('2d');
+      cctx.scale(scale, scale);
+      const full = markPathForFrame();
+      drawEventFrame(cctx, full ? pathLength(full) : 0, full);
+      c.toBlob(blob => {
+        if (!blob){ setStatus('Não foi possível gerar o PNG.', true); return; }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'circuito-post-evento.png';
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+        setStatus('');
+      }, 'image/png');
+    }
   } catch(err){
     console.error(err);
-    setStatus('Exportação bloqueada — provavelmente a foto deste artista não libera CORS. Tente outro artista, ou baixe o SVG.', true);
+    setStatus('Exportação bloqueada — provavelmente a foto (ou o mapa) não libera CORS. Tente novamente.', true);
   }
 });
 
 document.getElementById('btn-download-pdf').addEventListener('click', async () => {
   setStatus('gerando PDF…');
   try{
-    const c = await rasterizeSVG(3);
+    let dataUrl;
+    if (mode === 'artista'){
+      const c = await rasterizeSVG(3);
+      dataUrl = c.toDataURL('image/png');
+    } else {
+      const scale = 3;
+      const c = document.createElement('canvas');
+      c.width = LOGICAL*scale; c.height = LOGICAL*scale;
+      const cctx = c.getContext('2d');
+      cctx.scale(scale, scale);
+      const full = markPathForFrame();
+      drawEventFrame(cctx, full ? pathLength(full) : 0, full);
+      dataUrl = c.toDataURL('image/png');
+    }
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'px', format: [LOGICAL, LOGICAL] });
-    doc.addImage(c.toDataURL('image/png'), 'PNG', 0, 0, LOGICAL, LOGICAL);
-    doc.save('circuito-paralelo-post.pdf');
+    doc.addImage(dataUrl, 'PNG', 0, 0, LOGICAL, LOGICAL);
+    doc.save(mode === 'artista' ? 'circuito-post-artista.pdf' : 'circuito-post-evento.pdf');
     setStatus('');
   } catch(err){
     console.error(err);
-    setStatus('Não foi possível gerar o PDF agora — tente o SVG.', true);
+    setStatus('Não foi possível gerar o PDF agora.', true);
   }
 });
 
@@ -660,7 +898,9 @@ async function boot(){
   try{
     await Promise.all([
       document.fonts.load(`${NAME_SIZE}px 'Instrument Serif'`),
-      document.fonts.load(`${TITLE_SIZE}px 'Instrument Serif'`)
+      document.fonts.load(`${TITLE_SIZE}px 'Instrument Serif'`),
+      document.fonts.load(`${EVT_TITLE_SIZE}px 'Instrument Serif'`),
+      document.fonts.load(`${EVT_STATS_SIZE}px 'Instrument Serif'`)
     ]);
   } catch(e){}
   try{
@@ -682,9 +922,22 @@ async function boot(){
     minLng: Math.min(...withCoords.map(l=>l.lng)),
     maxLng: Math.max(...withCoords.map(l=>l.lng)),
   };
-  proj = computeProjection(bounds, LOGICAL, LOGICAL, 1.0);
 
+  // post do artista
+  proj = computeProjection(bounds, LOGICAL, LOGICAL, 1.0);
   PTS = withCoords.map(loc => pixelOf(loc.lat, loc.lng));
+
+  // post do evento
+  computeEvtProjection(bounds);
+  PTS_EVT = withCoords.map(loc => ({ ...pixelOfEvt(loc.lat, loc.lng), id: loc.id }));
+  const sortedForNum = [...withCoords].sort((a,b) =>
+    (a.local||a.endereco).localeCompare(b.local||b.endereco, 'pt-BR', {sensitivity:'base'}));
+  alphaNumEvt = {};
+  sortedForNum.forEach((loc,i) => { alphaNumEvt[loc.id] = i+1; });
+
+  numAddresses = LOCATIONS.length;
+  numArtists = LOCATIONS.reduce((sum, l) => sum + l.artistas.filter(a => a.nome).length, 0);
+  document.getElementById('evt-stats-note').textContent = `${numAddresses} endereços · ${numArtists} artistas (direto da planilha)`;
 
   LOCATIONS.forEach(loc => loc.artistas.forEach(art => {
     if (art.nome) FLAT_ARTISTS.push({ ...art, loc });
@@ -692,7 +945,7 @@ async function boot(){
   FLAT_ARTISTS.sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR',{sensitivity:'base'}));
 
   renderArtistSelect();
-  generateNewMark();
+  generateNewEventMark();
 }
 boot();
 </script>
