@@ -90,7 +90,7 @@
         <button class="btn" id="btn-new-mark" style="flex:1;">gerar nova marca</button>
       </div>
       <div class="row-btns" style="margin-top:0.5rem;">
-        <button class="btn primary" id="btn-mark-video" style="flex:1;">gerar vídeo da marca (~10s)</button>
+        <button class="btn primary" id="btn-mark-video" style="flex:1;">gerar vídeo do post (~10s)</button>
       </div>
     </div>
 
@@ -319,6 +319,7 @@ let PTS = [];
 let FLAT_ARTISTS = [];
 let currentArtist = null;
 let photoOk = false;
+let loadedImg = null;
 let markPoints = [];
 
 const svgEl = document.getElementById('art');
@@ -355,11 +356,12 @@ function renderArtistSelect(){
 function setArtist(idx){
   currentArtist = FLAT_ARTISTS[idx];
   photoOk = false;
+  loadedImg = null;
   if (currentArtist && currentArtist.foto){
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => { photoOk = true; draw(); };
-    img.onerror = () => { photoOk = false; draw(); };
+    img.onload = () => { photoOk = true; loadedImg = img; draw(); };
+    img.onerror = () => { photoOk = false; loadedImg = null; draw(); };
     img.src = currentArtist.foto;
   } else {
     draw();
@@ -381,16 +383,18 @@ function generateNewMark(){
 document.getElementById('btn-new-mark').addEventListener('click', generateNewMark);
 
 /* ============================================================
-   video da marca - a linha se desenha, da duas voltas completas
-   por todos os pontos, em ~10s, gravado a partir de um canvas
-   dedicado (o SVG nao serve pra isso, precisa ser canvas pra gravar)
+   video do post — o post inteiro (nome, endereco, foto, titulo,
+   data) fica igual ao estatico; so a marca se desenha, dando duas
+   voltas completas por todos os pontos, em ~10s. Gravado a partir
+   de um canvas dedicado (o SVG nao serve pra isso, precisa ser
+   canvas pra capturar video)
    ============================================================ */
 const videoCanvas = document.getElementById('video-canvas');
 const vctx = videoCanvas.getContext('2d');
 const btnMarkVideo = document.getElementById('btn-mark-video');
 const DURATION_MS = 10000;
 
-function buildDoubleLapPath(){
+function buildDoubleLapMarkPath(){
   const pass1 = [...PTS].sort(() => Math.random()-0.5);
   const pass2 = [...PTS].sort(() => Math.random()-0.5);
   const order = [...pass1, ...pass2];
@@ -398,8 +402,70 @@ function buildDoubleLapPath(){
   for (let i = 1; i < order.length; i++){
     buildLegPath(order[i-1], order[i]).slice(1).forEach(p => raw.push(p));
   }
-  const videoBox = { x: 90, y: 90, w: 820, h: 820 };
-  return fitPointsToBox(raw, videoBox, 0.92);
+  return fitPointsToBox(raw, MARK_BOX, 0.9);
+}
+
+function drawCoverImage(ctx2d, img, box){
+  const ir = img.width / img.height;
+  const br = box.w / box.h;
+  let dw, dh, dx, dy;
+  if (ir > br){ dh = box.h; dw = dh * ir; dx = box.x - (dw-box.w)/2; dy = box.y; }
+  else { dw = box.w; dh = dw / ir; dx = box.x; dy = box.y - (dh-box.h)/2; }
+  ctx2d.drawImage(img, dx, dy, dw, dh);
+}
+
+// desenha um quadro completo do post no canvas — igual ao SVG estatico,
+// so que a marca so vai ate a distancia "dMark" (usada pra animar)
+function drawPostFrameToCanvas(ctx2d, dMark, markPath){
+  const theme = THEMES[currentTheme];
+  ctx2d.clearRect(0, 0, LOGICAL, LOGICAL);
+  ctx2d.fillStyle = theme.bg;
+  ctx2d.fillRect(0, 0, LOGICAL, LOGICAL);
+
+  ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'alphabetic';
+  ctx2d.fillStyle = theme.ink;
+  ctx2d.font = `${NAME_SIZE}px 'Instrument Serif', Georgia, serif`;
+  ctx2d.fillText(currentArtist ? currentArtist.nome : '—', MARGIN, NAME_Y);
+
+  const addrLine = currentArtist
+    ? (currentArtist.loc.local ? `${currentArtist.loc.local} — ${currentArtist.loc.endereco}` : currentArtist.loc.endereco)
+    : '—';
+  ctx2d.fillStyle = theme.sub;
+  ctx2d.font = "24px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+  ctx2d.fillText(addrLine, MARGIN, ADDR_Y);
+
+  if (loadedImg && photoOk){
+    ctx2d.save();
+    ctx2d.beginPath();
+    ctx2d.rect(PHOTO_BOX.x, PHOTO_BOX.y, PHOTO_BOX.w, PHOTO_BOX.h);
+    ctx2d.clip();
+    drawCoverImage(ctx2d, loadedImg, PHOTO_BOX);
+    ctx2d.restore();
+  } else {
+    ctx2d.fillStyle = currentTheme === 'preto' ? '#2a2a2a' : '#e4e4e4';
+    ctx2d.fillRect(PHOTO_BOX.x, PHOTO_BOX.y, PHOTO_BOX.w, PHOTO_BOX.h);
+    ctx2d.fillStyle = theme.sub;
+    ctx2d.font = "48px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+    ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'middle';
+    ctx2d.fillText(currentArtist ? initials(currentArtist.nome) : '—', PHOTO_BOX.x+PHOTO_BOX.w/2, PHOTO_BOX.y+PHOTO_BOX.h/2);
+    ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'alphabetic';
+  }
+
+  const sub = subPathUpTo(markPath, dMark);
+  ctx2d.strokeStyle = theme.mark;
+  ctx2d.lineWidth = 2.4;
+  ctx2d.lineCap = 'round';
+  ctx2d.lineJoin = 'round';
+  ctx2d.beginPath();
+  sub.forEach(function(p, i){ if (i === 0) ctx2d.moveTo(p.x, p.y); else ctx2d.lineTo(p.x, p.y); });
+  ctx2d.stroke();
+
+  const textX = MARK_BOX.x + MARK_BOX.w + 26;
+  ctx2d.fillStyle = theme.ink;
+  ctx2d.font = `${TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
+  ctx2d.fillText(EVENT_TITLE, textX, MARK_BOX.y+52);
+  ctx2d.fillStyle = theme.sub;
+  ctx2d.fillText(EVENT_DATES, textX, MARK_BOX.y+98);
 }
 
 btnMarkVideo.addEventListener('click', () => {
@@ -407,10 +473,9 @@ btnMarkVideo.addEventListener('click', () => {
     setStatus('Este navegador nao suporta gravacao de video (tente no Chrome ou Firefox).', true);
     return;
   }
-  const fullPath = buildDoubleLapPath();
-  const totalLen = pathLength(fullPath);
+  const markPath = buildDoubleLapMarkPath();
+  const totalLen = pathLength(markPath);
   const speed = totalLen / (DURATION_MS/1000);
-  const theme = THEMES[currentTheme];
 
   svgEl.style.display = 'none';
   videoCanvas.style.display = 'block';
@@ -434,7 +499,7 @@ btnMarkVideo.addEventListener('click', () => {
     const blob = new Blob(chunks, { type: 'video/webm' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'circuito-paralelo-marca.webm';
+    a.href = url; a.download = 'circuito-post.webm';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
     svgEl.style.display = 'block';
@@ -442,7 +507,7 @@ btnMarkVideo.addEventListener('click', () => {
     setStatus('video pronto - download iniciado (.webm).');
   };
 
-  setStatus('gravando o video da marca...');
+  setStatus('gravando o video do post...');
   recorder.start();
 
   let startTs = null;
@@ -451,18 +516,7 @@ btnMarkVideo.addEventListener('click', () => {
     const elapsed = (ts - startTs) / 1000;
     const d = Math.min(totalLen, elapsed * speed);
 
-    vctx.clearRect(0, 0, 1000, 1000);
-    vctx.fillStyle = theme.bg;
-    vctx.fillRect(0, 0, 1000, 1000);
-
-    const sub = subPathUpTo(fullPath, d);
-    vctx.strokeStyle = theme.mark;
-    vctx.lineWidth = 5;
-    vctx.lineCap = 'round';
-    vctx.lineJoin = 'round';
-    vctx.beginPath();
-    sub.forEach(function(p, i){ if (i === 0) vctx.moveTo(p.x, p.y); else vctx.lineTo(p.x, p.y); });
-    vctx.stroke();
+    drawPostFrameToCanvas(vctx, d, markPath);
 
     if (elapsed < DURATION_MS/1000){
       requestAnimationFrame(frame);
@@ -603,7 +657,12 @@ document.getElementById('btn-download-pdf').addEventListener('click', async () =
    boot
    ============================================================ */
 async function boot(){
-  try{ await document.fonts.load(`${NAME_SIZE}px 'Instrument Serif'`); } catch(e){}
+  try{
+    await Promise.all([
+      document.fonts.load(`${NAME_SIZE}px 'Instrument Serif'`),
+      document.fonts.load(`${TITLE_SIZE}px 'Instrument Serif'`)
+    ]);
+  } catch(e){}
   try{
     LOCATIONS = await loadLocationsFromSheet();
   } catch(err){
