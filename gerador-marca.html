@@ -282,30 +282,27 @@ function buildRibbonAndTextSVG(text, points, fontSize, ribbonWidth, ribbonColor,
   if (points.length < 2) return '';
   const total = pathLength(points);
   if (total < 4) return '';
+
+  // a fita inteira é um único traço contínuo — sem costuras, sem
+  // caixinhas por letra
+  let pathD = 'M' + points[0].x.toFixed(2) + ' ' + points[0].y.toFixed(2) + ' ';
+  for (let i = 1; i < points.length; i++){
+    pathD += 'L' + points[i].x.toFixed(2) + ' ' + points[i].y.toFixed(2) + ' ';
+  }
+  let out = `<path d="${pathD}" fill="none" stroke="${ribbonColor}" stroke-width="${ribbonWidth}" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+  // o texto é só escrito em cima, seguindo o caminho — sem nenhuma
+  // fita extra por trás de cada letra
   const unit = text + '   ·   ';
-  let out = '';
   let d = 0, safety = 0;
   while (d < total && safety < 6000){
     for (const ch of unit){
       if (d >= total) break;
       const w = charWidth(ch, fontSize);
-      const dEnd = Math.min(d + w, total);
-
-      const start = Math.max(0, d - 2);
-      const STEPS = 4;
-      let pathD = '';
-      for (let s = 0; s <= STEPS; s++){
-        const dd = start + (dEnd - start) * s / STEPS;
-        const pt = pointAtDistance(points, dd);
-        pathD += (s === 0 ? 'M' : 'L') + pt.x.toFixed(2) + ' ' + pt.y.toFixed(2) + ' ';
-      }
-      out += `<path d="${pathD}" fill="none" stroke="${ribbonColor}" stroke-width="${ribbonWidth}" stroke-linecap="butt" stroke-linejoin="round"/>`;
-
       const pt = pointAtDistance(points, d);
       const angleDeg = (pt.angle * 180 / Math.PI).toFixed(2);
       out += `<text x="0" y="0" transform="translate(${pt.x.toFixed(2)} ${pt.y.toFixed(2)}) rotate(${angleDeg})" font-family="'Instrument Serif', Georgia, serif" font-size="${fontSize}" fill="${textColor}" text-anchor="start" dominant-baseline="middle">${escapeXML(ch)}</text>`;
-
-      d = dEnd;
+      d += w;
       safety++;
     }
   }
