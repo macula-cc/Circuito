@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
   :root{
@@ -42,30 +43,22 @@
   select{ width:100%; padding:0.65rem 0.7rem; border:1px solid var(--ink); border-radius:0; background:#fff;
           color:var(--ink); font-family:var(--sans); font-size:0.94rem; }
 
-  .row-btns{ display:flex; gap:0.5rem; }
+  .row-btns{ display:flex; gap:0.5rem; flex-wrap:wrap; }
   .btn{ font-family:var(--mono); font-size:0.79rem; background:#fff; color:var(--ink); border:1px solid var(--ink);
         padding:0.6rem 0.9rem; cursor:pointer; border-radius:0; transition:background 0.15s ease, color 0.15s ease; }
   .btn:hover{ background:var(--ink); color:#fff; }
-  .btn.primary{ background:var(--ink); color:#fff; width:100%; padding:0.85rem; font-size:0.83rem; }
+  .btn.active{ background:var(--ink); color:#fff; }
+  .btn.primary{ background:var(--ink); color:#fff; flex:1; padding:0.85rem; font-size:0.83rem; }
   .btn.primary:hover{ opacity:0.8; }
   .btn:disabled{ opacity:0.35; cursor:default; pointer-events:none; }
 
-  .checklist{ max-height:230px; overflow-y:auto; border:1px solid var(--line); }
-  .check-row{ display:flex; align-items:baseline; gap:0.6rem; padding:0.55rem 0.7rem; border-bottom:1px solid var(--line); cursor:pointer; }
-  .check-row:last-child{ border-bottom:none; }
-  .check-row:hover{ background:var(--hover); }
-  .check-row input{ margin-top:0.15rem; accent-color:var(--ink); }
-  .check-row .cname{ font-family:var(--sans); font-size:0.86rem; line-height:1.3; }
-  .check-row .cname small{ display:block; font-family:var(--mono); font-size:0.68rem; color:var(--gray); margin-top:0.1rem; }
-  .check-order{ font-family:var(--mono); font-size:0.68rem; color:var(--gray); margin-left:auto; flex-shrink:0; }
-
   .count-note{ font-family:var(--mono); font-size:0.73rem; color:var(--gray); margin-top:0.5rem; line-height:1.4; }
-  .status{ font-family:var(--mono); font-size:0.75rem; color:var(--gray); margin-top:0.9rem; min-height:1.2em; }
+  .status{ font-family:var(--mono); font-size:0.75rem; color:var(--gray); margin-top:0.9rem; min-height:1.2em; line-height:1.4; }
   .status.error{ color:#9A3324; }
 
   .stage{ display:flex; align-items:center; justify-content:center; padding:2.4rem; }
   .canvas-frame{ width:min(74vh, 100%); max-width:640px; aspect-ratio:1/1; border:1px solid var(--line);
-                 box-shadow:0 12px 40px rgba(0,0,0,0.08); background:#f4f4f4; }
+                 box-shadow:0 12px 40px rgba(0,0,0,0.08); background:#fff; }
   #art{ width:100%; height:100%; display:block; }
 </style>
 </head>
@@ -89,42 +82,47 @@
     </div>
 
     <div class="field">
-      <label>Pontos da janela colorida</label>
-      <div class="checklist" id="checklist"></div>
-      <div class="count-note" id="count-note"></div>
-      <div class="row-btns" style="margin-top:0.7rem;">
-        <button class="btn" id="btn-shuffle">sortear pontos</button>
-        <button class="btn" id="btn-clear">limpar</button>
+      <label>Pontos dos ateliês</label>
+      <div class="row-btns">
+        <button class="btn" id="pins-on">mostrar</button>
+        <button class="btn active" id="pins-off">esconder</button>
       </div>
     </div>
 
     <div class="field">
-      <button class="btn primary" id="btn-download">baixar PNG</button>
+      <label>Forma da máscara</label>
+      <div class="count-note" id="count-note">o contorno passa por todos os ateliês, em uma ordem nova a cada geração — tudo que fica dentro dele vira a máscara</div>
+      <div class="row-btns" style="margin-top:0.7rem;">
+        <button class="btn primary" id="btn-shuffle" style="flex:1;">gerar nova</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Exportar</label>
+      <div class="row-btns">
+        <button class="btn primary" id="btn-download-svg">SVG</button>
+        <button class="btn primary" id="btn-download-png">PNG</button>
+        <button class="btn primary" id="btn-download-pdf">PDF</button>
+      </div>
       <div class="status" id="status"></div>
     </div>
   </div>
 
   <div class="stage">
     <div class="canvas-frame">
-      <canvas id="art" width="1000" height="1000"></canvas>
+      <svg id="art" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg"></svg>
     </div>
   </div>
 </div>
 
 <script>
 /* ============================================================
-   Lógica da máscara:
-   a foto inteira é SEMPRE desenhada, cobrindo toda a área — em
-   tom de cinza, igual ao mapa do site. Os pontos selecionados
-   só recortam uma "janela" onde a mesma foto aparece em cor
-   cheia por cima. Ou seja: a geometia nunca esconde a imagem,
-   ela só marca uma região de destaque. Por isso a foto está
-   sempre visível por inteiro, não importa quais pontos ou
-   quantos forem escolhidos.
+   dados
    ============================================================ */
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
-const EVENT_TITLE = 'Circuito Paralelo';
-const EVENT_DATES = '18 – 19 de Setembro';
+const LOGICAL = 1000;
+const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap";
+const BOX = { x: 60, y: 60, w: 880, h: 600 }; // área onde a máscara/foto vive
 
 function parseCSV(text){
   const rows = []; let row = []; let field = ''; let inQuotes = false;
@@ -186,76 +184,98 @@ function initials(name){
   return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
 }
 
-let LOCATIONS = [];
-let FLAT_ARTISTS = [];
-let bounds = null;
-let selectedOrder = [];
-let currentArtist = null;
-let loadedImg = null;
+/* ============================================================
+   posiciona os pontos de acordo com as coordenadas reais, dentro
+   da área reservada pra máscara (BOX) — sem nenhum mapa desenhado
+   ============================================================ */
+function project(lat, lon){
+  const x = (lon + 180) / 360;
+  const rad = lat * Math.PI/180;
+  const y = (1 - Math.log(Math.tan(rad) + 1/Math.cos(rad)) / Math.PI) / 2;
+  return { x, y };
+}
+function expandBounds(b, factor){
+  const cLat = (b.minLat+b.maxLat)/2, cLng = (b.minLng+b.maxLng)/2;
+  const spanLat = Math.max((b.maxLat-b.minLat)*factor, 0.002);
+  const spanLng = Math.max((b.maxLng-b.minLng)*factor, 0.002);
+  return { minLat:cLat-spanLat/2, maxLat:cLat+spanLat/2, minLng:cLng-spanLng/2, maxLng:cLng+spanLng/2 };
+}
+let proj = null;
+function computeProjection(bounds, boxW, boxH, margin, padFactor){
+  const expanded = expandBounds(bounds, padFactor);
+  const p1 = project(expanded.maxLat, expanded.minLng);
+  const p2 = project(expanded.minLat, expanded.maxLng);
+  const worldW = p2.x - p1.x, worldH = p2.y - p1.y;
+  const scale = Math.min((boxW - margin*2)/worldW, (boxH - margin*2)/worldH);
+  const offsetX = (boxW - worldW*scale)/2, offsetY = (boxH - worldH*scale)/2;
+  return { p1, scale, offsetX, offsetY };
+}
+function pixelOf(lat, lon){
+  const p = project(lat, lon);
+  return {
+    x: BOX.x + proj.offsetX + (p.x - proj.p1.x)*proj.scale,
+    y: BOX.y + proj.offsetY + (p.y - proj.p1.y)*proj.scale
+  };
+}
 
-const canvas = document.getElementById('art');
-const ctx = canvas.getContext('2d');
+/* ============================================================
+   caminho reto/curvo entre dois pontos
+   ============================================================ */
+function buildLegPath(a, b){
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  if (Math.random() < 0.35 || len < 90){
+    return [ { x:a.x, y:a.y }, { x:b.x, y:b.y } ];
+  }
+  const nx = -dy/len, ny = dx/len;
+  const side = Math.random() < 0.5 ? 1 : -1;
+  const offset = len * (0.08 + Math.random()*0.14) * side;
+  const mx = (a.x+b.x)/2 + nx*offset;
+  const my = (a.y+b.y)/2 + ny*offset;
+  const N = Math.max(18, Math.round(len/16));
+  const pts = [];
+  for (let i=0;i<=N;i++){
+    const t = i/N;
+    const it = 1-t;
+    pts.push({
+      x: it*it*a.x + 2*it*t*mx + t*t*b.x,
+      y: it*it*a.y + 2*it*t*my + t*t*b.y
+    });
+  }
+  return pts;
+}
+
+function escapeXML(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ============================================================
+   estado
+   ============================================================ */
+let LOCATIONS = [];
+let PTS = [];
+let FLAT_ARTISTS = [];
+let alphaNum = {};
+let shapePoints = []; // pontos concatenados do contorno fechado atual
+let currentArtist = null;
+let photoOk = false;
+
+const svgEl = document.getElementById('art');
 const artistSelect = document.getElementById('artist-select');
-const checklistEl = document.getElementById('checklist');
 const countNote = document.getElementById('count-note');
 const statusEl = document.getElementById('status');
-const downloadBtn = document.getElementById('btn-download');
+const pinsOnBtn = document.getElementById('pins-on');
+const pinsOffBtn = document.getElementById('pins-off');
+
+let showPins = false;
 
 function setStatus(msg, isError){
   statusEl.textContent = msg || '';
   statusEl.classList.toggle('error', !!isError);
 }
 
-function renderChecklist(){
-  checklistEl.innerHTML = '';
-  const sorted = [...LOCATIONS].sort((a,b) =>
-    (a.local||a.endereco).localeCompare(b.local||b.endereco, 'pt-BR', {sensitivity:'base'}));
-  sorted.forEach(loc => {
-    if (loc.lat == null || loc.lng == null) return;
-    const row = document.createElement('label');
-    row.className = 'check-row';
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.value = loc.id;
-    cb.checked = selectedOrder.includes(loc.id);
-    cb.addEventListener('change', () => {
-      if (cb.checked) selectedOrder.push(loc.id);
-      else selectedOrder = selectedOrder.filter(id => id !== loc.id);
-      renderChecklist();
-      draw();
-    });
-    const name = document.createElement('span');
-    name.className = 'cname';
-    name.innerHTML = `${loc.local || loc.endereco}${loc.local ? `<small>${loc.endereco}</small>` : ''}`;
-    row.appendChild(cb);
-    row.appendChild(name);
-    const orderIdx = selectedOrder.indexOf(loc.id);
-    if (orderIdx > -1){
-      const badge = document.createElement('span');
-      badge.className = 'check-order';
-      badge.textContent = String(orderIdx+1).padStart(2,'0');
-      row.appendChild(badge);
-    }
-    checklistEl.appendChild(row);
-  });
-  countNote.textContent = selectedOrder.length < 3
-    ? `a foto inteira sempre aparece — com 3+ pontos, uma janela em cor cheia se abre sobre o cinza`
-    : `${selectedOrder.length} pontos abrindo a janela colorida`;
-}
-
-document.getElementById('btn-shuffle').addEventListener('click', () => {
-  const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
-  const n = Math.min(withCoords.length, 4 + Math.floor(Math.random()*4));
-  const shuffled = [...withCoords].sort(() => Math.random()-0.5).slice(0, n);
-  selectedOrder = shuffled.map(l => l.id);
-  renderChecklist();
-  draw();
-});
-document.getElementById('btn-clear').addEventListener('click', () => {
-  selectedOrder = [];
-  renderChecklist();
-  draw();
-});
+pinsOnBtn.addEventListener('click', () => { showPins = true; pinsOnBtn.classList.add('active'); pinsOffBtn.classList.remove('active'); draw(); });
+pinsOffBtn.addEventListener('click', () => { showPins = false; pinsOffBtn.classList.add('active'); pinsOnBtn.classList.remove('active'); draw(); });
 
 function renderArtistSelect(){
   artistSelect.innerHTML = '';
@@ -269,182 +289,206 @@ function renderArtistSelect(){
 }
 function setArtist(idx){
   currentArtist = FLAT_ARTISTS[idx];
-  loadedImg = null;
+  photoOk = false;
   if (currentArtist && currentArtist.foto){
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => { loadedImg = img; draw(); };
-    img.onerror = () => { loadedImg = null; draw(); };
+    img.onload = () => { photoOk = true; draw(); };
+    img.onerror = () => { photoOk = false; draw(); };
     img.src = currentArtist.foto;
+  } else {
+    draw();
   }
-  draw();
 }
 artistSelect.addEventListener('change', () => setArtist(parseInt(artistSelect.value, 10)));
 
-function projectPoints(box){
-  if (!bounds) return [];
-  const { minLat, maxLat, minLng, maxLng } = bounds;
-  const spanLat = (maxLat - minLat) || 1;
-  const spanLng = (maxLng - minLng) || 1;
-  return selectedOrder.map(id => {
-    const loc = LOCATIONS.find(l => l.id === id);
-    if (!loc) return null;
-    const nx = (loc.lng - minLng) / spanLng;
-    const ny = (maxLat - loc.lat) / spanLat;
-    return { x: box.x + nx * box.w, y: box.y + ny * box.h };
-  }).filter(Boolean);
+function generateNewShape(){
+  const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
+  const order = [...withCoords].sort(() => Math.random()-0.5);
+  const orderPts = order.map(loc => PTS.find(p => p.loc.id === loc.id)).filter(Boolean);
+  const closed = [...orderPts, orderPts[0]];
+
+  const pts = [ { x: closed[0].x, y: closed[0].y } ];
+  for (let i = 1; i < closed.length; i++){
+    buildLegPath(closed[i-1], closed[i]).slice(1).forEach(pt => pts.push(pt));
+  }
+  shapePoints = pts;
+  draw();
+}
+document.getElementById('btn-shuffle').addEventListener('click', generateNewShape);
+
+function buildShapePathD(){
+  if (shapePoints.length < 3) return '';
+  let d = 'M' + shapePoints[0].x.toFixed(2) + ' ' + shapePoints[0].y.toFixed(2) + ' ';
+  for (let i = 1; i < shapePoints.length; i++){
+    d += 'L' + shapePoints[i].x.toFixed(2) + ' ' + shapePoints[i].y.toFixed(2) + ' ';
+  }
+  d += 'Z';
+  return d;
 }
 
-function drawCoverImage(ctx, img, box, filter){
-  const ir = img.width / img.height;
-  const br = box.w / box.h;
-  let dw, dh, dx, dy;
-  if (ir > br){ dh = box.h; dw = dh * ir; dx = box.x - (dw-box.w)/2; dy = box.y; }
-  else { dw = box.w; dh = dw / ir; dx = box.x; dy = box.y - (dh-box.h)/2; }
-  ctx.filter = filter || 'none';
-  ctx.drawImage(img, dx, dy, dw, dh);
-  ctx.filter = 'none';
-}
+/* ============================================================
+   desenho
+   ============================================================ */
+function buildContentSVG(){
+  let s = '';
+  const shapeD = buildShapePathD();
 
-async function draw(){
-  const W = canvas.width, H = canvas.height;
-  ctx.clearRect(0,0,W,H);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0,0,W,H);
-  ctx.strokeStyle = 'rgba(0,0,0,0.15)';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(0.5,0.5,W-1,H-1);
+  s += `<defs><clipPath id="maskClip"><path d="${shapeD}" fill-rule="nonzero"/></clipPath></defs>`;
 
-  const margin = 60;
-  const photoBox = { x: margin, y: margin, w: W - margin*2, h: 600 };
-  const pts = projectPoints(photoBox);
-  const canWindow = pts.length >= 3;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(photoBox.x, photoBox.y, photoBox.w, photoBox.h);
-  ctx.clip();
-
-  // camada 1: a foto inteira, sempre visível, em tom de cinza
-  if (loadedImg){
-    drawCoverImage(ctx, loadedImg, photoBox, 'grayscale(1) contrast(1.05) brightness(1.03)');
-  } else {
-    ctx.fillStyle = '#e4e4e4';
-    ctx.fillRect(photoBox.x, photoBox.y, photoBox.w, photoBox.h);
-    ctx.fillStyle = '#6b6b6b';
-    ctx.font = '48px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(currentArtist ? initials(currentArtist.nome) : '—', photoBox.x+photoBox.w/2, photoBox.y+photoBox.h/2);
-    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  if (shapeD){
+    if (currentArtist && currentArtist.foto && photoOk){
+      s += `<image href="${currentArtist.foto}" x="${BOX.x}" y="${BOX.y}" width="${BOX.w}" height="${BOX.h}" preserveAspectRatio="xMidYMid slice" clip-path="url(#maskClip)"/>`;
+    } else {
+      s += `<rect x="${BOX.x}" y="${BOX.y}" width="${BOX.w}" height="${BOX.h}" fill="#e4e4e4" clip-path="url(#maskClip)"/>`;
+      s += `<text x="${BOX.x+BOX.w/2}" y="${BOX.y+BOX.h/2}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="48" fill="#6b6b6b" text-anchor="middle" dominant-baseline="middle" clip-path="url(#maskClip)">${currentArtist ? initials(currentArtist.nome) : '—'}</text>`;
+    }
   }
 
-  // camada 2: a mesma foto em cor cheia, só dentro da janela geométrica
-  if (canWindow && loadedImg){
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
-    ctx.closePath();
-    ctx.clip();
-    drawCoverImage(ctx, loadedImg, photoBox, 'none');
-    ctx.restore();
-  }
-
-  // linhas de conexão + pontos, sempre visíveis por cima
-  if (pts.length >= 2){
-    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
-    if (canWindow) ctx.closePath();
-    ctx.stroke();
-
-    ctx.strokeStyle = 'rgba(17,17,17,0.9)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
-    if (canWindow) ctx.closePath();
-    ctx.stroke();
-
-    pts.forEach(p => {
-      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
-      ctx.fillStyle = '#fff'; ctx.fill();
-      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
-      ctx.strokeStyle = '#111'; ctx.lineWidth = 1.4; ctx.stroke();
+  if (showPins){
+    PTS.forEach(p => {
+      s += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="10" fill="#111" stroke="#fff" stroke-width="1.5"/>`;
+      s += `<text x="${p.x.toFixed(2)}" y="${(p.y+0.5).toFixed(2)}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="9" fill="#fff" text-anchor="middle" dominant-baseline="middle">${String(alphaNum[p.loc.id]).padStart(2,'0')}</text>`;
     });
   }
-  ctx.restore();
 
-  const textY = photoBox.y + photoBox.h + 40;
-  ctx.strokeStyle = 'rgba(0,0,0,0.15)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(margin, textY - 20); ctx.lineTo(W-margin, textY - 20); ctx.stroke();
-
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#6b6b6b';
-  ctx.font = '13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-  ctx.fillText(`${EVENT_TITLE} · ${EVENT_DATES}`, margin, textY);
-
-  ctx.fillStyle = '#111';
-  ctx.font = "52px 'Instrument Serif', Georgia, serif";
-  ctx.fillText(currentArtist ? currentArtist.nome : '—', margin, textY + 60);
-
-  ctx.fillStyle = '#6b6b6b';
-  ctx.font = '14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+  const textY = BOX.y + BOX.h + 70;
+  s += `<text x="${BOX.x}" y="${textY}" font-family="'Instrument Serif', Georgia, serif" font-size="46" fill="#111">${escapeXML(currentArtist ? currentArtist.nome : '—')}</text>`;
   const addrLine = currentArtist
     ? (currentArtist.loc.local ? `${currentArtist.loc.local} — ${currentArtist.loc.endereco}` : currentArtist.loc.endereco)
     : '—';
-  ctx.fillText(addrLine, margin, textY + 92);
+  s += `<text x="${BOX.x}" y="${textY+38}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="20" fill="#6b6b6b">${escapeXML(addrLine)}</text>`;
+
+  return s;
 }
 
-downloadBtn.addEventListener('click', () => {
+function draw(){
+  svgEl.innerHTML = buildContentSVG();
+}
+
+function buildFullSVGString(){
+  const content = buildContentSVG();
+  return `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LOGICAL} ${LOGICAL}" width="${LOGICAL}" height="${LOGICAL}">` +
+    `<defs><style>@import url('${FONT_IMPORT.replace(/&/g,'&amp;')}');</style></defs>` +
+    content +
+    `</svg>`;
+}
+
+/* ============================================================
+   exportação — SVG (vetorial), PNG e PDF (rasterizados do SVG)
+   ============================================================ */
+document.getElementById('btn-download-svg').addEventListener('click', () => {
   setStatus('');
+  const blob = new Blob([buildFullSVGString()], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'circuito-paralelo-mascara.svg';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+});
+
+function rasterizeSVG(scale){
+  return new Promise((resolve, reject) => {
+    const svgBlob = new Blob([buildFullSVGString()], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = LOGICAL * scale;
+      c.height = LOGICAL * scale;
+      const cctx = c.getContext('2d');
+      try{
+        cctx.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve(c);
+      } catch(err){
+        URL.revokeObjectURL(url);
+        reject(err);
+      }
+    };
+    img.onerror = (err) => { URL.revokeObjectURL(url); reject(err); };
+    img.src = url;
+  });
+}
+
+document.getElementById('btn-download-png').addEventListener('click', async () => {
+  setStatus('gerando PNG em alta resolução…');
   try{
-    canvas.toBlob(blob => {
+    const c = await rasterizeSVG(3);
+    c.toBlob(blob => {
       if (!blob){ setStatus('Não foi possível gerar o PNG.', true); return; }
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      const slug = (currentArtist ? currentArtist.nome : 'mascara').toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
-      a.href = url; a.download = `circuito-paralelo-${slug || 'mascara'}.png`;
+      a.href = url; a.download = 'circuito-paralelo-mascara.png';
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
+      setStatus('');
     }, 'image/png');
   } catch(err){
     console.error(err);
-    setStatus('A foto deste artista bloqueia a exportação (restrição de CORS da origem da imagem). Tente outro artista, ou salve por print da tela.', true);
+    setStatus('Exportação bloqueada — provavelmente a foto deste artista não libera CORS. Tente outro artista, ou baixe o SVG.', true);
   }
 });
 
+document.getElementById('btn-download-pdf').addEventListener('click', async () => {
+  setStatus('gerando PDF…');
+  try{
+    const c = await rasterizeSVG(3);
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'px', format: [LOGICAL, LOGICAL] });
+    doc.addImage(c.toDataURL('image/png'), 'PNG', 0, 0, LOGICAL, LOGICAL);
+    doc.save('circuito-paralelo-mascara.pdf');
+    setStatus('');
+  } catch(err){
+    console.error(err);
+    setStatus('Não foi possível gerar o PDF agora — tente o SVG.', true);
+  }
+});
+
+/* ============================================================
+   boot
+   ============================================================ */
 async function boot(){
-  try{ await document.fonts.load("52px 'Instrument Serif'"); } catch(e){}
+  try{ await document.fonts.load("46px 'Instrument Serif'"); } catch(e){}
   try{
     LOCATIONS = await loadLocationsFromSheet();
   } catch(err){
     console.error(err);
     setStatus('Não foi possível carregar os dados da planilha agora. Recarregue a página em instantes.', true);
-    downloadBtn.disabled = true;
     return;
   }
+
   const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
-  if (withCoords.length){
-    bounds = {
-      minLat: Math.min(...withCoords.map(l=>l.lat)),
-      maxLat: Math.max(...withCoords.map(l=>l.lat)),
-      minLng: Math.min(...withCoords.map(l=>l.lng)),
-      maxLng: Math.max(...withCoords.map(l=>l.lng)),
-    };
+  if (withCoords.length < 3){
+    setStatus('poucos ateliês com coordenadas preenchidas ainda — é preciso pelo menos 3 pra fechar uma forma.', true);
+    return;
   }
+  const bounds = {
+    minLat: Math.min(...withCoords.map(l=>l.lat)),
+    maxLat: Math.max(...withCoords.map(l=>l.lat)),
+    minLng: Math.min(...withCoords.map(l=>l.lng)),
+    maxLng: Math.max(...withCoords.map(l=>l.lng)),
+  };
+  proj = computeProjection(bounds, BOX.w, BOX.h, 20, 1.0);
+
+  PTS = withCoords.map(loc => {
+    const { x, y } = pixelOf(loc.lat, loc.lng);
+    return { loc, x, y };
+  });
+
+  const sortedForNum = [...withCoords].sort((a,b) =>
+    (a.local||a.endereco).localeCompare(b.local||b.endereco, 'pt-BR', {sensitivity:'base'}));
+  alphaNum = {};
+  sortedForNum.forEach((loc,i) => { alphaNum[loc.id] = i+1; });
+
   LOCATIONS.forEach(loc => loc.artistas.forEach(art => {
     if (art.nome) FLAT_ARTISTS.push({ ...art, loc });
   }));
   FLAT_ARTISTS.sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR',{sensitivity:'base'}));
 
   renderArtistSelect();
-  renderChecklist();
-  draw();
+  generateNewShape();
 }
 boot();
 </script>

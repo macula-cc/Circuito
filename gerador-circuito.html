@@ -46,6 +46,7 @@
   .btn{ font-family:var(--mono); font-size:0.79rem; background:#fff; color:var(--ink); border:1px solid var(--ink);
         padding:0.6rem 0.9rem; cursor:pointer; border-radius:0; transition:background 0.15s ease, color 0.15s ease; }
   .btn:hover{ background:var(--ink); color:#fff; }
+  .btn.active{ background:var(--ink); color:#fff; }
   .btn.primary{ background:var(--ink); color:#fff; width:100%; padding:0.85rem; font-size:0.83rem; }
   .btn.primary:hover{ opacity:0.8; }
   .btn:disabled{ opacity:0.35; cursor:default; pointer-events:none; }
@@ -78,6 +79,14 @@
 
     <h1>Circuito<br>Vivo</h1>
     <div class="sub">Circuito Paralelo — Ateliês do Centro do Rio</div>
+
+    <div class="field">
+      <label>Pontos dos ateliês</label>
+      <div class="row-btns">
+        <button class="btn active" id="pins-on">mostrar</button>
+        <button class="btn" id="pins-off">esconder</button>
+      </div>
+    </div>
 
     <div class="field">
       <label>Vídeo / animação aleatória</label>
@@ -318,6 +327,7 @@ let head = { x:0, y:0 };
 let targetIdx = 0;
 let subIdx = 1; // próximo waypoint dentro de legPaths[targetIdx]
 let mode = 'idle'; // idle | moving | paused | finished | static
+let showPins = true;
 let pauseUntil = 0;
 let activeCardLoc = null;
 let rafId = null;
@@ -438,6 +448,11 @@ function loop(ts){
   drawFrame();
 }
 
+const pinsOnBtn = document.getElementById('pins-on');
+const pinsOffBtn = document.getElementById('pins-off');
+pinsOnBtn.addEventListener('click', () => { showPins = true; pinsOnBtn.classList.add('active'); pinsOffBtn.classList.remove('active'); drawFrame(); });
+pinsOffBtn.addEventListener('click', () => { showPins = false; pinsOffBtn.classList.add('active'); pinsOnBtn.classList.remove('active'); drawFrame(); });
+
 document.getElementById('btn-restart').addEventListener('click', () => {
   mode = 'idle';
   startTour();
@@ -471,32 +486,24 @@ function pointAtDistance(points, dist){
 // desenha um pedaço curto da fita (o fundo preto) entre duas distâncias
 // ao longo do caminho — amostra alguns pontos intermediários pra acompanhar
 // bem trechos curvos
-function drawRibbonSegment(points, dStart, dEnd, width){
-  const STEPS = 4;
-  const start = Math.max(0, dStart - 2); // pequena sobreposição, evita frestas entre segmentos
-  ctx.save();
-  ctx.lineCap = 'butt'; // reta — 'round' fazia a ponta do próximo segmento cobrir o caractere anterior inteiro
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = width;
-  ctx.strokeStyle = '#111';
-  ctx.beginPath();
-  for (let s = 0; s <= STEPS; s++){
-    const dd = start + (dEnd - start) * s / STEPS;
-    const pt = pointAtDistance(points, dd);
-    if (s === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
-  }
-  ctx.stroke();
-  ctx.restore();
-}
-
-// fita + texto desenhados juntos, caractere por caractere, sempre na ordem
-// em que o caminho foi percorrido — assim, onde a fita se cruza com ela
-// mesma, o trecho mais novo é desenhado por cima e cobre fisicamente o
-// texto mais antigo que estiver embaixo, como uma fita real embolada
+// fita + texto — a fita inteira é um único traço contínuo (sem costuras
+// por letra), e o texto é escrito por cima seguindo o caminho
 function drawRibbonAndText(text, points, fontSize, ribbonWidth, fadeZone){
   if (points.length < 2) return;
   const total = pathLength(points);
   if (total < 4) return;
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = ribbonWidth;
+  ctx.strokeStyle = '#111';
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+  ctx.stroke();
+  ctx.restore();
+
   ctx.font = `${fontSize}px 'Instrument Serif', Georgia, serif`;
   const unit = text + '   ·   ';
   let d = 0, safety = 0;
@@ -504,9 +511,6 @@ function drawRibbonAndText(text, points, fontSize, ribbonWidth, fadeZone){
     for (const ch of unit){
       if (d >= total) break;
       const w = ctx.measureText(ch).width;
-      const dEnd = Math.min(d + w, total);
-
-      drawRibbonSegment(points, d, dEnd, ribbonWidth);
 
       let alpha = 1;
       if (fadeZone > 0) alpha = Math.max(0, Math.min(1, (total - d) / fadeZone));
@@ -521,7 +525,7 @@ function drawRibbonAndText(text, points, fontSize, ribbonWidth, fadeZone){
       ctx.fillText(ch, 0, 0);
       ctx.restore();
 
-      d = dEnd;
+      d += w;
       safety++;
     }
   }
@@ -638,23 +642,25 @@ function drawFrame(){
     ctx.fill();
   }
 
-  // todos os pontos dos ateliês já ficam visíveis desde o início, com o
-  // mesmo visual de pino do site — numerados em ordem alfabética, sempre
-  // com o mesmo número (não é a ordem em que a cobrinha visita)
-  PTS.forEach((p) => {
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 15, 0, Math.PI*2);
-    ctx.fillStyle = '#111';
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#fff';
-    ctx.stroke();
-    ctx.fillStyle = '#fff';
-    ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(String(alphaNum[p.loc.id]).padStart(2,'0'), p.x, p.y + 0.5);
-    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-  });
+  // todos os pontos dos ateliês, com o mesmo visual de pino do site —
+  // numerados em ordem alfabética, sempre com o mesmo número (não é a
+  // ordem em que a cobrinha visita) — pode ser escondido
+  if (showPins){
+    PTS.forEach((p) => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 15, 0, Math.PI*2);
+      ctx.fillStyle = '#111';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#fff';
+      ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(alphaNum[p.loc.id]).padStart(2,'0'), p.x, p.y + 0.5);
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    });
+  }
 
   if (activeCardLoc) drawCard(activeCardLoc);
 }
