@@ -92,6 +92,14 @@
     </div>
 
     <div class="field">
+      <label>Pontos dos ateliês</label>
+      <div class="row-btns">
+        <button class="btn active" id="pins-on">mostrar</button>
+        <button class="btn" id="pins-off">esconder</button>
+      </div>
+    </div>
+
+    <div class="field">
       <label>Traçado</label>
       <div class="count-note" id="count-note">a cobrinha sempre passa por todos os ateliês, em uma ordem nova a cada geração</div>
       <div class="row-btns" style="margin-top:0.7rem;">
@@ -336,6 +344,12 @@ const themeClaroBtn = document.getElementById('theme-claro');
 const themeEscuroBtn = document.getElementById('theme-escuro');
 
 let selectedOrder = []; // sempre contém TODOS os pontos com coordenada, em ordem embaralhada
+let showPins = true;
+
+const pinsOnBtn = document.getElementById('pins-on');
+const pinsOffBtn = document.getElementById('pins-off');
+pinsOnBtn.addEventListener('click', () => { showPins = true; pinsOnBtn.classList.add('active'); pinsOffBtn.classList.remove('active'); draw(); });
+pinsOffBtn.addEventListener('click', () => { showPins = false; pinsOffBtn.classList.add('active'); pinsOnBtn.classList.remove('active'); draw(); });
 
 function setStatus(msg, isError){
   statusEl.textContent = msg || '';
@@ -366,16 +380,20 @@ document.getElementById('btn-shuffle').addEventListener('click', generateNewRout
    desenho — monta marcação SVG (texto e formas vetoriais de
    verdade, não pixel) e injeta no <svg> da tela
    ============================================================ */
-function buildContentSVG(){
+function buildContentSVG(includeBg){
   const theme = THEMES[currentTheme];
   let s = '';
-  s += `<rect x="0" y="0" width="${LOGICAL}" height="${LOGICAL}" fill="${theme.bg}"/>`;
-  s += `<rect x="0.5" y="0.5" width="${LOGICAL-1}" height="${LOGICAL-1}" fill="none" stroke="${currentTheme==='claro' ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)'}" stroke-width="1"/>`;
+  if (includeBg){
+    s += `<rect x="0" y="0" width="${LOGICAL}" height="${LOGICAL}" fill="${theme.bg}"/>`;
+    s += `<rect x="0.5" y="0.5" width="${LOGICAL-1}" height="${LOGICAL-1}" fill="none" stroke="${currentTheme==='claro' ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)'}" stroke-width="1"/>`;
+  }
 
-  PTS.forEach(p => {
-    s += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="15" fill="${theme.pin}" stroke="${theme.pinRing}" stroke-width="2"/>`;
-    s += `<text x="${p.x.toFixed(2)}" y="${(p.y+0.5).toFixed(2)}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="${theme.pinText}" text-anchor="middle" dominant-baseline="middle">${String(alphaNum[p.loc.id]).padStart(2,'0')}</text>`;
-  });
+  if (showPins){
+    PTS.forEach(p => {
+      s += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="15" fill="${theme.pin}" stroke="${theme.pinRing}" stroke-width="2"/>`;
+      s += `<text x="${p.x.toFixed(2)}" y="${(p.y+0.5).toFixed(2)}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="${theme.pinText}" text-anchor="middle" dominant-baseline="middle">${String(alphaNum[p.loc.id]).padStart(2,'0')}</text>`;
+    });
+  }
 
   if (selectedOrder.length >= 2){
     const selPts = selectedOrder.map(id => PTS.find(p => p.loc.id === id)).filter(Boolean);
@@ -389,11 +407,11 @@ function buildContentSVG(){
 }
 
 function draw(){
-  svgEl.innerHTML = buildContentSVG();
+  svgEl.innerHTML = buildContentSVG(true);
 }
 
 function buildFullSVGString(){
-  const content = buildContentSVG();
+  const content = buildContentSVG(false); // exportação sai com fundo transparente por padrão
   return `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LOGICAL} ${LOGICAL}" width="${LOGICAL}" height="${LOGICAL}">` +
     `<defs><style>@import url('${FONT_IMPORT.replace(/&/g,'&amp;')}');</style></defs>` +
