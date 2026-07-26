@@ -108,8 +108,8 @@
       <div class="field">
         <label>Mapa</label>
         <div class="row-btns">
-          <button class="btn" id="evt-map-on">mostrar mapa</button>
-          <button class="btn active" id="evt-map-off">esconder mapa</button>
+          <button class="btn active" id="evt-map-on">mostrar mapa</button>
+          <button class="btn" id="evt-map-off">esconder mapa</button>
         </div>
       </div>
 
@@ -195,7 +195,7 @@ const EVT_TITLE_SIZE = 72;
 const EVT_TITLE_Y1 = 136;
 const EVT_TITLE_Y2 = 208;
 const EVT_MAP_BOX = { x: 0, y: 0, w: LOGICAL, h: LOGICAL };
-const EVT_MARK_WIDTH = 38; // mesma espessura de linha usada no gerador de marca
+const EVT_MARK_WIDTH = 30;
 const EVT_STATS_SIZE = 40;
 const EVT_STATS_Y1 = 878;
 const EVT_STATS_Y2 = 924;
@@ -330,12 +330,12 @@ function fitZoomEvt(bounds, boxW, boxH, margin){
 let evtProj = null; // { zoom, originX, originY, tile }
 function computeEvtProjection(bounds){
   const expanded = expandBounds(bounds, 1.0);
-  const zoom = fitZoomEvt(expanded, EVT_MAP_BOX.w, EVT_MAP_BOX.h, 10);
+  const zoom = fitZoomEvt(expanded, EVT_MAP_BOX.w, EVT_MAP_BOX.h, 45);
   const p1 = mercProject(expanded.maxLat, expanded.minLng, zoom);
   const p2 = mercProject(expanded.minLat, expanded.maxLng, zoom);
   const pxW = (p2.x - p1.x) * TILE_SIZE;
   const pxH = (p2.y - p1.y) * TILE_SIZE;
-  const scale = Math.min(8, Math.max(1, Math.min((EVT_MAP_BOX.w-20)/pxW, (EVT_MAP_BOX.h-20)/pxH)));
+  const scale = Math.min(8, Math.max(1, Math.min((EVT_MAP_BOX.w-90)/pxW, (EVT_MAP_BOX.h-90)/pxH)));
   const tile = TILE_SIZE * scale;
   const cLat = (expanded.minLat+expanded.maxLat)/2, cLng = (expanded.minLng+expanded.maxLng)/2;
   const center = mercProject(cLat, cLng, zoom);
@@ -473,7 +473,7 @@ let evtMarkPoints = []; // marca (estática) do post do evento
 let numAddresses = 0;
 let numArtists = 0;
 let mode = 'artista'; // artista | evento
-let showMapEvt = false;
+let showMapEvt = true;
 let showPinsEvt = false;
 let markModeEvt = 'estatica'; // estatica | video
 
@@ -755,7 +755,7 @@ function markPathForFrame(){
 /* ---- vídeo do post do evento: anda ponto a ponto, sem modais, uma
    volta só, no ritmo real (sem duração fixa) ---- */
 const btnEvtVideo = document.getElementById('btn-evt-video');
-const EVT_SPEED = 260; // px por segundo
+const EVT_DURATION_MS = 4000; // duração alvo do vídeo — bem mais rápido
 
 btnEvtVideo.addEventListener('click', () => {
   if (!('MediaRecorder' in window)){
@@ -768,7 +768,8 @@ btnEvtVideo.addEventListener('click', () => {
     buildLegPath(order[i-1], order[i]).slice(1).forEach(p => raw.push(p));
   }
   const totalLen = pathLength(raw);
-  const durationSec = totalLen / EVT_SPEED;
+  const durationSec = EVT_DURATION_MS / 1000;
+  const evtSpeed = totalLen / durationSec;
 
   let stream, recorder;
   try{
@@ -801,7 +802,7 @@ btnEvtVideo.addEventListener('click', () => {
   function frame(ts){
     if (startTs == null) startTs = ts;
     const elapsed = (ts - startTs) / 1000;
-    const d = Math.min(totalLen, elapsed * EVT_SPEED);
+    const d = Math.min(totalLen, elapsed * evtSpeed);
     drawEventFrame(ectx, d, raw);
     if (elapsed < durationSec){
       requestAnimationFrame(frame);
@@ -931,6 +932,10 @@ async function boot(){
   // post do evento
   computeEvtProjection(bounds);
   PTS_EVT = withCoords.map(loc => ({ ...pixelOfEvt(loc.lat, loc.lng), id: loc.id }));
+  if (showMapEvt){
+    setStatus('carregando mapa…');
+    fetchEvtBasemapTiles().then(() => { setStatus(''); redrawEvent(); });
+  }
   const sortedForNum = [...withCoords].sort((a,b) =>
     (a.local||a.endereco).localeCompare(b.local||b.endereco, 'pt-BR', {sensitivity:'base'}));
   alphaNumEvt = {};
