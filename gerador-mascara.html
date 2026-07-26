@@ -194,7 +194,8 @@ const EVT_TITLE_L2 = 'Ateliês do Centro';
 const EVT_TITLE_SIZE = 72;
 const EVT_TITLE_Y1 = 136;
 const EVT_TITLE_Y2 = 208;
-const EVT_MAP_BOX = { x: MARGIN, y: 240, w: LOGICAL - MARGIN*2, h: 560 };
+const EVT_MAP_BOX = { x: 0, y: 0, w: LOGICAL, h: LOGICAL };
+const EVT_MARK_WIDTH = 38; // mesma espessura de linha usada no gerador de marca
 const EVT_STATS_SIZE = 40;
 const EVT_STATS_Y1 = 878;
 const EVT_STATS_Y2 = 924;
@@ -329,12 +330,12 @@ function fitZoomEvt(bounds, boxW, boxH, margin){
 let evtProj = null; // { zoom, originX, originY, tile }
 function computeEvtProjection(bounds){
   const expanded = expandBounds(bounds, 1.0);
-  const zoom = fitZoomEvt(expanded, EVT_MAP_BOX.w, EVT_MAP_BOX.h, 20);
+  const zoom = fitZoomEvt(expanded, EVT_MAP_BOX.w, EVT_MAP_BOX.h, 10);
   const p1 = mercProject(expanded.maxLat, expanded.minLng, zoom);
   const p2 = mercProject(expanded.minLat, expanded.maxLng, zoom);
   const pxW = (p2.x - p1.x) * TILE_SIZE;
   const pxH = (p2.y - p1.y) * TILE_SIZE;
-  const scale = Math.min(8, Math.max(1, Math.min((EVT_MAP_BOX.w-40)/pxW, (EVT_MAP_BOX.h-40)/pxH)));
+  const scale = Math.min(8, Math.max(1, Math.min((EVT_MAP_BOX.w-20)/pxW, (EVT_MAP_BOX.h-20)/pxH)));
   const tile = TILE_SIZE * scale;
   const cLat = (expanded.minLat+expanded.maxLat)/2, cLng = (expanded.minLng+expanded.maxLng)/2;
   const center = mercProject(cLat, cLng, zoom);
@@ -703,6 +704,17 @@ function drawEventFrame(ctx2d, dMark, markPath){
   ctx2d.fillText(EVT_TITLE_L1, MARGIN, EVT_TITLE_Y1);
   ctx2d.fillText(EVT_TITLE_L2, MARGIN, EVT_TITLE_Y2);
 
+  if (markPath && markPath.length >= 2){
+    const sub = subPathUpTo(markPath, dMark);
+    ctx2d.strokeStyle = theme.mark;
+    ctx2d.lineWidth = EVT_MARK_WIDTH;
+    ctx2d.lineCap = 'round';
+    ctx2d.lineJoin = 'round';
+    ctx2d.beginPath();
+    sub.forEach((p, i) => { if (i === 0) ctx2d.moveTo(p.x, p.y); else ctx2d.lineTo(p.x, p.y); });
+    ctx2d.stroke();
+  }
+
   if (showPinsEvt){
     PTS_EVT.forEach((p) => {
       ctx2d.beginPath();
@@ -718,17 +730,6 @@ function drawEventFrame(ctx2d, dMark, markPath){
       ctx2d.fillText(String(alphaNumEvt[p.id]).padStart(2,'0'), p.x, p.y+0.5);
       ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'alphabetic';
     });
-  }
-
-  if (markPath && markPath.length >= 2){
-    const sub = subPathUpTo(markPath, dMark);
-    ctx2d.strokeStyle = theme.mark;
-    ctx2d.lineWidth = 5;
-    ctx2d.lineCap = 'round';
-    ctx2d.lineJoin = 'round';
-    ctx2d.beginPath();
-    sub.forEach((p, i) => { if (i === 0) ctx2d.moveTo(p.x, p.y); else ctx2d.lineTo(p.x, p.y); });
-    ctx2d.stroke();
   }
 
   ctx2d.textAlign = 'left';
