@@ -257,6 +257,7 @@ let PTS = [];
 let FLAT_ARTISTS = [];
 let alphaNum = {};
 let shapePoints = []; // pontos concatenados do contorno fechado atual
+let maskPoints = []; // fecho convexo suavizado — a máscara de verdade
 let currentArtist = null;
 let photoOk = false;
 
@@ -302,6 +303,43 @@ function setArtist(idx){
 }
 artistSelect.addEventListener('change', () => setArtist(parseInt(artistSelect.value, 10)));
 
+// fecho convexo (monotone chain) — garante um contorno simples, sem
+// auto-interseção, então o preenchimento nunca fica com buracos
+function convexHull(points){
+  const pts = [...points].sort((a,b) => a.x === b.x ? a.y-b.y : a.x-b.x);
+  const cross = (o,a,b) => (a.x-o.x)*(b.y-o.y) - (a.y-o.y)*(b.x-o.x);
+  const lower = [];
+  for (const p of pts){
+    while (lower.length >= 2 && cross(lower[lower.length-2], lower[lower.length-1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper = [];
+  for (let i = pts.length-1; i >= 0; i--){
+    const p = pts[i];
+    while (upper.length >= 2 && cross(upper[upper.length-2], upper[upper.length-1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  upper.pop(); lower.pop();
+  return lower.concat(upper);
+}
+
+// arredonda os cantos de um polígono fechado (Chaikin), pra suavizar as
+// pontas do fecho convexo
+function chaikinSmoothClosed(points, iterations){
+  let pts = points;
+  for (let it = 0; it < iterations; it++){
+    const next = [];
+    const n = pts.length;
+    for (let i = 0; i < n; i++){
+      const p0 = pts[i], p1 = pts[(i+1) % n];
+      next.push({ x: p0.x*0.8 + p1.x*0.2, y: p0.y*0.8 + p1.y*0.2 });
+      next.push({ x: p0.x*0.2 + p1.x*0.8, y: p0.y*0.2 + p1.y*0.8 });
+    }
+    pts = next;
+  }
+  return pts;
+}
+
 function generateNewShape(){
   const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
   const order = [...withCoords].sort(() => Math.random()-0.5);
@@ -313,15 +351,18 @@ function generateNewShape(){
     buildLegPath(closed[i-1], closed[i]).slice(1).forEach(pt => pts.push(pt));
   }
   shapePoints = pts;
+  // a máscara de verdade é só o contorno externo desse traçado, suavizado —
+  // nunca tem "buraco" porque é sempre um polígono simples
+  maskPoints = chaikinSmoothClosed(convexHull(shapePoints), 3);
   draw();
 }
 document.getElementById('btn-shuffle').addEventListener('click', generateNewShape);
 
 function buildShapePathD(){
-  if (shapePoints.length < 3) return '';
-  let d = 'M' + shapePoints[0].x.toFixed(2) + ' ' + shapePoints[0].y.toFixed(2) + ' ';
-  for (let i = 1; i < shapePoints.length; i++){
-    d += 'L' + shapePoints[i].x.toFixed(2) + ' ' + shapePoints[i].y.toFixed(2) + ' ';
+  if (maskPoints.length < 3) return '';
+  let d = 'M' + maskPoints[0].x.toFixed(2) + ' ' + maskPoints[0].y.toFixed(2) + ' ';
+  for (let i = 1; i < maskPoints.length; i++){
+    d += 'L' + maskPoints[i].x.toFixed(2) + ' ' + maskPoints[i].y.toFixed(2) + ' ';
   }
   d += 'Z';
   return d;
