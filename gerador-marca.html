@@ -83,6 +83,14 @@
     <div class="sub">Circuito de Ateliês do Centro · vetorial (SVG)</div>
 
     <div class="field">
+      <label>Tipo</label>
+      <div class="row-btns">
+        <button class="btn active" id="mode-simbolo">símbolo</button>
+        <button class="btn" id="mode-completa">marca completa</button>
+      </div>
+    </div>
+
+    <div class="field">
       <label>Cores</label>
       <div class="row-btns">
         <button class="btn active" id="theme-claro">fita preta · texto branco</button>
@@ -90,19 +98,21 @@
       </div>
     </div>
 
-    <div class="field">
-      <label>Pontos dos ateliês</label>
-      <div class="row-btns">
-        <button class="btn active" id="pins-on">mostrar</button>
-        <button class="btn" id="pins-off">esconder</button>
+    <div id="simbolo-fields">
+      <div class="field">
+        <label>Pontos dos ateliês</label>
+        <div class="row-btns">
+          <button class="btn active" id="pins-on">mostrar</button>
+          <button class="btn" id="pins-off">esconder</button>
+        </div>
       </div>
-    </div>
 
-    <div class="field">
-      <label>Texto na linha</label>
-      <div class="row-btns">
-        <button class="btn active" id="text-on">com texto</button>
-        <button class="btn" id="text-off">sem texto</button>
+      <div class="field">
+        <label>Texto na linha</label>
+        <div class="row-btns">
+          <button class="btn active" id="text-on">com texto</button>
+          <button class="btn" id="text-off">sem texto</button>
+        </div>
       </div>
     </div>
 
@@ -137,9 +147,15 @@
    dados
    ============================================================ */
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
-const EVENT_TITLE = 'Circuito de Ateliês do Centro';
 const LOGICAL = 1000;
 const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap";
+const EVENT_TITLE = 'Circuito de Ateliês do Centro';
+const EVENT_DATES = '18 – 19 de Setembro';
+
+// mesma diagramação usada na parte de baixo do post do artista
+const SMALL_MARGIN = 60;
+const SMALL_MARK_BOX = { x: SMALL_MARGIN, y: LOGICAL - SMALL_MARGIN - 120, w: 120, h: 120 };
+const SMALL_TITLE_SIZE = 36;
 
 function parseCSV(text){
   const rows = []; let row = []; let field = ''; let inQuotes = false;
@@ -224,6 +240,18 @@ function pixelOf(lat, lon){
 /* ============================================================
    caminho reto/curvo entre dois pontos
    ============================================================ */
+// encaixa qualquer nuvem de pontos numa caixa alvo, centralizada
+function fitPointsToBox(points, box, fillFraction){
+  const xs = points.map(p=>p.x), ys = points.map(p=>p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const w = (maxX-minX) || 1, h = (maxY-minY) || 1;
+  const scale = Math.min(box.w*fillFraction/w, box.h*fillFraction/h);
+  const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
+  const boxCx = box.x + box.w/2, boxCy = box.y + box.h/2;
+  return points.map(p => ({ x: boxCx + (p.x-cx)*scale, y: boxCy + (p.y-cy)*scale }));
+}
+
 function buildLegPath(a, b){
   const dx = b.x - a.x, dy = b.y - a.y;
   const len = Math.hypot(dx, dy) || 1;
@@ -369,6 +397,8 @@ const themeEscuroBtn = document.getElementById('theme-escuro');
 let selectedOrder = []; // sempre contém TODOS os pontos com coordenada, em ordem embaralhada
 let showPins = true;
 let showText = true;
+let modeMarca = 'simbolo'; // simbolo | completa
+let completeMarkPoints = [];
 
 const textOnBtn = document.getElementById('text-on');
 const textOffBtn = document.getElementById('text-off');
@@ -402,7 +432,37 @@ function generateNewRoute(){
   countNote.textContent = `${selectedOrder.length} ateliês conectados, nesta ordem`;
   draw();
 }
-document.getElementById('btn-shuffle').addEventListener('click', generateNewRoute);
+function generateCompleteMark(){
+  const order = [...PTS].sort(() => Math.random()-0.5);
+  const closed = [...order, order[0]];
+  const pts = [ { x: closed[0].x, y: closed[0].y } ];
+  for (let i = 1; i < closed.length; i++){
+    buildLegPath(closed[i-1], closed[i]).slice(1).forEach(p => pts.push(p));
+  }
+  completeMarkPoints = fitPointsToBox(pts, SMALL_MARK_BOX, 0.9);
+  draw();
+}
+document.getElementById('btn-shuffle').addEventListener('click', () => {
+  if (modeMarca === 'simbolo') generateNewRoute();
+  else generateCompleteMark();
+});
+
+const modeSimboloBtn = document.getElementById('mode-simbolo');
+const modeCompletaBtn = document.getElementById('mode-completa');
+const simboloFieldsEl = document.getElementById('simbolo-fields');
+modeSimboloBtn.addEventListener('click', () => {
+  modeMarca = 'simbolo';
+  modeSimboloBtn.classList.add('active'); modeCompletaBtn.classList.remove('active');
+  simboloFieldsEl.style.display = 'block';
+  draw();
+});
+modeCompletaBtn.addEventListener('click', () => {
+  modeMarca = 'completa';
+  modeCompletaBtn.classList.add('active'); modeSimboloBtn.classList.remove('active');
+  simboloFieldsEl.style.display = 'none';
+  if (completeMarkPoints.length < 2) generateCompleteMark();
+  draw();
+});
 
 
 /* ============================================================
@@ -415,6 +475,16 @@ function buildContentSVG(includeBg){
   if (includeBg){
     s += `<rect x="0" y="0" width="${LOGICAL}" height="${LOGICAL}" fill="${theme.bg}"/>`;
     s += `<rect x="0.5" y="0.5" width="${LOGICAL-1}" height="${LOGICAL-1}" fill="none" stroke="${currentTheme==='claro' ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)'}" stroke-width="1"/>`;
+  }
+
+  if (modeMarca === 'completa'){
+    if (completeMarkPoints.length >= 2){
+      s += `<path d="${buildOpenPathD(completeMarkPoints)}" fill="none" stroke="${theme.ribbon}" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+    }
+    const textX = SMALL_MARK_BOX.x + SMALL_MARK_BOX.w + 26;
+    s += `<text x="${textX}" y="${SMALL_MARK_BOX.y+52}" font-family="'Instrument Serif', Georgia, serif" font-size="${SMALL_TITLE_SIZE}" fill="${theme.ribbon}">${escapeXML(EVENT_TITLE)}</text>`;
+    s += `<text x="${textX}" y="${SMALL_MARK_BOX.y+98}" font-family="'Instrument Serif', Georgia, serif" font-size="${SMALL_TITLE_SIZE}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
+    return s;
   }
 
   if (selectedOrder.length >= 2){

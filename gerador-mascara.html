@@ -832,27 +832,39 @@ function markPathForFrame(){
 /* ---- vídeo do post do evento: anda ponto a ponto, sem modais, uma
    volta só, no ritmo real (sem duração fixa) ---- */
 const btnEvtVideo = document.getElementById('btn-evt-video');
-const EVT_DURATION_MS = 4000; // duração alvo do vídeo — bem mais rápido
+
+const EVT_SLIDE_COUNT = 20;
+const EVT_SLIDE_MS = 1000;
+
+function buildRandomEventMark(){
+  const order = [...PTS_EVT].sort(() => Math.random()-0.5);
+  const closed = [...order, order[0]];
+  const pts = [ { x: closed[0].x, y: closed[0].y } ];
+  for (let i = 1; i < closed.length; i++){
+    buildLegPath(closed[i-1], closed[i]).slice(1).forEach(p => pts.push(p));
+  }
+  return fitPointsToBox(pts, EVT_MAP_BOX, 0.94);
+}
 
 btnEvtVideo.addEventListener('click', () => {
   if (!('MediaRecorder' in window)){
     setStatus('Este navegador não suporta gravação de vídeo (tente no Chrome ou Firefox).', true);
     return;
   }
-  const order = [...PTS_EVT].sort(() => Math.random()-0.5);
-  const raw = [ { x: order[0].x, y: order[0].y } ];
-  for (let i = 1; i < order.length; i++){
-    buildLegPath(order[i-1], order[i]).slice(1).forEach(p => raw.push(p));
-  }
-  const totalLen = pathLength(raw);
-  const durationSec = EVT_DURATION_MS / 1000;
-  const evtSpeed = totalLen / durationSec;
 
-  let stream, recorder;
+  // 20 marcas aleatórias prontas de antemão — cada uma some pra próxima
+  // de uma vez, sem transição, como 20 cliques em "gerar nova"
+  const slides = [];
+  for (let i = 0; i < EVT_SLIDE_COUNT; i++) slides.push(buildRandomEventMark());
+
+  let stream, recorder, isMp4 = false;
   try{
     stream = eventCanvas.captureStream(30);
-    const mimeCandidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+    // mp4 primeiro — já sai pronto pro Instagram; webm é o único formato
+    // que a maioria dos navegadores desktop consegue gravar nativamente
+    const mimeCandidates = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
     const mimeType = mimeCandidates.find(m => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || '';
+    isMp4 = mimeType.indexOf('mp4') === 0 || mimeType.indexOf('video/mp4') === 0;
     recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
   } catch(err){
     setStatus('Não foi possível iniciar a gravação neste navegador.', true);
@@ -862,32 +874,33 @@ btnEvtVideo.addEventListener('click', () => {
   const chunks = [];
   recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
   recorder.onstop = () => {
-    const blob = new Blob(chunks, { type: 'video/webm' });
+    const ext = isMp4 ? 'mp4' : 'webm';
+    const blob = new Blob(chunks, { type: isMp4 ? 'video/mp4' : 'video/webm' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'circuito-post-evento.webm';
+    a.href = url; a.download = `circuito-post-evento.${ext}`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
-    setStatus('vídeo pronto — download iniciado (.webm).');
+    setStatus(isMp4
+      ? 'vídeo pronto (.mp4) — já dá pra postar direto no Instagram.'
+      : 'vídeo pronto (.webm) — esse navegador só grava nesse formato; talvez precise converter pra .mp4 antes de postar no Instagram (o Safari grava .mp4 direto).');
     redrawEvent();
   };
 
   setStatus('gravando o vídeo do evento…');
   recorder.start();
 
-  let startTs = null;
-  function frame(ts){
-    if (startTs == null) startTs = ts;
-    const elapsed = (ts - startTs) / 1000;
-    const d = Math.min(totalLen, elapsed * evtSpeed);
-    drawEventFrame(ectx, d, raw);
-    if (elapsed < durationSec){
-      requestAnimationFrame(frame);
-    } else {
+  let i = 0;
+  drawEventFrame(ectx, pathLength(slides[0]), slides[0]);
+  const interval = setInterval(() => {
+    i++;
+    if (i >= EVT_SLIDE_COUNT){
+      clearInterval(interval);
       recorder.stop();
+      return;
     }
-  }
-  requestAnimationFrame(frame);
+    drawEventFrame(ectx, pathLength(slides[i]), slides[i]);
+  }, EVT_SLIDE_MS);
 });
 
 /* ============================================================
