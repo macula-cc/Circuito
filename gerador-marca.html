@@ -99,6 +99,14 @@
     </div>
 
     <div class="field">
+      <label>Texto na linha</label>
+      <div class="row-btns">
+        <button class="btn active" id="text-on">com texto</button>
+        <button class="btn" id="text-off">sem texto</button>
+      </div>
+    </div>
+
+    <div class="field">
       <label>Traçado</label>
       <div class="count-note" id="count-note">a cobrinha sempre passa por todos os ateliês, em uma ordem nova a cada geração</div>
       <div class="row-btns" style="margin-top:0.7rem;">
@@ -283,6 +291,22 @@ function escapeXML(s){
    caractere, sempre na ordem do caminho, pra que trechos mais
    novos cubram os mais antigos nos cruzamentos
    ============================================================ */
+// só a fita, sem nenhum texto por cima — cada perna vira um traço
+// único e contínuo, na mesma ordem (perna nova cobre a antiga nos
+// cruzamentos, igual à versão com texto)
+function buildRibbonOnlySVG(legs, ribbonWidth, ribbonColor){
+  let out = '';
+  legs.forEach(points => {
+    if (points.length < 2) return;
+    let pathD = 'M' + points[0].x.toFixed(2) + ' ' + points[0].y.toFixed(2) + ' ';
+    for (let i = 1; i < points.length; i++){
+      pathD += 'L' + points[i].x.toFixed(2) + ' ' + points[i].y.toFixed(2) + ' ';
+    }
+    out += `<path d="${pathD}" fill="none" stroke="${ribbonColor}" stroke-width="${ribbonWidth}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  });
+  return out;
+}
+
 function buildRibbonAndTextSVG(text, legs, fontSize, ribbonWidth, ribbonColor, textColor){
   const unit = text + '   ·   ';
   let out = '';
@@ -344,6 +368,12 @@ const themeEscuroBtn = document.getElementById('theme-escuro');
 
 let selectedOrder = []; // sempre contém TODOS os pontos com coordenada, em ordem embaralhada
 let showPins = true;
+let showText = true;
+
+const textOnBtn = document.getElementById('text-on');
+const textOffBtn = document.getElementById('text-off');
+textOnBtn.addEventListener('click', () => { showText = true; textOnBtn.classList.add('active'); textOffBtn.classList.remove('active'); draw(); });
+textOffBtn.addEventListener('click', () => { showText = false; textOffBtn.classList.add('active'); textOnBtn.classList.remove('active'); draw(); });
 
 const pinsOnBtn = document.getElementById('pins-on');
 const pinsOffBtn = document.getElementById('pins-off');
@@ -393,7 +423,9 @@ function buildContentSVG(includeBg){
     for (let i = 1; i < selPts.length; i++){
       legs.push(buildLegPath(selPts[i-1], selPts[i]));
     }
-    s += buildRibbonAndTextSVG(EVENT_TITLE, legs, 24, 38, theme.ribbon, theme.text);
+    s += showText
+      ? buildRibbonAndTextSVG(EVENT_TITLE, legs, 24, 38, theme.ribbon, theme.text)
+      : buildRibbonOnlySVG(legs, 38, theme.ribbon);
   }
 
   if (showPins){
