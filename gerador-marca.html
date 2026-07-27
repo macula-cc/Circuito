@@ -90,6 +90,14 @@
       </div>
     </div>
 
+    <div class="field" id="orient-field" style="display:none;">
+      <label>Orientação</label>
+      <div class="row-btns">
+        <button class="btn" id="orient-vertical">vertical</button>
+        <button class="btn active" id="orient-horizontal">horizontal</button>
+      </div>
+    </div>
+
     <div class="field">
       <label>Cores</label>
       <div class="row-btns">
@@ -152,10 +160,18 @@ const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Instrument+Serif:i
 const EVENT_TITLE = 'Circuito de Ateliês do Centro';
 const EVENT_DATES = '18 – 19 de Setembro';
 
-// mesma diagramação usada na parte de baixo do post do artista
+// mesma diagramação usada na parte de baixo do post do artista (horizontal)
 const SMALL_MARGIN = 60;
-const SMALL_MARK_BOX = { x: SMALL_MARGIN, y: LOGICAL - SMALL_MARGIN - 120, w: 120, h: 120 };
-const SMALL_TITLE_SIZE = 36;
+const MARK_BOX_H = { x: SMALL_MARGIN, y: LOGICAL - SMALL_MARGIN - 120, w: 120, h: 120 };
+const TITLE_SIZE_H = 36;
+
+// marca completa vertical: símbolo grande em cima, texto embaixo, à esquerda
+const MARK_BOX_V = { x: SMALL_MARGIN, y: SMALL_MARGIN, w: 400, h: 400 };
+const TITLE_SIZE_V = 56;
+const DATE_SIZE_V = 32;
+const TITLE_V_Y1 = 550;
+const TITLE_V_Y2 = 610;
+const DATE_V_Y = 655;
 
 function parseCSV(text){
   const rows = []; let row = []; let field = ''; let inQuotes = false;
@@ -310,6 +326,13 @@ function charWidth(ch, fontSize){
   return measureCtx.measureText(ch).width;
 }
 
+function buildOpenPathD(points){
+  if (points.length < 2) return '';
+  let d = 'M' + points[0].x.toFixed(2) + ' ' + points[0].y.toFixed(2) + ' ';
+  for (let i = 1; i < points.length; i++) d += 'L' + points[i].x.toFixed(2) + ' ' + points[i].y.toFixed(2) + ' ';
+  return d;
+}
+
 function escapeXML(s){
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
@@ -398,6 +421,7 @@ let selectedOrder = []; // sempre contém TODOS os pontos com coordenada, em ord
 let showPins = true;
 let showText = true;
 let modeMarca = 'simbolo'; // simbolo | completa
+let orientMarca = 'horizontal'; // vertical | horizontal
 let completeMarkPoints = [];
 
 const textOnBtn = document.getElementById('text-on');
@@ -439,7 +463,8 @@ function generateCompleteMark(){
   for (let i = 1; i < closed.length; i++){
     buildLegPath(closed[i-1], closed[i]).slice(1).forEach(p => pts.push(p));
   }
-  completeMarkPoints = fitPointsToBox(pts, SMALL_MARK_BOX, 0.9);
+  const box = orientMarca === 'vertical' ? MARK_BOX_V : MARK_BOX_H;
+  completeMarkPoints = fitPointsToBox(pts, box, 0.9);
   draw();
 }
 document.getElementById('btn-shuffle').addEventListener('click', () => {
@@ -450,16 +475,32 @@ document.getElementById('btn-shuffle').addEventListener('click', () => {
 const modeSimboloBtn = document.getElementById('mode-simbolo');
 const modeCompletaBtn = document.getElementById('mode-completa');
 const simboloFieldsEl = document.getElementById('simbolo-fields');
+const orientFieldEl = document.getElementById('orient-field');
+const orientVerticalBtn = document.getElementById('orient-vertical');
+const orientHorizontalBtn = document.getElementById('orient-horizontal');
+orientVerticalBtn.addEventListener('click', () => {
+  orientMarca = 'vertical';
+  orientVerticalBtn.classList.add('active'); orientHorizontalBtn.classList.remove('active');
+  generateCompleteMark();
+});
+orientHorizontalBtn.addEventListener('click', () => {
+  orientMarca = 'horizontal';
+  orientHorizontalBtn.classList.add('active'); orientVerticalBtn.classList.remove('active');
+  generateCompleteMark();
+});
+
 modeSimboloBtn.addEventListener('click', () => {
   modeMarca = 'simbolo';
   modeSimboloBtn.classList.add('active'); modeCompletaBtn.classList.remove('active');
   simboloFieldsEl.style.display = 'block';
+  orientFieldEl.style.display = 'none';
   draw();
 });
 modeCompletaBtn.addEventListener('click', () => {
   modeMarca = 'completa';
   modeCompletaBtn.classList.add('active'); modeSimboloBtn.classList.remove('active');
   simboloFieldsEl.style.display = 'none';
+  orientFieldEl.style.display = 'block';
   if (completeMarkPoints.length < 2) generateCompleteMark();
   draw();
 });
@@ -478,12 +519,21 @@ function buildContentSVG(includeBg){
   }
 
   if (modeMarca === 'completa'){
-    if (completeMarkPoints.length >= 2){
-      s += `<path d="${buildOpenPathD(completeMarkPoints)}" fill="none" stroke="${theme.ribbon}" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+    if (orientMarca === 'vertical'){
+      if (completeMarkPoints.length >= 2){
+        s += `<path d="${buildOpenPathD(completeMarkPoints)}" fill="none" stroke="${theme.ribbon}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`;
+      }
+      s += `<text x="${SMALL_MARGIN}" y="${TITLE_V_Y1}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Circuito de</text>`;
+      s += `<text x="${SMALL_MARGIN}" y="${TITLE_V_Y2}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Ateliês do Centro</text>`;
+      s += `<text x="${SMALL_MARGIN}" y="${DATE_V_Y}" font-family="'Instrument Serif', Georgia, serif" font-size="${DATE_SIZE_V}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
+    } else {
+      if (completeMarkPoints.length >= 2){
+        s += `<path d="${buildOpenPathD(completeMarkPoints)}" fill="none" stroke="${theme.ribbon}" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+      }
+      const textX = MARK_BOX_H.x + MARK_BOX_H.w + 26;
+      s += `<text x="${textX}" y="${MARK_BOX_H.y+52}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_H}" fill="${theme.ribbon}">${escapeXML(EVENT_TITLE)}</text>`;
+      s += `<text x="${textX}" y="${MARK_BOX_H.y+98}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_H}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
     }
-    const textX = SMALL_MARK_BOX.x + SMALL_MARK_BOX.w + 26;
-    s += `<text x="${textX}" y="${SMALL_MARK_BOX.y+52}" font-family="'Instrument Serif', Georgia, serif" font-size="${SMALL_TITLE_SIZE}" fill="${theme.ribbon}">${escapeXML(EVENT_TITLE)}</text>`;
-    s += `<text x="${textX}" y="${SMALL_MARK_BOX.y+98}" font-family="'Instrument Serif', Georgia, serif" font-size="${SMALL_TITLE_SIZE}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
     return s;
   }
 
@@ -509,7 +559,12 @@ function buildContentSVG(includeBg){
 }
 
 function draw(){
-  svgEl.innerHTML = buildContentSVG(true);
+  try{
+    svgEl.innerHTML = buildContentSVG(true);
+  } catch(err){
+    console.error(err);
+    setStatus('Erro ao desenhar: ' + err.message, true);
+  }
 }
 
 function buildFullSVGString(){
