@@ -98,6 +98,14 @@
       </div>
     </div>
 
+    <div class="field" id="completa-pins-field" style="display:none;">
+      <label>Pontos dos ateliês</label>
+      <div class="row-btns">
+        <button class="btn active" id="completa-pins-on">mostrar</button>
+        <button class="btn" id="completa-pins-off">esconder</button>
+      </div>
+    </div>
+
     <div class="field">
       <label>Cores</label>
       <div class="row-btns">
@@ -160,33 +168,18 @@ const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Instrument+Serif:i
 const EVENT_TITLE = 'Circuito de Ateliês do Centro';
 const EVENT_DATES = '18 – 19 de Setembro';
 
-// mesma diagramação usada na parte de baixo do post do artista (horizontal)
-const SMALL_MARGIN = 60;
-// marca completa — horizontal: símbolo ligeiramente maior que o texto,
-// composição inteira centralizada no artboard
-const SYMBOL_H_SIZE = 170;
-const TITLE_SIZE_H = 44;
-const DATE_SIZE_H = 34;
-const GAP_H = 30;
 // estimativa de largura do texto (fontes serifadas ~0.52× o tamanho por
 // caractere) — só pra centralizar a composição, não precisa ser exata
 function estimateTextWidth(text, fontSize){ return text.length * fontSize * 0.52; }
-const TEXT_W_H = Math.max(estimateTextWidth(EVENT_TITLE, TITLE_SIZE_H), estimateTextWidth(EVENT_DATES, DATE_SIZE_H));
-const TOTAL_W_H = SYMBOL_H_SIZE + GAP_H + TEXT_W_H;
-const START_X_H = (LOGICAL - TOTAL_W_H) / 2;
-const MARK_BOX_H = { x: START_X_H, y: LOGICAL/2 - SYMBOL_H_SIZE/2, w: SYMBOL_H_SIZE, h: SYMBOL_H_SIZE };
-const TITLE_X_H = START_X_H + SYMBOL_H_SIZE + GAP_H;
-const TITLE_Y_H = LOGICAL/2 - 6;
-const DATE_Y_H = TITLE_Y_H + 46;
 
 // marca completa — vertical: símbolo bem grande e grosso, nas mesmas
-// proporções do gerador de símbolo, com o texto embaixo; grupo inteiro
-// centralizado no artboard
+// proporções do gerador de símbolo, com o texto logo abaixo; grupo
+// inteiro centralizado no artboard
 const SYMBOL_V_SIZE = 640;
 const SYMBOL_V_STROKE = 35;
 const TITLE_SIZE_V = 64;
 const DATE_SIZE_V = 64;
-const GAP_V = 18;
+const GAP_V = 9;
 const TITLE_LEAD_V = 62;
 const DATE_GAP_V = 66;
 const TEXT_BLOCK_H_V = (TITLE_SIZE_V*0.72) + TITLE_LEAD_V + DATE_GAP_V + (DATE_SIZE_V*0.25);
@@ -198,6 +191,25 @@ const TEXT_TOP_V = MARK_BOX_V.y + SYMBOL_V_SIZE + GAP_V;
 const TITLE_V_Y1 = TEXT_TOP_V + TITLE_SIZE_V*0.72;
 const TITLE_V_Y2 = TITLE_V_Y1 + TITLE_LEAD_V;
 const DATE_V_Y = TITLE_V_Y2 + DATE_GAP_V;
+
+// marca completa — horizontal: exatamente a marca vertical (mesma
+// tipografia, mesmo espaçamento), só que com o símbolo 20% menor e o
+// texto ao lado em vez de embaixo, os dois centralizados pela altura
+const SYMBOL_H_SIZE = SYMBOL_V_SIZE * 0.8;
+const SYMBOL_H_STROKE = SYMBOL_V_STROKE * 0.8;
+const GAP_H = 40;
+const TEXT_MAX_W_H = Math.max(
+  estimateTextWidth('Circuito de', TITLE_SIZE_V),
+  estimateTextWidth('Ateliês do Centro', TITLE_SIZE_V),
+  estimateTextWidth(EVENT_DATES, DATE_SIZE_V)
+);
+const TOTAL_W_H = SYMBOL_H_SIZE + GAP_H + TEXT_MAX_W_H;
+const START_X_H = Math.max(20, (LOGICAL - TOTAL_W_H) / 2);
+const MARK_BOX_H = { x: START_X_H, y: LOGICAL/2 - SYMBOL_H_SIZE/2, w: SYMBOL_H_SIZE, h: SYMBOL_H_SIZE };
+const TITLE_X_H = START_X_H + SYMBOL_H_SIZE + GAP_H;
+const TITLE_Y1_H = LOGICAL/2 - TEXT_BLOCK_H_V/2 + TITLE_SIZE_V*0.72;
+const TITLE_Y2_H = TITLE_Y1_H + TITLE_LEAD_V;
+const DATE_Y_H = TITLE_Y2_H + DATE_GAP_V;
 
 function parseCSV(text){
   const rows = []; let row = []; let field = ''; let inQuotes = false;
@@ -283,7 +295,7 @@ function pixelOf(lat, lon){
    caminho reto/curvo entre dois pontos
    ============================================================ */
 // encaixa qualquer nuvem de pontos numa caixa alvo, centralizada
-function fitPointsToBox(points, box, fillFraction){
+function computeFitTransform(points, box, fillFraction){
   const xs = points.map(p=>p.x), ys = points.map(p=>p.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
@@ -291,7 +303,13 @@ function fitPointsToBox(points, box, fillFraction){
   const scale = Math.min(box.w*fillFraction/w, box.h*fillFraction/h);
   const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
   const boxCx = box.x + box.w/2, boxCy = box.y + box.h/2;
-  return points.map(p => ({ x: boxCx + (p.x-cx)*scale, y: boxCy + (p.y-cy)*scale }));
+  return { scale, cx, cy, boxCx, boxCy };
+}
+function applyFitTransform(points, t){
+  return points.map(p => ({ x: t.boxCx + (p.x-t.cx)*t.scale, y: t.boxCy + (p.y-t.cy)*t.scale }));
+}
+function fitPointsToBox(points, box, fillFraction){
+  return applyFitTransform(points, computeFitTransform(points, box, fillFraction));
 }
 
 function buildLegPath(a, b){
@@ -449,6 +467,8 @@ let showText = true;
 let modeMarca = 'simbolo'; // simbolo | completa
 let orientMarca = 'horizontal'; // vertical | horizontal
 let completeMarkPoints = [];
+let completeMarkPins = [];
+let showPinsCompleta = true;
 
 const textOnBtn = document.getElementById('text-on');
 const textOffBtn = document.getElementById('text-off');
@@ -490,7 +510,9 @@ function generateCompleteMark(){
     buildLegPath(closed[i-1], closed[i]).slice(1).forEach(p => pts.push(p));
   }
   const box = orientMarca === 'vertical' ? MARK_BOX_V : MARK_BOX_H;
-  completeMarkPoints = fitPointsToBox(pts, box, 0.9);
+  const t = computeFitTransform(pts, box, 0.9);
+  completeMarkPoints = applyFitTransform(pts, t);
+  completeMarkPins = applyFitTransform(order, t);
   draw();
 }
 document.getElementById('btn-shuffle').addEventListener('click', () => {
@@ -515,11 +537,18 @@ orientHorizontalBtn.addEventListener('click', () => {
   generateCompleteMark();
 });
 
+const completaPinsFieldEl = document.getElementById('completa-pins-field');
+const completaPinsOnBtn = document.getElementById('completa-pins-on');
+const completaPinsOffBtn = document.getElementById('completa-pins-off');
+completaPinsOnBtn.addEventListener('click', () => { showPinsCompleta = true; completaPinsOnBtn.classList.add('active'); completaPinsOffBtn.classList.remove('active'); draw(); });
+completaPinsOffBtn.addEventListener('click', () => { showPinsCompleta = false; completaPinsOffBtn.classList.add('active'); completaPinsOnBtn.classList.remove('active'); draw(); });
+
 modeSimboloBtn.addEventListener('click', () => {
   modeMarca = 'simbolo';
   modeSimboloBtn.classList.add('active'); modeCompletaBtn.classList.remove('active');
   simboloFieldsEl.style.display = 'block';
   orientFieldEl.style.display = 'none';
+  completaPinsFieldEl.style.display = 'none';
   draw();
 });
 modeCompletaBtn.addEventListener('click', () => {
@@ -527,6 +556,7 @@ modeCompletaBtn.addEventListener('click', () => {
   modeCompletaBtn.classList.add('active'); modeSimboloBtn.classList.remove('active');
   simboloFieldsEl.style.display = 'none';
   orientFieldEl.style.display = 'block';
+  completaPinsFieldEl.style.display = 'block';
   if (completeMarkPoints.length < 2) generateCompleteMark();
   draw();
 });
@@ -536,6 +566,15 @@ modeCompletaBtn.addEventListener('click', () => {
    desenho — monta marcação SVG (texto e formas vetoriais de
    verdade, não pixel) e injeta no <svg> da tela
    ============================================================ */
+function renderCompletaPins(pins, strokeWidth, theme){
+  const r = strokeWidth / 2;
+  let s = '';
+  pins.forEach(p => {
+    s += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="${r.toFixed(2)}" fill="${theme.bg}" stroke="${theme.ribbon}" stroke-width="${Math.max(1.5, strokeWidth*0.12).toFixed(2)}"/>`;
+  });
+  return s;
+}
+
 function buildContentSVG(includeBg){
   const theme = THEMES[currentTheme];
   let s = '';
@@ -552,12 +591,15 @@ function buildContentSVG(includeBg){
       s += `<text x="${TITLE_X_V}" y="${TITLE_V_Y1}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Circuito de</text>`;
       s += `<text x="${TITLE_X_V}" y="${TITLE_V_Y2}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Ateliês do Centro</text>`;
       s += `<text x="${TITLE_X_V}" y="${DATE_V_Y}" font-family="'Instrument Serif', Georgia, serif" font-size="${DATE_SIZE_V}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
+      if (showPinsCompleta) s += renderCompletaPins(completeMarkPins, SYMBOL_V_STROKE, theme);
     } else {
       if (completeMarkPoints.length >= 2){
-        s += `<path d="${buildOpenPathD(completeMarkPoints)}" fill="none" stroke="${theme.ribbon}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>`;
+        s += `<path d="${buildOpenPathD(completeMarkPoints)}" fill="none" stroke="${theme.ribbon}" stroke-width="${SYMBOL_H_STROKE}" stroke-linecap="round" stroke-linejoin="round"/>`;
       }
-      s += `<text x="${TITLE_X_H}" y="${TITLE_Y_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_H}" fill="${theme.ribbon}">${escapeXML(EVENT_TITLE)}</text>`;
-      s += `<text x="${TITLE_X_H}" y="${DATE_Y_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${DATE_SIZE_H}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
+      s += `<text x="${TITLE_X_H}" y="${TITLE_Y1_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Circuito de</text>`;
+      s += `<text x="${TITLE_X_H}" y="${TITLE_Y2_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Ateliês do Centro</text>`;
+      s += `<text x="${TITLE_X_H}" y="${DATE_Y_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${DATE_SIZE_V}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
+      if (showPinsCompleta) s += renderCompletaPins(completeMarkPins, SYMBOL_H_STROKE, theme);
     }
     return s;
   }
