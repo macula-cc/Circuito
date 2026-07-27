@@ -180,7 +180,7 @@ const SYMBOL_V_SIZE = 640;
 const SYMBOL_V_STROKE = 35;
 const TITLE_SIZE_V = 64;
 const DATE_SIZE_V = 64;
-const GAP_V = 3.6;
+const GAP_V = 30; // distância real entre a ponta de baixo do símbolo e a tipografia
 const TITLE_LEAD_V = 62;
 const DATE_GAP_V = 66;
 const TEXT_BLOCK_H_V = (TITLE_SIZE_V*0.72) + TITLE_LEAD_V + DATE_GAP_V + (DATE_SIZE_V*0.25);
@@ -198,14 +198,14 @@ const DATE_V_Y = TITLE_V_Y2 + DATE_GAP_V;
 // texto ao lado em vez de embaixo, os dois centralizados pela altura
 // marca completa — horizontal: símbolo ligeiramente maior que o texto,
 // composição inteira centralizada no artboard
-const SYMBOL_H_SIZE = 170;
-const SYMBOL_H_STROKE = 8;
+const SYMBOL_H_SIZE = 260;
+const SYMBOL_H_STROKE = 12;
 const TITLE_SIZE_H = 44;
 const DATE_SIZE_H = 34;
 const GAP_H = 30;
 const TEXT_W_H = Math.max(estimateTextWidth(EVENT_TITLE, TITLE_SIZE_H), estimateTextWidth(EVENT_DATES, DATE_SIZE_H));
 const TOTAL_W_H = SYMBOL_H_SIZE + GAP_H + TEXT_W_H;
-const START_X_H = (LOGICAL - TOTAL_W_H) / 2;
+const START_X_H = Math.max(15, (LOGICAL - TOTAL_W_H) / 2);
 const MARK_BOX_H = { x: START_X_H, y: LOGICAL/2 - SYMBOL_H_SIZE/2, w: SYMBOL_H_SIZE, h: SYMBOL_H_SIZE };
 const TITLE_X_H = START_X_H + SYMBOL_H_SIZE + GAP_H;
 const TITLE_Y_H = LOGICAL/2 - 6;

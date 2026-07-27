@@ -150,7 +150,14 @@
         <button class="btn active" id="bg-branco">branco</button>
         <button class="btn" id="bg-cinza">cinza</button>
         <button class="btn" id="bg-preto">preto</button>
-        <button class="btn" id="bg-degrade">degradê</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Preenchimento</label>
+      <div class="row-btns">
+        <button class="btn active" id="fill-solido">sólido</button>
+        <button class="btn" id="fill-degrade">degradê</button>
       </div>
     </div>
 
@@ -506,10 +513,10 @@ function escapeXML(s){
 const THEMES = {
   branco: { bg:'#ffffff', ink:'#111111', sub:'#6b6b6b', mark:'#111111' },
   cinza:  { bg:'#d8d8d6', ink:'#111111', sub:'#55524f', mark:'#111111' },
-  preto:  { bg:'#111111', ink:'#ffffff', sub:'#b5b5b3', mark:'#ffffff' },
-  degrade:{ bg:'#ffffff', ink:'#111111', sub:'#6b6b6b', mark:'#111111' }
+  preto:  { bg:'#111111', ink:'#ffffff', sub:'#b5b5b3', mark:'#ffffff' }
 };
 let currentTheme = 'branco';
+let markFill = 'solido'; // solido | degrade — independente do fundo
 
 /* ============================================================
    estado geral
@@ -538,7 +545,19 @@ const ectx = eventCanvas.getContext('2d');
 const artistSelect = document.getElementById('artist-select');
 const statusEl = document.getElementById('status');
 const canvasFrame = document.getElementById('canvas-frame');
-const bgBtns = { branco: document.getElementById('bg-branco'), cinza: document.getElementById('bg-cinza'), preto: document.getElementById('bg-preto'), degrade: document.getElementById('bg-degrade') };
+const bgBtns = { branco: document.getElementById('bg-branco'), cinza: document.getElementById('bg-cinza'), preto: document.getElementById('bg-preto') };
+const fillSolidoBtn = document.getElementById('fill-solido');
+const fillDegradeBtn = document.getElementById('fill-degrade');
+fillSolidoBtn.addEventListener('click', () => {
+  markFill = 'solido';
+  fillSolidoBtn.classList.add('active'); fillDegradeBtn.classList.remove('active');
+  if (mode === 'artista') draw(); else redrawEvent();
+});
+fillDegradeBtn.addEventListener('click', () => {
+  markFill = 'degrade';
+  fillDegradeBtn.classList.add('active'); fillSolidoBtn.classList.remove('active');
+  if (mode === 'artista') draw(); else redrawEvent();
+});
 const artistFieldsEl = document.getElementById('artist-fields');
 const eventFieldsEl = document.getElementById('event-fields');
 const svgDownloadBtn = document.getElementById('btn-download-svg');
@@ -800,7 +819,7 @@ function drawEventFrame(ctx2d, dMark, markPath){
         ctx2d.lineWidth = EVT_MARK_WIDTH;
         ctx2d.lineCap = 'round';
         ctx2d.lineJoin = 'round';
-        if (currentTheme === 'degrade'){
+        if (markFill === 'degrade'){
           const a = leg[0], b = leg[leg.length-1];
           const grad = ctx2d.createLinearGradient(a.x, a.y, b.x, b.y);
           grad.addColorStop(0, '#000000');
