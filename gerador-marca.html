@@ -387,13 +387,6 @@ function buildContentSVG(includeBg){
     s += `<rect x="0.5" y="0.5" width="${LOGICAL-1}" height="${LOGICAL-1}" fill="none" stroke="${currentTheme==='claro' ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)'}" stroke-width="1"/>`;
   }
 
-  if (showPins){
-    PTS.forEach(p => {
-      s += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="15" fill="${theme.pin}" stroke="${theme.pinRing}" stroke-width="2"/>`;
-      s += `<text x="${p.x.toFixed(2)}" y="${(p.y+0.5).toFixed(2)}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="${theme.pinText}" text-anchor="middle" dominant-baseline="middle">${String(alphaNum[p.loc.id]).padStart(2,'0')}</text>`;
-    });
-  }
-
   if (selectedOrder.length >= 2){
     const selPts = selectedOrder.map(id => PTS.find(p => p.loc.id === id)).filter(Boolean);
     const legs = [];
@@ -402,6 +395,14 @@ function buildContentSVG(includeBg){
     }
     s += buildRibbonAndTextSVG(EVENT_TITLE, legs, 24, 38, theme.ribbon, theme.text);
   }
+
+  if (showPins){
+    PTS.forEach(p => {
+      s += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="15" fill="${theme.pin}" stroke="${theme.pinRing}" stroke-width="2"/>`;
+      s += `<text x="${p.x.toFixed(2)}" y="${(p.y+0.5).toFixed(2)}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="${theme.pinText}" text-anchor="middle" dominant-baseline="middle">${String(alphaNum[p.loc.id]).padStart(2,'0')}</text>`;
+    });
+  }
+
   return s;
 }
 
