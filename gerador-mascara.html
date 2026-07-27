@@ -150,6 +150,7 @@
         <button class="btn active" id="bg-branco">branco</button>
         <button class="btn" id="bg-cinza">cinza</button>
         <button class="btn" id="bg-preto">preto</button>
+        <button class="btn" id="bg-degrade">degradê</button>
       </div>
     </div>
 
@@ -295,7 +296,7 @@ function pixelOf(lat, lon){
   const p = project(lat, lon);
   return { x: proj.offsetX + (p.x - proj.p1.x)*proj.scale, y: proj.offsetY + (p.y - proj.p1.y)*proj.scale };
 }
-function fitPointsToBox(points, box, fillFraction){
+function computeFitTransform(points, box, fillFraction){
   const xs = points.map(p=>p.x), ys = points.map(p=>p.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
@@ -303,7 +304,13 @@ function fitPointsToBox(points, box, fillFraction){
   const scale = Math.min(box.w*fillFraction/w, box.h*fillFraction/h);
   const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
   const boxCx = box.x + box.w/2, boxCy = box.y + box.h/2;
-  return points.map(p => ({ x: boxCx + (p.x-cx)*scale, y: boxCy + (p.y-cy)*scale }));
+  return { scale, cx, cy, boxCx, boxCy };
+}
+function applyFitTransform(points, t){
+  return points.map(p => ({ x: t.boxCx + (p.x-t.cx)*t.scale, y: t.boxCy + (p.y-t.cy)*t.scale }));
+}
+function fitPointsToBox(points, box, fillFraction){
+  return applyFitTransform(points, computeFitTransform(points, box, fillFraction));
 }
 
 /* ============================================================
@@ -499,7 +506,8 @@ function escapeXML(s){
 const THEMES = {
   branco: { bg:'#ffffff', ink:'#111111', sub:'#6b6b6b', mark:'#111111' },
   cinza:  { bg:'#d8d8d6', ink:'#111111', sub:'#55524f', mark:'#111111' },
-  preto:  { bg:'#111111', ink:'#ffffff', sub:'#b5b5b3', mark:'#ffffff' }
+  preto:  { bg:'#111111', ink:'#ffffff', sub:'#b5b5b3', mark:'#ffffff' },
+  degrade:{ bg:'#ffffff', ink:'#111111', sub:'#6b6b6b', mark:'#111111' }
 };
 let currentTheme = 'branco';
 
@@ -515,7 +523,7 @@ let currentArtist = null;
 let photoOk = false;
 let loadedImg = null;
 let markPoints = [];   // marca do post do artista
-let evtMarkPoints = []; // marca (estática) do post do evento
+let evtMarkLegs = []; // marca (estática) do post do evento — pernas separadas
 let numAddresses = 0;
 let numArtists = 0;
 let mode = 'artista'; // artista | evento
@@ -530,7 +538,7 @@ const ectx = eventCanvas.getContext('2d');
 const artistSelect = document.getElementById('artist-select');
 const statusEl = document.getElementById('status');
 const canvasFrame = document.getElementById('canvas-frame');
-const bgBtns = { branco: document.getElementById('bg-branco'), cinza: document.getElementById('bg-cinza'), preto: document.getElementById('bg-preto') };
+const bgBtns = { branco: document.getElementById('bg-branco'), cinza: document.getElementById('bg-cinza'), preto: document.getElementById('bg-preto'), degrade: document.getElementById('bg-degrade') };
 const artistFieldsEl = document.getElementById('artist-fields');
 const eventFieldsEl = document.getElementById('event-fields');
 const svgDownloadBtn = document.getElementById('btn-download-svg');
@@ -728,11 +736,12 @@ evtMarkVideoBtn.addEventListener('click', () => {
 function generateNewEventMark(){
   const order = [...PTS_EVT].sort(() => Math.random()-0.5);
   const closed = [...order, order[0]];
+  const rawLegs = [];
+  for (let i = 1; i < closed.length; i++) rawLegs.push(buildLegPath(closed[i-1], closed[i]));
   const pts = [ { x: closed[0].x, y: closed[0].y } ];
-  for (let i = 1; i < closed.length; i++){
-    buildLegPath(closed[i-1], closed[i]).slice(1).forEach(p => pts.push(p));
-  }
-  evtMarkPoints = fitPointsToBox(pts, EVT_MAP_BOX, 0.94);
+  rawLegs.forEach(leg => leg.slice(1).forEach(p => pts.push(p)));
+  const t = computeFitTransform(pts, EVT_MAP_BOX, 0.94);
+  evtMarkLegs = rawLegs.map(leg => applyFitTransform(leg, t));
   redrawEvent();
 }
 document.getElementById('btn-evt-new-mark').addEventListener('click', generateNewEventMark);
@@ -740,6 +749,30 @@ document.getElementById('btn-evt-new-mark').addEventListener('click', generateNe
 // desenha um quadro completo do post do evento — assume que o contexto
 // já tem a escala/transformação aplicada (pra funcionar tanto na prévia
 // em tela quanto na exportação em alta resolução)
+function totalLegsLength(legs){
+  return legs.reduce((s,leg) => s + pathLength(leg), 0);
+}
+// concatena os pontos já revelados, cruzando as pernas — usado pro texto
+// na fita e pra máscara do "negativo", que não precisam saber onde uma
+// perna termina e a outra começa
+function revealedFlatPoints(legs, dist){
+  let remaining = dist;
+  const out = [];
+  for (const leg of legs){
+    if (remaining <= 0) break;
+    const legLen = pathLength(leg);
+    if (remaining >= legLen){
+      out.push(...leg);
+    } else {
+      out.push(...subPathUpTo(leg, remaining));
+      remaining = 0;
+      break;
+    }
+    remaining -= legLen;
+  }
+  return out;
+}
+
 function drawEventFrame(ctx2d, dMark, markPath){
   const theme = THEMES[currentTheme];
   ctx2d.clearRect(0, 0, LOGICAL, LOGICAL);
@@ -756,40 +789,61 @@ function drawEventFrame(ctx2d, dMark, markPath){
   ctx2d.fillText(EVT_TITLE_L1, MARGIN, EVT_TITLE_Y1);
   ctx2d.fillText(EVT_TITLE_L2, MARGIN, EVT_TITLE_Y2);
 
-  if (markPath && markPath.length >= 2){
-    const sub = subPathUpTo(markPath, dMark);
-    ctx2d.strokeStyle = theme.mark;
-    ctx2d.lineWidth = EVT_MARK_WIDTH;
-    ctx2d.lineCap = 'round';
-    ctx2d.lineJoin = 'round';
-    ctx2d.beginPath();
-    sub.forEach((p, i) => { if (i === 0) ctx2d.moveTo(p.x, p.y); else ctx2d.lineTo(p.x, p.y); });
-    ctx2d.stroke();
+  if (markPath && markPath.length){
+    let remaining = dMark;
+    for (const leg of markPath){
+      if (remaining <= 0) break;
+      const legLen = pathLength(leg);
+      const drawLen = Math.min(remaining, legLen);
+      const sub = drawLen >= legLen ? leg : subPathUpTo(leg, drawLen);
+      if (sub.length >= 2){
+        ctx2d.lineWidth = EVT_MARK_WIDTH;
+        ctx2d.lineCap = 'round';
+        ctx2d.lineJoin = 'round';
+        if (currentTheme === 'degrade'){
+          const a = leg[0], b = leg[leg.length-1];
+          const grad = ctx2d.createLinearGradient(a.x, a.y, b.x, b.y);
+          grad.addColorStop(0, '#000000');
+          grad.addColorStop(1, '#ffffff');
+          ctx2d.strokeStyle = grad;
+        } else {
+          ctx2d.strokeStyle = theme.mark;
+        }
+        ctx2d.beginPath();
+        sub.forEach((p, i) => { if (i === 0) ctx2d.moveTo(p.x, p.y); else ctx2d.lineTo(p.x, p.y); });
+        ctx2d.stroke();
+      }
+      remaining -= legLen;
+    }
 
-    if (showTextEvt){
-      drawTextAlongPath(ctx2d, EVENT_TITLE, sub, 20, theme.bg);
+    const flatRevealed = revealedFlatPoints(markPath, dMark);
+
+    if (showTextEvt && flatRevealed.length >= 2){
+      drawTextAlongPath(ctx2d, EVENT_TITLE, flatRevealed, 20, theme.bg);
     }
 
     // "negativo": onde a linha cruza o título, revela o título na cor
     // do fundo — como se a linha fosse uma máscara pra uma versão
     // invertida do texto por baixo dela
-    const off = document.createElement('canvas');
-    off.width = LOGICAL; off.height = LOGICAL;
-    const octx = off.getContext('2d');
-    octx.fillStyle = theme.bg;
-    octx.textAlign = 'left'; octx.textBaseline = 'alphabetic';
-    octx.font = `${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
-    octx.fillText(EVT_TITLE_L1, MARGIN, EVT_TITLE_Y1);
-    octx.fillText(EVT_TITLE_L2, MARGIN, EVT_TITLE_Y2);
-    octx.globalCompositeOperation = 'destination-in';
-    octx.lineWidth = EVT_MARK_WIDTH;
-    octx.lineCap = 'round';
-    octx.lineJoin = 'round';
-    octx.strokeStyle = '#000';
-    octx.beginPath();
-    sub.forEach((p, i) => { if (i === 0) octx.moveTo(p.x, p.y); else octx.lineTo(p.x, p.y); });
-    octx.stroke();
-    ctx2d.drawImage(off, 0, 0, LOGICAL, LOGICAL);
+    if (flatRevealed.length >= 2){
+      const off = document.createElement('canvas');
+      off.width = LOGICAL; off.height = LOGICAL;
+      const octx = off.getContext('2d');
+      octx.fillStyle = theme.bg;
+      octx.textAlign = 'left'; octx.textBaseline = 'alphabetic';
+      octx.font = `${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
+      octx.fillText(EVT_TITLE_L1, MARGIN, EVT_TITLE_Y1);
+      octx.fillText(EVT_TITLE_L2, MARGIN, EVT_TITLE_Y2);
+      octx.globalCompositeOperation = 'destination-in';
+      octx.lineWidth = EVT_MARK_WIDTH;
+      octx.lineCap = 'round';
+      octx.lineJoin = 'round';
+      octx.strokeStyle = '#000';
+      octx.beginPath();
+      flatRevealed.forEach((p, i) => { if (i === 0) octx.moveTo(p.x, p.y); else octx.lineTo(p.x, p.y); });
+      octx.stroke();
+      ctx2d.drawImage(off, 0, 0, LOGICAL, LOGICAL);
+    }
   }
 
   if (showPinsEvt){
@@ -823,10 +877,10 @@ function drawEventFrame(ctx2d, dMark, markPath){
 
 function redrawEvent(){
   const full = markPathForFrame();
-  drawEventFrame(ectx, full ? pathLength(full) : 0, full);
+  drawEventFrame(ectx, full ? totalLegsLength(full) : 0, full);
 }
 function markPathForFrame(){
-  return evtMarkPoints.length >= 2 ? evtMarkPoints : null;
+  return evtMarkLegs.length >= 1 ? evtMarkLegs : null;
 }
 
 /* ---- vídeo do post do evento: anda ponto a ponto, sem modais, uma
@@ -839,11 +893,12 @@ const EVT_SLIDE_MS = 500;
 function buildRandomEventMark(){
   const order = [...PTS_EVT].sort(() => Math.random()-0.5);
   const closed = [...order, order[0]];
+  const rawLegs = [];
+  for (let i = 1; i < closed.length; i++) rawLegs.push(buildLegPath(closed[i-1], closed[i]));
   const pts = [ { x: closed[0].x, y: closed[0].y } ];
-  for (let i = 1; i < closed.length; i++){
-    buildLegPath(closed[i-1], closed[i]).slice(1).forEach(p => pts.push(p));
-  }
-  return fitPointsToBox(pts, EVT_MAP_BOX, 0.94);
+  rawLegs.forEach(leg => leg.slice(1).forEach(p => pts.push(p)));
+  const t = computeFitTransform(pts, EVT_MAP_BOX, 0.94);
+  return rawLegs.map(leg => applyFitTransform(leg, t));
 }
 
 btnEvtVideo.addEventListener('click', () => {
@@ -891,7 +946,7 @@ btnEvtVideo.addEventListener('click', () => {
   recorder.start();
 
   let i = 0;
-  drawEventFrame(ectx, pathLength(slides[0]), slides[0]);
+  drawEventFrame(ectx, totalLegsLength(slides[0]), slides[0]);
   const interval = setInterval(() => {
     i++;
     if (i >= EVT_SLIDE_COUNT){
@@ -899,7 +954,7 @@ btnEvtVideo.addEventListener('click', () => {
       recorder.stop();
       return;
     }
-    drawEventFrame(ectx, pathLength(slides[i]), slides[i]);
+    drawEventFrame(ectx, totalLegsLength(slides[i]), slides[i]);
   }, EVT_SLIDE_MS);
 });
 
@@ -938,7 +993,7 @@ document.getElementById('btn-download-png').addEventListener('click', async () =
       const cctx = c.getContext('2d');
       cctx.scale(scale, scale);
       const full = markPathForFrame();
-      drawEventFrame(cctx, full ? pathLength(full) : 0, full);
+      drawEventFrame(cctx, full ? totalLegsLength(full) : 0, full);
       c.toBlob(blob => {
         if (!blob){ setStatus('Não foi possível gerar o PNG.', true); return; }
         const url = URL.createObjectURL(blob);
@@ -969,7 +1024,7 @@ document.getElementById('btn-download-pdf').addEventListener('click', async () =
       const cctx = c.getContext('2d');
       cctx.scale(scale, scale);
       const full = markPathForFrame();
-      drawEventFrame(cctx, full ? pathLength(full) : 0, full);
+      drawEventFrame(cctx, full ? totalLegsLength(full) : 0, full);
       dataUrl = c.toDataURL('image/png');
     }
     const { jsPDF } = window.jspdf;
