@@ -713,19 +713,40 @@ function drawEventFrame(ctx2d, dMark, markPath){
     ctx2d.beginPath();
     sub.forEach((p, i) => { if (i === 0) ctx2d.moveTo(p.x, p.y); else ctx2d.lineTo(p.x, p.y); });
     ctx2d.stroke();
+
+    // "negativo": onde a linha cruza o título, revela o título na cor
+    // do fundo — como se a linha fosse uma máscara pra uma versão
+    // invertida do texto por baixo dela
+    const off = document.createElement('canvas');
+    off.width = LOGICAL; off.height = LOGICAL;
+    const octx = off.getContext('2d');
+    octx.fillStyle = theme.bg;
+    octx.textAlign = 'left'; octx.textBaseline = 'alphabetic';
+    octx.font = `${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
+    octx.fillText(EVT_TITLE_L1, MARGIN, EVT_TITLE_Y1);
+    octx.fillText(EVT_TITLE_L2, MARGIN, EVT_TITLE_Y2);
+    octx.globalCompositeOperation = 'destination-in';
+    octx.lineWidth = EVT_MARK_WIDTH;
+    octx.lineCap = 'round';
+    octx.lineJoin = 'round';
+    octx.strokeStyle = '#000';
+    octx.beginPath();
+    sub.forEach((p, i) => { if (i === 0) octx.moveTo(p.x, p.y); else octx.lineTo(p.x, p.y); });
+    octx.stroke();
+    ctx2d.drawImage(off, 0, 0, LOGICAL, LOGICAL);
   }
 
   if (showPinsEvt){
     PTS_EVT.forEach((p) => {
       ctx2d.beginPath();
-      ctx2d.arc(p.x, p.y, 11, 0, Math.PI*2);
+      ctx2d.arc(p.x, p.y, 15, 0, Math.PI*2);
       ctx2d.fillStyle = theme.mark;
       ctx2d.fill();
-      ctx2d.lineWidth = 1.6;
+      ctx2d.lineWidth = 2.2;
       ctx2d.strokeStyle = theme.bg;
       ctx2d.stroke();
       ctx2d.fillStyle = theme.bg;
-      ctx2d.font = "9px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+      ctx2d.font = "12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
       ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'middle';
       ctx2d.fillText(String(alphaNumEvt[p.id]).padStart(2,'0'), p.x, p.y+0.5);
       ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'alphabetic';
