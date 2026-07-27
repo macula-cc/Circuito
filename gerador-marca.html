@@ -183,12 +183,12 @@ const DATE_Y_H = TITLE_Y_H + 46;
 // proporções do gerador de símbolo, com o texto embaixo; grupo inteiro
 // centralizado no artboard
 const SYMBOL_V_SIZE = 640;
-const SYMBOL_V_STROKE = 40;
-const TITLE_SIZE_V = 56;
-const DATE_SIZE_V = 36;
-const GAP_V = 50;
-const TITLE_LEAD_V = 64;
-const DATE_GAP_V = 50;
+const SYMBOL_V_STROKE = 35;
+const TITLE_SIZE_V = 64;
+const DATE_SIZE_V = 64;
+const GAP_V = 18;
+const TITLE_LEAD_V = 62;
+const DATE_GAP_V = 66;
 const TEXT_BLOCK_H_V = (TITLE_SIZE_V*0.72) + TITLE_LEAD_V + DATE_GAP_V + (DATE_SIZE_V*0.25);
 const GROUP_H_V = SYMBOL_V_SIZE + GAP_V + TEXT_BLOCK_H_V;
 const GROUP_TOP_V = (LOGICAL - GROUP_H_V) / 2;
@@ -554,7 +554,7 @@ function buildContentSVG(includeBg){
       s += `<text x="${TITLE_X_V}" y="${DATE_V_Y}" font-family="'Instrument Serif', Georgia, serif" font-size="${DATE_SIZE_V}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
     } else {
       if (completeMarkPoints.length >= 2){
-        s += `<path d="${buildOpenPathD(completeMarkPoints)}" fill="none" stroke="${theme.ribbon}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>`;
+        s += `<path d="${buildOpenPathD(completeMarkPoints)}" fill="none" stroke="${theme.ribbon}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>`;
       }
       s += `<text x="${TITLE_X_H}" y="${TITLE_Y_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_H}" fill="${theme.ribbon}">${escapeXML(EVENT_TITLE)}</text>`;
       s += `<text x="${TITLE_X_H}" y="${DATE_Y_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${DATE_SIZE_H}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
