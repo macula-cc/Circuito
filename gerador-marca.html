@@ -180,7 +180,7 @@ const SYMBOL_V_SIZE = 640;
 const SYMBOL_V_STROKE = 35;
 const TITLE_SIZE_V = 64;
 const DATE_SIZE_V = 64;
-const GAP_V = 9;
+const GAP_V = 3.6;
 const TITLE_LEAD_V = 62;
 const DATE_GAP_V = 66;
 const TEXT_BLOCK_H_V = (TITLE_SIZE_V*0.72) + TITLE_LEAD_V + DATE_GAP_V + (DATE_SIZE_V*0.25);
@@ -617,18 +617,27 @@ function buildContentSVG(includeBg){
       const stroke = legStrokeAttr(points[0], points[points.length-1], theme);
       pathsOut += `<path d="${pathD}" fill="none" stroke="${stroke}" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"/>`;
     });
-    if (gradientDefs.length) s += `<defs>${gradientDefs.join('')}</defs>`;
-    s += pathsOut;
+
+    let content = '';
+    if (gradientDefs.length) content += `<defs>${gradientDefs.join('')}</defs>`;
+    content += pathsOut;
 
     if (orientMarca === 'vertical'){
-      s += `<text x="${TITLE_X_V}" y="${TITLE_V_Y1}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Circuito de</text>`;
-      s += `<text x="${TITLE_X_V}" y="${TITLE_V_Y2}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Ateliês do Centro</text>`;
-      s += `<text x="${TITLE_X_V}" y="${DATE_V_Y}" font-family="'Instrument Serif', Georgia, serif" font-size="${DATE_SIZE_V}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
-      if (showPinsCompleta) s += renderCompletaPins(completeMarkPins, SYMBOL_V_STROKE, theme);
+      content += `<text x="${TITLE_X_V}" y="${TITLE_V_Y1}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Circuito de</text>`;
+      content += `<text x="${TITLE_X_V}" y="${TITLE_V_Y2}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Ateliês do Centro</text>`;
+      content += `<text x="${TITLE_X_V}" y="${DATE_V_Y}" font-family="'Instrument Serif', Georgia, serif" font-size="${DATE_SIZE_V}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
+      if (showPinsCompleta) content += renderCompletaPins(completeMarkPins, SYMBOL_V_STROKE, theme);
+      s += content;
     } else {
-      s += `<text x="${TITLE_X_H}" y="${TITLE_Y_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_H}" fill="${theme.ribbon}">${escapeXML(EVENT_TITLE)}</text>`;
-      s += `<text x="${TITLE_X_H}" y="${DATE_Y_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_H}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
-      if (showPinsCompleta) s += renderCompletaPins(completeMarkPins, SYMBOL_H_STROKE, theme);
+      content += `<text x="${TITLE_X_H}" y="${TITLE_Y_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_H}" fill="${theme.ribbon}">${escapeXML(EVENT_TITLE)}</text>`;
+      content += `<text x="${TITLE_X_H}" y="${DATE_Y_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_H}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
+      if (showPinsCompleta) content += renderCompletaPins(completeMarkPins, SYMBOL_H_STROKE, theme);
+      // só a apresentação muda aqui: a composição inteira é ampliada em
+      // volta do centro do artboard, sem alterar nenhuma proporção da marca
+      const fillFactor = 0.94;
+      const scaleUp = Math.min(fillFactor*LOGICAL/TOTAL_W_H, fillFactor*LOGICAL/SYMBOL_H_SIZE);
+      const c = LOGICAL/2;
+      s += `<g transform="translate(${c} ${c}) scale(${scaleUp.toFixed(4)}) translate(${-c} ${-c})">${content}</g>`;
     }
     return s;
   }
