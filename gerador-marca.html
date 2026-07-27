@@ -171,7 +171,12 @@ const EVENT_DATES = '18 – 19 de Setembro';
 
 // estimativa de largura do texto (fontes serifadas ~0.52× o tamanho por
 // caractere) — só pra centralizar a composição, não precisa ser exata
-function estimateTextWidth(text, fontSize){ return text.length * fontSize * 0.52; }
+const measureCanvas = document.createElement('canvas');
+const measureCtx = measureCanvas.getContext('2d');
+function estimateTextWidth(text, fontSize){
+  measureCtx.font = `${fontSize}px 'Instrument Serif', Georgia, serif`;
+  return measureCtx.measureText(text).width;
+}
 
 // marca completa — vertical: símbolo bem grande e grosso, nas mesmas
 // proporções do gerador de símbolo, com o texto logo abaixo; grupo
@@ -180,7 +185,7 @@ const SYMBOL_V_SIZE = 640;
 const SYMBOL_V_STROKE = 35;
 const TITLE_SIZE_V = 64;
 const DATE_SIZE_V = 64;
-const GAP_V = 30; // distância real entre a ponta de baixo do símbolo e a tipografia
+const GAP_V = 10; // distância real entre a ponta de baixo do símbolo e a tipografia
 const TITLE_LEAD_V = 62;
 const DATE_GAP_V = 66;
 const TEXT_BLOCK_H_V = (TITLE_SIZE_V*0.72) + TITLE_LEAD_V + DATE_GAP_V + (DATE_SIZE_V*0.25);
@@ -198,18 +203,22 @@ const DATE_V_Y = TITLE_V_Y2 + DATE_GAP_V;
 // texto ao lado em vez de embaixo, os dois centralizados pela altura
 // marca completa — horizontal: símbolo ligeiramente maior que o texto,
 // composição inteira centralizada no artboard
-const SYMBOL_H_SIZE = 260;
-const SYMBOL_H_STROKE = 12;
+const SYMBOL_H_SIZE = 500;
+const SYMBOL_H_STROKE = 24;
 const TITLE_SIZE_H = 44;
 const DATE_SIZE_H = 34;
 const GAP_H = 30;
-const TEXT_W_H = Math.max(estimateTextWidth(EVENT_TITLE, TITLE_SIZE_H), estimateTextWidth(EVENT_DATES, DATE_SIZE_H));
-const TOTAL_W_H = SYMBOL_H_SIZE + GAP_H + TEXT_W_H;
-const START_X_H = Math.max(15, (LOGICAL - TOTAL_W_H) / 2);
-const MARK_BOX_H = { x: START_X_H, y: LOGICAL/2 - SYMBOL_H_SIZE/2, w: SYMBOL_H_SIZE, h: SYMBOL_H_SIZE };
-const TITLE_X_H = START_X_H + SYMBOL_H_SIZE + GAP_H;
-const TITLE_Y_H = LOGICAL/2 - 6;
-const DATE_Y_H = TITLE_Y_H + 46;
+let TEXT_W_H, TOTAL_W_H, START_X_H, MARK_BOX_H, TITLE_X_H, TITLE_Y_H, DATE_Y_H;
+function computeHorizontalLayout(){
+  TEXT_W_H = Math.max(estimateTextWidth(EVENT_TITLE, TITLE_SIZE_H), estimateTextWidth(EVENT_DATES, DATE_SIZE_H));
+  TOTAL_W_H = SYMBOL_H_SIZE + GAP_H + TEXT_W_H;
+  START_X_H = Math.max(15, (LOGICAL - TOTAL_W_H) / 2);
+  MARK_BOX_H = { x: START_X_H, y: LOGICAL/2 - SYMBOL_H_SIZE/2, w: SYMBOL_H_SIZE, h: SYMBOL_H_SIZE };
+  TITLE_X_H = START_X_H + SYMBOL_H_SIZE + GAP_H;
+  TITLE_Y_H = LOGICAL/2 - 6;
+  DATE_Y_H = TITLE_Y_H + 46;
+}
+computeHorizontalLayout(); // primeira estimativa (fonte de fallback), recalculado depois que a web font carrega de verdade
 
 function parseCSV(text){
   const rows = []; let row = []; let field = ''; let inQuotes = false;
@@ -363,8 +372,6 @@ function pointAtDistance(points, dist){
    como "régua" (nunca é desenhado nem exportado); o resultado
    final continua sendo texto SVG de verdade, vetorial
    ============================================================ */
-const measureCanvas = document.createElement('canvas');
-const measureCtx = measureCanvas.getContext('2d');
 function charWidth(ch, fontSize){
   measureCtx.font = `${fontSize}px 'Instrument Serif', Georgia, serif`;
   return measureCtx.measureText(ch).width;
@@ -531,7 +538,7 @@ function generateCompleteMark(){
   rawLegs.forEach(leg => leg.slice(1).forEach(p => pts.push(p)));
 
   const box = orientMarca === 'vertical' ? MARK_BOX_V : MARK_BOX_H;
-  const t = computeFitTransform(pts, box, 0.9);
+  const t = computeFitTransform(pts, box, 0.97);
   completeMarkLegs = rawLegs.map(leg => applyFitTransform(leg, t));
   completeMarkPins = applyFitTransform(order, t).map((p,i) => ({ ...p, loc: order[i].loc }));
   draw();
@@ -755,7 +762,16 @@ document.getElementById('btn-download-pdf').addEventListener('click', async () =
    boot
    ============================================================ */
 async function boot(){
-  try{ await document.fonts.load("24px 'Instrument Serif'"); } catch(e){}
+  try{
+    await Promise.all([
+      document.fonts.load("24px 'Instrument Serif'"),
+      document.fonts.load(`${TITLE_SIZE_H}px 'Instrument Serif'`),
+      document.fonts.load(`${DATE_SIZE_H}px 'Instrument Serif'`)
+    ]);
+  } catch(e){}
+  // agora que a fonte de verdade carregou, recalcula a largura do texto
+  // horizontal com a métrica real (antes disso, usava a fonte de fallback)
+  computeHorizontalLayout();
   try{
     LOCATIONS = await loadLocationsFromSheet();
   } catch(err){
@@ -788,6 +804,7 @@ async function boot(){
   sortedForNum.forEach((loc,i) => { alphaNum[loc.id] = i+1; });
 
   generateNewRoute();
+  generateCompleteMark();
 }
 boot();
 </script>
