@@ -673,17 +673,18 @@ function buildContentSVG(){
 function draw(){
   svgEl.innerHTML = buildContentSVG();
 }
-function buildFullSVGString(){
+function buildFullSVGString(scale){
+  const s = scale || 1;
   const content = buildContentSVG();
   return `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LOGICAL} ${LOGICAL}" width="${LOGICAL}" height="${LOGICAL}">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LOGICAL} ${LOGICAL}" width="${LOGICAL*s}" height="${LOGICAL*s}">` +
     `<defs><style>@import url('${FONT_IMPORT.replace(/&/g,'&amp;')}');</style></defs>` +
     content +
     `</svg>`;
 }
 function rasterizeSVG(scale){
   return new Promise((resolve, reject) => {
-    const svgBlob = new Blob([buildFullSVGString()], { type: 'image/svg+xml;charset=utf-8' });
+    const svgBlob = new Blob([buildFullSVGString(scale)], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
     const img = new Image();
     img.onload = () => {

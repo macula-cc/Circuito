@@ -203,10 +203,10 @@ const DATE_V_Y = TITLE_V_Y2 + DATE_GAP_V;
 // texto ao lado em vez de embaixo, os dois centralizados pela altura
 // marca completa — horizontal: símbolo ligeiramente maior que o texto,
 // composição inteira centralizada no artboard
-const SYMBOL_H_SIZE = 500;
-const SYMBOL_H_STROKE = 24;
-const TITLE_SIZE_H = 44;
-const DATE_SIZE_H = 34;
+const SYMBOL_H_SIZE = 380;
+const SYMBOL_H_STROKE = 18;
+const TITLE_SIZE_H = 56;
+const DATE_SIZE_H = 44;
 const GAP_H = 30;
 let TEXT_W_H, TOTAL_W_H, START_X_H, MARK_BOX_H, TITLE_X_H, TITLE_Y_H, DATE_Y_H;
 function computeHorizontalLayout(){
@@ -215,8 +215,8 @@ function computeHorizontalLayout(){
   START_X_H = Math.max(15, (LOGICAL - TOTAL_W_H) / 2);
   MARK_BOX_H = { x: START_X_H, y: LOGICAL/2 - SYMBOL_H_SIZE/2, w: SYMBOL_H_SIZE, h: SYMBOL_H_SIZE };
   TITLE_X_H = START_X_H + SYMBOL_H_SIZE + GAP_H;
-  TITLE_Y_H = LOGICAL/2 - 6;
-  DATE_Y_H = TITLE_Y_H + 46;
+  TITLE_Y_H = LOGICAL/2 - 8;
+  DATE_Y_H = TITLE_Y_H + 58;
 }
 computeHorizontalLayout(); // primeira estimativa (fonte de fallback), recalculado depois que a web font carrega de verdade
 
@@ -682,10 +682,11 @@ function draw(){
   }
 }
 
-function buildFullSVGString(){
+function buildFullSVGString(scale){
+  const s = scale || 1;
   const content = buildContentSVG(false); // exportação sai com fundo transparente por padrão
   return `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LOGICAL} ${LOGICAL}" width="${LOGICAL}" height="${LOGICAL}">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LOGICAL} ${LOGICAL}" width="${LOGICAL*s}" height="${LOGICAL*s}">` +
     `<defs><style>@import url('${FONT_IMPORT.replace(/&/g,'&amp;')}');</style></defs>` +
     content +
     `</svg>`;
@@ -707,7 +708,7 @@ document.getElementById('btn-download-svg').addEventListener('click', () => {
 
 function rasterizeSVG(scale){
   return new Promise((resolve, reject) => {
-    const svgBlob = new Blob([buildFullSVGString()], { type: 'image/svg+xml;charset=utf-8' });
+    const svgBlob = new Blob([buildFullSVGString(scale)], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
     const img = new Image();
     img.onload = () => {
