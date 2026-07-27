@@ -124,6 +124,10 @@
       <div class="field">
         <label>Marca</label>
         <div class="row-btns">
+          <button class="btn active" id="evt-text-on">com texto</button>
+          <button class="btn" id="evt-text-off">sem texto</button>
+        </div>
+        <div class="row-btns" style="margin-top:0.5rem;">
           <button class="btn active" id="evt-mark-static">imagem estática</button>
           <button class="btn" id="evt-mark-video">vídeo</button>
         </div>
@@ -428,6 +432,48 @@ function pathLength(points){
   for (let i=1;i<points.length;i++) len += Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
   return len;
 }
+function pointAtDistance(points, dist){
+  let d = 0;
+  for (let i = 1; i < points.length; i++){
+    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+    if (d + seg >= dist){
+      const t = seg === 0 ? 0 : (dist-d)/seg;
+      return {
+        x: points[i-1].x + (points[i].x-points[i-1].x)*t,
+        y: points[i-1].y + (points[i].y-points[i-1].y)*t,
+        angle: Math.atan2(points[i].y-points[i-1].y, points[i].x-points[i-1].x)
+      };
+    }
+    d += seg;
+  }
+  const last = points[points.length-1];
+  return { x:last.x, y:last.y, angle:0 };
+}
+// texto seguindo o caminho da marca — mesma lógica do gerador de marca,
+// só que em canvas em vez de SVG
+function drawTextAlongPath(ctx2d, text, points, fontSize, color){
+  const total = pathLength(points);
+  if (total < fontSize) return;
+  ctx2d.font = `${fontSize}px 'Instrument Serif', Georgia, serif`;
+  ctx2d.fillStyle = color;
+  const unit = text + '   ·   ';
+  let d = 0, safety = 0;
+  while (d < total && safety < 4000){
+    for (const ch of unit){
+      if (d >= total) break;
+      const w = ctx2d.measureText(ch).width;
+      const pt = pointAtDistance(points, d);
+      ctx2d.save();
+      ctx2d.translate(pt.x, pt.y);
+      ctx2d.rotate(pt.angle);
+      ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'middle';
+      ctx2d.fillText(ch, 0, 0);
+      ctx2d.restore();
+      d += w;
+      safety++;
+    }
+  }
+}
 function subPathUpTo(points, dist){
   const out = [points[0]];
   let d = 0;
@@ -475,6 +521,7 @@ let numArtists = 0;
 let mode = 'artista'; // artista | evento
 let showMapEvt = true;
 let showPinsEvt = true;
+let showTextEvt = true;
 let markModeEvt = 'estatica'; // estatica | video
 
 const svgEl = document.getElementById('art');
@@ -588,7 +635,7 @@ function buildContentSVG(){
   }
 
   if (markPoints.length >= 2){
-    s += `<path d="${buildOpenPathD(markPoints)}" fill="none" stroke="${theme.mark}" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    s += `<path d="${buildOpenPathD(markPoints)}" fill="none" stroke="${theme.mark}" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>`;
   }
   const textX = MARK_BOX.x + MARK_BOX.w + 26;
   s += `<text x="${textX}" y="${MARK_BOX.y+52}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE}" fill="${theme.ink}">${escapeXML(EVENT_TITLE)}</text>`;
@@ -652,6 +699,11 @@ evtMapOffBtn.addEventListener('click', () => {
   redrawEvent();
 });
 
+const evtTextOnBtn = document.getElementById('evt-text-on');
+const evtTextOffBtn = document.getElementById('evt-text-off');
+evtTextOnBtn.addEventListener('click', () => { showTextEvt = true; evtTextOnBtn.classList.add('active'); evtTextOffBtn.classList.remove('active'); redrawEvent(); });
+evtTextOffBtn.addEventListener('click', () => { showTextEvt = false; evtTextOffBtn.classList.add('active'); evtTextOnBtn.classList.remove('active'); redrawEvent(); });
+
 const evtPinsOnBtn = document.getElementById('evt-pins-on');
 const evtPinsOffBtn = document.getElementById('evt-pins-off');
 evtPinsOnBtn.addEventListener('click', () => { showPinsEvt = true; evtPinsOnBtn.classList.add('active'); evtPinsOffBtn.classList.remove('active'); redrawEvent(); });
@@ -714,6 +766,10 @@ function drawEventFrame(ctx2d, dMark, markPath){
     sub.forEach((p, i) => { if (i === 0) ctx2d.moveTo(p.x, p.y); else ctx2d.lineTo(p.x, p.y); });
     ctx2d.stroke();
 
+    if (showTextEvt){
+      drawTextAlongPath(ctx2d, EVENT_TITLE, sub, 20, theme.bg);
+    }
+
     // "negativo": onde a linha cruza o título, revela o título na cor
     // do fundo — como se a linha fosse uma máscara pra uma versão
     // invertida do texto por baixo dela
@@ -760,7 +816,7 @@ function drawEventFrame(ctx2d, dMark, markPath){
   ctx2d.fillText(`${numArtists} Artistas`, MARGIN, EVT_STATS_Y2);
 
   ctx2d.textAlign = 'right';
-  ctx2d.fillStyle = theme.sub;
+  ctx2d.fillStyle = theme.ink;
   ctx2d.fillText(EVENT_DATES, LOGICAL - MARGIN, EVT_DATE_Y);
   ctx2d.textAlign = 'left';
 }
