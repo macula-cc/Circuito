@@ -111,6 +111,7 @@
       <div class="row-btns">
         <button class="btn active" id="theme-claro">fita preta · texto branco</button>
         <button class="btn" id="theme-escuro">fita branca · texto preto</button>
+        <button class="btn" id="theme-degrade">degradê</button>
       </div>
     </div>
 
@@ -195,21 +196,20 @@ const DATE_V_Y = TITLE_V_Y2 + DATE_GAP_V;
 // marca completa — horizontal: exatamente a marca vertical (mesma
 // tipografia, mesmo espaçamento), só que com o símbolo 20% menor e o
 // texto ao lado em vez de embaixo, os dois centralizados pela altura
-const SYMBOL_H_SIZE = SYMBOL_V_SIZE * 0.8;
-const SYMBOL_H_STROKE = SYMBOL_V_STROKE * 0.8;
-const GAP_H = 40;
-const TEXT_MAX_W_H = Math.max(
-  estimateTextWidth('Circuito de', TITLE_SIZE_V),
-  estimateTextWidth('Ateliês do Centro', TITLE_SIZE_V),
-  estimateTextWidth(EVENT_DATES, DATE_SIZE_V)
-);
-const TOTAL_W_H = SYMBOL_H_SIZE + GAP_H + TEXT_MAX_W_H;
-const START_X_H = Math.max(20, (LOGICAL - TOTAL_W_H) / 2);
+// marca completa — horizontal: símbolo ligeiramente maior que o texto,
+// composição inteira centralizada no artboard
+const SYMBOL_H_SIZE = 170;
+const SYMBOL_H_STROKE = 8;
+const TITLE_SIZE_H = 44;
+const DATE_SIZE_H = 34;
+const GAP_H = 30;
+const TEXT_W_H = Math.max(estimateTextWidth(EVENT_TITLE, TITLE_SIZE_H), estimateTextWidth(EVENT_DATES, DATE_SIZE_H));
+const TOTAL_W_H = SYMBOL_H_SIZE + GAP_H + TEXT_W_H;
+const START_X_H = (LOGICAL - TOTAL_W_H) / 2;
 const MARK_BOX_H = { x: START_X_H, y: LOGICAL/2 - SYMBOL_H_SIZE/2, w: SYMBOL_H_SIZE, h: SYMBOL_H_SIZE };
 const TITLE_X_H = START_X_H + SYMBOL_H_SIZE + GAP_H;
-const TITLE_Y1_H = LOGICAL/2 - TEXT_BLOCK_H_V/2 + TITLE_SIZE_V*0.72;
-const TITLE_Y2_H = TITLE_Y1_H + TITLE_LEAD_V;
-const DATE_Y_H = TITLE_Y2_H + DATE_GAP_V;
+const TITLE_Y_H = LOGICAL/2 - 6;
+const DATE_Y_H = TITLE_Y_H + 46;
 
 function parseCSV(text){
   const rows = []; let row = []; let field = ''; let inQuotes = false;
@@ -397,7 +397,8 @@ function buildRibbonOnlySVG(legs, ribbonWidth, ribbonColor){
     for (let i = 1; i < points.length; i++){
       pathD += 'L' + points[i].x.toFixed(2) + ' ' + points[i].y.toFixed(2) + ' ';
     }
-    out += `<path d="${pathD}" fill="none" stroke="${ribbonColor}" stroke-width="${ribbonWidth}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    const stroke = currentTheme === 'degrade' ? legStrokeAttr(points[0], points[points.length-1], null) : ribbonColor;
+    out += `<path d="${pathD}" fill="none" stroke="${stroke}" stroke-width="${ribbonWidth}" stroke-linecap="round" stroke-linejoin="round"/>`;
   });
   return out;
 }
@@ -420,7 +421,8 @@ function buildRibbonAndTextSVG(text, legs, fontSize, ribbonWidth, ribbonColor, t
     for (let i = 1; i < points.length; i++){
       pathD += 'L' + points[i].x.toFixed(2) + ' ' + points[i].y.toFixed(2) + ' ';
     }
-    out += `<path d="${pathD}" fill="none" stroke="${ribbonColor}" stroke-width="${ribbonWidth}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    const stroke = currentTheme === 'degrade' ? legStrokeAttr(points[0], points[points.length-1], null) : ribbonColor;
+    out += `<path d="${pathD}" fill="none" stroke="${stroke}" stroke-width="${ribbonWidth}" stroke-linecap="round" stroke-linejoin="round"/>`;
 
     let d = 0, safety = 0;
     while (d < total && safety < 3000){
@@ -444,9 +446,22 @@ function buildRibbonAndTextSVG(text, legs, fontSize, ribbonWidth, ribbonColor, t
    ============================================================ */
 const THEMES = {
   claro: { bg:'#ffffff', pin:'#111111', pinRing:'#ffffff', pinText:'#ffffff', ribbon:'#111111', text:'rgba(255,255,255,0.95)' },
-  escuro:{ bg:'#111111', pin:'#ffffff', pinRing:'#111111', pinText:'#111111', ribbon:'#ffffff', text:'rgba(17,17,17,0.95)' }
+  escuro:{ bg:'#111111', pin:'#ffffff', pinRing:'#111111', pinText:'#111111', ribbon:'#ffffff', text:'rgba(17,17,17,0.95)' },
+  degrade:{ bg:'#ffffff', pin:'#111111', pinRing:'#ffffff', pinText:'#ffffff', ribbon:'#111111', text:'rgba(120,120,120,0.95)' }
 };
 let currentTheme = 'claro';
+
+// degradê: cada trecho (perna) ganha um gradiente linear preto→branco,
+// orientado do começo ao fim daquele trecho específico
+let gradientDefs = [];
+let gradientCounter = 0;
+function resetGradients(){ gradientDefs = []; gradientCounter = 0; }
+function legStrokeAttr(a, b, theme){
+  if (currentTheme !== 'degrade') return theme.ribbon;
+  const id = 'grad' + (gradientCounter++);
+  gradientDefs.push(`<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${a.x.toFixed(2)}" y1="${a.y.toFixed(2)}" x2="${b.x.toFixed(2)}" y2="${b.y.toFixed(2)}"><stop offset="0%" stop-color="#000000"/><stop offset="100%" stop-color="#ffffff"/></linearGradient>`);
+  return `url(#${id})`;
+}
 
 /* ============================================================
    estado
@@ -460,13 +475,14 @@ const statusEl = document.getElementById('status');
 const canvasFrame = document.getElementById('canvas-frame');
 const themeClaroBtn = document.getElementById('theme-claro');
 const themeEscuroBtn = document.getElementById('theme-escuro');
+const themeDegradeBtn = document.getElementById('theme-degrade');
 
 let selectedOrder = []; // sempre contém TODOS os pontos com coordenada, em ordem embaralhada
 let showPins = true;
 let showText = true;
 let modeMarca = 'simbolo'; // simbolo | completa
 let orientMarca = 'horizontal'; // vertical | horizontal
-let completeMarkPoints = [];
+let completeMarkLegs = [];
 let completeMarkPins = [];
 let showPinsCompleta = true;
 
@@ -489,11 +505,13 @@ function setTheme(t){
   currentTheme = t;
   themeClaroBtn.classList.toggle('active', t === 'claro');
   themeEscuroBtn.classList.toggle('active', t === 'escuro');
+  themeDegradeBtn.classList.toggle('active', t === 'degrade');
   canvasFrame.style.background = THEMES[t].bg;
   draw();
 }
 themeClaroBtn.addEventListener('click', () => setTheme('claro'));
 themeEscuroBtn.addEventListener('click', () => setTheme('escuro'));
+themeDegradeBtn.addEventListener('click', () => setTheme('degrade'));
 
 function generateNewRoute(){
   const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
@@ -505,14 +523,17 @@ function generateNewRoute(){
 function generateCompleteMark(){
   const order = [...PTS].sort(() => Math.random()-0.5);
   const closed = [...order, order[0]];
-  const pts = [ { x: closed[0].x, y: closed[0].y } ];
+  const rawLegs = [];
   for (let i = 1; i < closed.length; i++){
-    buildLegPath(closed[i-1], closed[i]).slice(1).forEach(p => pts.push(p));
+    rawLegs.push(buildLegPath(closed[i-1], closed[i]));
   }
+  const pts = [ { x: closed[0].x, y: closed[0].y } ];
+  rawLegs.forEach(leg => leg.slice(1).forEach(p => pts.push(p)));
+
   const box = orientMarca === 'vertical' ? MARK_BOX_V : MARK_BOX_H;
   const t = computeFitTransform(pts, box, 0.9);
-  completeMarkPoints = applyFitTransform(pts, t);
-  completeMarkPins = applyFitTransform(order, t);
+  completeMarkLegs = rawLegs.map(leg => applyFitTransform(leg, t));
+  completeMarkPins = applyFitTransform(order, t).map((p,i) => ({ ...p, loc: order[i].loc }));
   draw();
 }
 document.getElementById('btn-shuffle').addEventListener('click', () => {
@@ -557,7 +578,7 @@ modeCompletaBtn.addEventListener('click', () => {
   simboloFieldsEl.style.display = 'none';
   orientFieldEl.style.display = 'block';
   completaPinsFieldEl.style.display = 'block';
-  if (completeMarkPoints.length < 2) generateCompleteMark();
+  if (completeMarkLegs.length < 1) generateCompleteMark();
   draw();
 });
 
@@ -568,9 +589,11 @@ modeCompletaBtn.addEventListener('click', () => {
    ============================================================ */
 function renderCompletaPins(pins, strokeWidth, theme){
   const r = strokeWidth / 2;
+  const fontSize = Math.max(7, r*0.8);
   let s = '';
   pins.forEach(p => {
-    s += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="${r.toFixed(2)}" fill="${theme.bg}" stroke="${theme.ribbon}" stroke-width="${Math.max(1.5, strokeWidth*0.12).toFixed(2)}"/>`;
+    s += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="${r.toFixed(2)}" fill="${theme.pin}" stroke="${theme.pinRing}" stroke-width="2"/>`;
+    s += `<text x="${p.x.toFixed(2)}" y="${(p.y+0.5).toFixed(2)}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="${fontSize.toFixed(1)}" fill="${theme.pinText}" text-anchor="middle" dominant-baseline="middle">${String(alphaNum[p.loc.id]).padStart(2,'0')}</text>`;
   });
   return s;
 }
@@ -584,21 +607,27 @@ function buildContentSVG(includeBg){
   }
 
   if (modeMarca === 'completa'){
+    resetGradients();
+    let pathsOut = '';
+    completeMarkLegs.forEach(points => {
+      if (points.length < 2) return;
+      let pathD = 'M' + points[0].x.toFixed(2) + ' ' + points[0].y.toFixed(2) + ' ';
+      for (let i = 1; i < points.length; i++) pathD += 'L' + points[i].x.toFixed(2) + ' ' + points[i].y.toFixed(2) + ' ';
+      const strokeW = orientMarca === 'vertical' ? SYMBOL_V_STROKE : SYMBOL_H_STROKE;
+      const stroke = legStrokeAttr(points[0], points[points.length-1], theme);
+      pathsOut += `<path d="${pathD}" fill="none" stroke="${stroke}" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    });
+    if (gradientDefs.length) s += `<defs>${gradientDefs.join('')}</defs>`;
+    s += pathsOut;
+
     if (orientMarca === 'vertical'){
-      if (completeMarkPoints.length >= 2){
-        s += `<path d="${buildOpenPathD(completeMarkPoints)}" fill="none" stroke="${theme.ribbon}" stroke-width="${SYMBOL_V_STROKE}" stroke-linecap="round" stroke-linejoin="round"/>`;
-      }
       s += `<text x="${TITLE_X_V}" y="${TITLE_V_Y1}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Circuito de</text>`;
       s += `<text x="${TITLE_X_V}" y="${TITLE_V_Y2}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Ateliês do Centro</text>`;
       s += `<text x="${TITLE_X_V}" y="${DATE_V_Y}" font-family="'Instrument Serif', Georgia, serif" font-size="${DATE_SIZE_V}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
       if (showPinsCompleta) s += renderCompletaPins(completeMarkPins, SYMBOL_V_STROKE, theme);
     } else {
-      if (completeMarkPoints.length >= 2){
-        s += `<path d="${buildOpenPathD(completeMarkPoints)}" fill="none" stroke="${theme.ribbon}" stroke-width="${SYMBOL_H_STROKE}" stroke-linecap="round" stroke-linejoin="round"/>`;
-      }
-      s += `<text x="${TITLE_X_H}" y="${TITLE_Y1_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Circuito de</text>`;
-      s += `<text x="${TITLE_X_H}" y="${TITLE_Y2_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Ateliês do Centro</text>`;
-      s += `<text x="${TITLE_X_H}" y="${DATE_Y_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${DATE_SIZE_V}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
+      s += `<text x="${TITLE_X_H}" y="${TITLE_Y_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_H}" fill="${theme.ribbon}">${escapeXML(EVENT_TITLE)}</text>`;
+      s += `<text x="${TITLE_X_H}" y="${DATE_Y_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_H}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
       if (showPinsCompleta) s += renderCompletaPins(completeMarkPins, SYMBOL_H_STROKE, theme);
     }
     return s;
@@ -610,9 +639,12 @@ function buildContentSVG(includeBg){
     for (let i = 1; i < selPts.length; i++){
       legs.push(buildLegPath(selPts[i-1], selPts[i]));
     }
-    s += showText
+    resetGradients();
+    const ribbonMarkup = showText
       ? buildRibbonAndTextSVG(EVENT_TITLE, legs, 24, 38, theme.ribbon, theme.text)
       : buildRibbonOnlySVG(legs, 38, theme.ribbon);
+    if (gradientDefs.length) s += `<defs>${gradientDefs.join('')}</defs>`;
+    s += ribbonMarkup;
   }
 
   if (showPins){
