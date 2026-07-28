@@ -29,7 +29,7 @@
 
   /* ---------------- Hero: full-bleed map (always mounted) ---------------- */
   .hero{ position:fixed; inset:0; }
-  #map{ position:absolute; inset:0; width:100%; height:100%; background:#e9e9e9; }
+  #map{ position:absolute; inset:0; width:100%; height:100%; background:#e9e9e9; z-index:1; isolation:isolate; }
   .leaflet-tile-pane{ filter: grayscale(1) contrast(1.05) brightness(1.03); }
   .leaflet-container{ background:#e9e9e9; font-family:var(--sans); }
 
