@@ -108,6 +108,21 @@
   .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.18); }
   .pin.active{ transform:scale(1.18); box-shadow:0 0 0 3px rgba(0,0,0,0.18); }
 
+  /* transit stations (metrô/VLT): a smaller, muted, diamond-shaped marker —
+     visually secondary to the ateliê pins, and a different shape (not just a
+     different color) so they read as a distinct category at a glance. */
+  .station-hit{ width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .station-pin{ width:13px; height:13px; background:var(--gray); border:1.5px solid #fff;
+                 transform:rotate(45deg); box-shadow:0 0 0 1px rgba(0,0,0,0.25);
+                 display:flex; align-items:center; justify-content:center;
+                 transition:transform 0.18s cubic-bezier(.4,0,.2,1); }
+  .station-pin span{ transform:rotate(-45deg); font-family:var(--mono); font-size:0.42rem; font-weight:600; color:#fff; }
+  .station-hit:hover .station-pin{ transform:rotate(45deg) scale(1.25); }
+
+  .leaflet-popup-content-wrapper{ border-radius:2px !important; box-shadow:0 8px 24px rgba(0,0,0,0.18) !important; }
+  .leaflet-popup-content{ font-family:var(--mono); font-size:0.79rem; color:var(--ink); margin:0.7rem 0.9rem !important; }
+  .leaflet-popup-tip{ box-shadow:0 8px 24px rgba(0,0,0,0.1) !important; }
+
   .leaflet-control-zoom{ border:none !important; }
   .leaflet-control-zoom a{ background:#fff !important; color:#111 !important; border:1px solid var(--line) !important;
                             border-radius:0 !important; font-family:var(--mono) !important; }
@@ -187,6 +202,10 @@
   .drawer-head{ padding:1.5rem 1.6rem 1.1rem; border-bottom:1px solid var(--line); flex-shrink:0; position:relative; }
   .drawer-title{ font-family:var(--serif); font-size:1.54rem; margin:0 0 0.15rem; line-height:1.2; }
   .drawer-addr{ font-family:var(--mono); font-size:0.83rem; color:var(--gray); }
+  .drawer-directions{ display:inline-block; font-family:var(--mono); font-size:0.79rem; color:var(--ink);
+                       text-decoration:underline; text-underline-offset:2px; margin-top:0.4rem; }
+  .drawer-directions:hover{ opacity:0.6; }
+  .drawer-directions.hidden{ display:none; }
   .drawer-count{ font-family:var(--mono); font-size:0.77rem; color:var(--gray); margin-top:0.5rem; }
 
   .drawer-close{ position:absolute; top:0.9rem; right:0.9rem; background:none; border:none; cursor:pointer;
@@ -296,6 +315,7 @@
     <button class="drawer-close" id="drawer-close" aria-label="Fechar">fechar ×</button>
     <div class="drawer-title" id="drawer-local">—</div>
     <div class="drawer-addr" id="drawer-endereco">—</div>
+    <a class="drawer-directions" id="drawer-directions" href="#" target="_blank" rel="noopener">Como chegar →</a>
     <div class="drawer-count" id="drawer-count">—</div>
   </div>
   <div class="drawer-list" id="drawer-list"></div>
@@ -456,6 +476,38 @@ function addMarkerForLocation(loc){
   markers[loc.id] = marker;
 }
 
+// ---------------- estações de metrô e VLT (curadas manualmente) ----------------
+// Poucas estações fixas no Centro — mais simples e confiável curar à mão do
+// que depender de mais uma API externa em tempo real no dia do evento.
+const STATIONS = [
+  { nome: 'Central',            tipo: 'metro', lat: -22.9049227, lng: -43.1908422 },
+  { nome: 'Presidente Vargas',   tipo: 'metro', lat: -22.9033525, lng: -43.186042  },
+  { nome: 'Uruguaiana',          tipo: 'metro', lat: -22.9029900, lng: -43.1817000 },
+  { nome: 'Carioca',             tipo: 'metro', lat: -22.9081555, lng: -43.1784408 },
+  { nome: 'Cinelândia',          tipo: 'metro', lat: -22.9111200, lng: -43.1756600 },
+  { nome: 'Gamboa',              tipo: 'vlt',   lat: -22.8979897, lng: -43.1993772 },
+  { nome: 'Candelária',          tipo: 'vlt',   lat: -22.9016863, lng: -43.1788611 },
+  { nome: 'Sete de Setembro',    tipo: 'vlt',   lat: -22.9052875, lng: -43.1775573 },
+  { nome: 'Carioca',             tipo: 'vlt',   lat: -22.9079900, lng: -43.1765500 },
+  { nome: 'Cinelândia',          tipo: 'vlt',   lat: -22.9105900, lng: -43.1755931 },
+  { nome: 'Praça XV',            tipo: 'vlt',   lat: -22.9021792, lng: -43.1730718 },
+];
+
+function addStationMarkers(){
+  STATIONS.forEach(st => {
+    const label = st.tipo === 'metro' ? 'M' : 'V';
+    const icon = L.divIcon({
+      className:'',
+      html:`<div class="station-hit"><div class="station-pin"><span>${label}</span></div></div>`,
+      iconSize:[28,28],
+      iconAnchor:[14,14]
+    });
+    const marker = L.marker([st.lat, st.lng], { icon, zIndexOffset:-100 }).addTo(map);
+    const tipoLabel = st.tipo === 'metro' ? 'Estação de Metrô' : 'Parada de VLT';
+    marker.bindPopup(`<strong>${st.nome}</strong><br>${tipoLabel}`, { closeButton:true });
+  });
+}
+
 function initMap(){
   try{
     if (typeof L === 'undefined') throw new Error('Leaflet não carregou');
@@ -466,6 +518,7 @@ function initMap(){
     }).addTo(map);
 
     LOCATIONS.forEach((loc) => addMarkerForLocation(loc));
+    addStationMarkers();
     locateUserAutomatically();
   } catch(err){
     console.error('Mapa indisponível:', err);
@@ -559,6 +612,14 @@ function openDrawer(locId){
   document.getElementById('drawer-local').textContent = loc.local || loc.endereco;
   document.getElementById('drawer-endereco').textContent = loc.local ? loc.endereco : '';
   document.getElementById('drawer-count').textContent = loc.artistas.length + (loc.artistas.length===1 ? ' artista' : ' artistas');
+
+  const directionsLink = document.getElementById('drawer-directions');
+  if (loc.lat != null && loc.lng != null){
+    directionsLink.href = `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`;
+    directionsLink.classList.remove('hidden');
+  } else {
+    directionsLink.classList.add('hidden');
+  }
 
   const list = document.getElementById('drawer-list');
   list.innerHTML = '';
