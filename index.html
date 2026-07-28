@@ -538,24 +538,31 @@ function initMap(){
 function locateUserAutomatically(){
   if (!map || !navigator.geolocation) return;
 
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      const { latitude, longitude } = pos.coords;
-      const icon = L.divIcon({
-        className: '',
-        html: '<div class="user-dot"></div>',
-        iconSize: [16, 16],
-        iconAnchor: [8, 8]
-      });
-      L.marker([latitude, longitude], { icon, zIndexOffset: 1000 }).addTo(map);
-      // não move a câmera automaticamente — só mostra o ponto, sem tirar
-      // o usuário do centro do mapa que ele já está vendo
-    },
-    (err) => {
-      console.warn('Localização não disponível:', err);
-    },
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-  );
+  try{
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const icon = L.divIcon({
+          className: '',
+          html: '<div class="user-dot"></div>',
+          iconSize: [16, 16],
+          iconAnchor: [8, 8]
+        });
+        L.marker([latitude, longitude], { icon, zIndexOffset: 1000 }).addTo(map);
+        // não move a câmera automaticamente — só mostra o ponto, sem tirar
+        // o usuário do centro do mapa que ele já está vendo
+      },
+      (err) => {
+        console.warn('Localização não disponível:', err);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  } catch(err){
+    // getCurrentPosition pode lançar de forma síncrona em contextos restritos
+    // (ex: iframe sem permissão de geolocalização) — isso não deve afetar o
+    // resto do mapa, que já está funcionando nesse ponto.
+    console.warn('Geolocalização indisponível neste contexto:', err);
+  }
 }
 
 // ---------------- geocodificação automática (fallback) ----------------
@@ -777,9 +784,10 @@ function goToLocation(loc){
 const heroTitle = document.getElementById('hero-title');
 let heroShrunk = false;
 
-function shrinkHero(){
+function shrinkHero(e){
   if (heroShrunk) return;
   heroShrunk = true;
+  console.log('[diagnóstico] hero encolheu por causa de:', e ? e.type : '(sem evento)', 'em', (performance.now()/1000).toFixed(2)+'s desde o carregamento, alvo:', e ? e.target : null);
   heroTitle.classList.add('shrunk');
 }
 document.addEventListener('pointerdown', shrinkHero, { once:true, passive:true });
