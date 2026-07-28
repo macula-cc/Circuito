@@ -515,7 +515,7 @@ function addStationMarkers(){
 function initMap(){
   try{
     if (typeof L === 'undefined') throw new Error('Leaflet não carregou');
-    map = L.map('map', { scrollWheelZoom:false, zoomControl:false }).setView([-22.9065, -43.1795], 15);
+    map = L.map('map', { scrollWheelZoom:true, zoomControl:false }).setView([-22.9065, -43.1795], 15);
     L.control.zoom({ position:'bottomright' }).addTo(map);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19
