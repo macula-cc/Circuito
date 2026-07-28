@@ -30,7 +30,11 @@
   /* ---------------- Hero: full-bleed map (always mounted) ---------------- */
   .hero{ position:fixed; inset:0; }
   #map{ position:absolute; inset:0; width:100%; height:100%; background:#e9e9e9; z-index:1; isolation:isolate; }
-  .leaflet-tile-pane{ filter: grayscale(1) contrast(1.05) brightness(1.03); }
+  /* filtro aplicado por tile individual (não na pane inteira) — cada tile é só
+     256x256px, então cada rasterização do filtro é barata; aplicar na pane
+     inteira forçava recalcular o filtro da área visível toda a cada tile novo
+     que chegava, causando as travinhas no zoom */
+  .leaflet-tile-pane img{ filter: grayscale(1) contrast(1.05) brightness(1.03); }
   .leaflet-container{ background:#e9e9e9; font-family:var(--sans); }
 
   .hero-title{ position:absolute; top:0; left:0; right:0;
@@ -212,15 +216,14 @@
   .drawer-head{ padding:1.5rem 1.6rem 1.1rem; border-bottom:1px solid var(--line); flex-shrink:0; position:relative; }
   .drawer-title{ font-family:var(--serif); font-size:1.54rem; margin:0 0 0.15rem; line-height:1.2; }
   .drawer-addr{ font-family:var(--mono); font-size:0.83rem; color:var(--gray); }
-  .drawer-directions{ display:inline-block; font-family:var(--mono); font-size:0.79rem; color:var(--ink);
+  .drawer-directions{ display:inline-block; font-family:var(--mono); font-size:0.94rem; color:var(--ink);
                        text-decoration:underline; text-underline-offset:2px; margin-top:0.4rem; }
   .drawer-directions:hover{ opacity:0.6; }
   .drawer-directions.hidden{ display:none; }
-  .drawer-count{ font-family:var(--mono); font-size:0.77rem; color:var(--gray); margin-top:0.5rem; }
 
   .drawer-close{ position:absolute; top:0.9rem; right:0.9rem; background:none; border:none; cursor:pointer;
                  padding:0.7rem; min-height:44px;
-                 font-family:var(--mono); font-size:0.94rem; color:var(--ink); transition:opacity 0.15s ease; }
+                 font-family:var(--mono); font-size:0.79rem; color:var(--ink); transition:opacity 0.15s ease; }
   .drawer-close:hover{ opacity:0.5; }
 
   .drawer-list{ overflow-y:auto; -webkit-overflow-scrolling:touch; padding:1rem 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); }
@@ -287,7 +290,7 @@
   .lightbox-caption .lb-bio{ font-family:var(--sans); font-size:0.97rem; line-height:1.55; color:var(--gray); margin:0.8rem 0 0; }
   .lightbox-close{ position:absolute; top:1rem; right:1rem;
                     background:none; border:none; cursor:pointer; padding:0.6rem; min-height:36px;
-                    font-family:var(--mono); font-size:0.86rem; color:var(--ink); }
+                    font-family:var(--mono); font-size:0.79rem; color:var(--ink); }
   .lightbox-close:hover{ opacity:0.6; }
 </style>
 
@@ -326,7 +329,6 @@
     <div class="drawer-title" id="drawer-local">—</div>
     <div class="drawer-addr" id="drawer-endereco">—</div>
     <a class="drawer-directions" id="drawer-directions" href="#" target="_blank" rel="noopener">Como chegar →</a>
-    <div class="drawer-count" id="drawer-count">—</div>
   </div>
   <div class="drawer-list" id="drawer-list"></div>
 </div>
@@ -541,7 +543,11 @@ function initMap(){
     });
     new LocateControl().addTo(map);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19
+      attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19,
+      updateWhenZooming:false // evita buscar/desenhar tiles no meio da animação de zoom
+                               // (o filtro grayscale na tile-pane força re-rasterizar a
+                               // pane inteira a cada tile que chega — isso é o que causava
+                               // as pequenas travas "tipo carregando aos poucos" durante o zoom)
     }).addTo(map);
 
     // Duplo-toque pra dar zoom: escuta touchstart/touchend crus, direto no
@@ -745,7 +751,6 @@ function openDrawer(locId){
 
   document.getElementById('drawer-local').textContent = loc.local || loc.endereco;
   document.getElementById('drawer-endereco').textContent = loc.local ? loc.endereco : '';
-  document.getElementById('drawer-count').textContent = loc.artistas.length + (loc.artistas.length===1 ? ' artista' : ' artistas');
 
   const directionsLink = document.getElementById('drawer-directions');
   if (loc.lat != null && loc.lng != null){
