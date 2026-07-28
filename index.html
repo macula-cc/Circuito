@@ -108,16 +108,23 @@
   .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.18); }
   .pin.active{ transform:scale(1.18); box-shadow:0 0 0 3px rgba(0,0,0,0.18); }
 
-  /* transit stations (metrô/VLT): a smaller, muted, diamond-shaped marker —
-     visually secondary to the ateliê pins, and a different shape (not just a
-     different color) so they read as a distinct category at a glance. */
+  /* transit stations (metrô/VLT): blue circular badge with letter, plus an
+     always-visible name label — same visual language commonly used across
+     metro maps worldwide (not a reproduction of the transit agency's own
+     logo artwork), styled to sit quietly against the grayscale map. */
   .station-hit{ width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
-  .station-pin{ width:13px; height:13px; background:var(--gray); border:1.5px solid #fff;
-                 transform:rotate(45deg); box-shadow:0 0 0 1px rgba(0,0,0,0.25);
-                 display:flex; align-items:center; justify-content:center;
-                 transition:transform 0.18s cubic-bezier(.4,0,.2,1); }
-  .station-pin span{ transform:rotate(-45deg); font-family:var(--mono); font-size:0.42rem; font-weight:600; color:#fff; }
-  .station-hit:hover .station-pin{ transform:rotate(45deg) scale(1.25); }
+  .station-badge{ width:20px; height:20px; border-radius:50%; background:#2A5CDB; border:2px solid #fff;
+                   box-shadow:0 1px 4px rgba(0,0,0,0.35);
+                   display:flex; align-items:center; justify-content:center;
+                   transition:transform 0.18s cubic-bezier(.4,0,.2,1); }
+  .station-badge span{ font-family:var(--sans); font-weight:700; font-size:0.62rem; color:#fff; }
+  .station-hit:hover .station-badge{ transform:scale(1.15); }
+
+  .station-label{ background:rgba(255,255,255,0.92) !important; border:none !important;
+                   box-shadow:0 1px 5px rgba(0,0,0,0.18) !important; border-radius:3px !important;
+                   font-family:var(--sans); font-size:0.72rem; font-weight:600; color:#222 !important;
+                   padding:2px 7px !important; white-space:nowrap; }
+  .station-label::before{ display:none !important; }
 
   .leaflet-popup-content-wrapper{ border-radius:2px !important; box-shadow:0 8px 24px rgba(0,0,0,0.18) !important; }
   .leaflet-popup-content{ font-family:var(--mono); font-size:0.79rem; color:var(--ink); margin:0.7rem 0.9rem !important; }
@@ -498,11 +505,17 @@ function addStationMarkers(){
     const label = st.tipo === 'metro' ? 'M' : 'V';
     const icon = L.divIcon({
       className:'',
-      html:`<div class="station-hit"><div class="station-pin"><span>${label}</span></div></div>`,
+      html:`<div class="station-hit"><div class="station-badge"><span>${label}</span></div></div>`,
       iconSize:[28,28],
       iconAnchor:[14,14]
     });
     const marker = L.marker([st.lat, st.lng], { icon, zIndexOffset:-100 }).addTo(map);
+    marker.bindTooltip(st.nome, {
+      permanent: true,
+      direction: 'right',
+      offset: [8, 0],
+      className: 'station-label'
+    });
     const tipoLabel = st.tipo === 'metro' ? 'Estação de Metrô' : 'Parada de VLT';
     marker.bindPopup(`<strong>${st.nome}</strong><br>${tipoLabel}`, { closeButton:true });
   });
