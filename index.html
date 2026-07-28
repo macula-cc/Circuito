@@ -132,6 +132,12 @@
                             border-radius:0 !important; font-family:var(--mono) !important; }
   .leaflet-control-attribution{ font-family:var(--mono); font-size:0.68rem !important; background:rgba(255,255,255,0.75) !important; }
 
+  .locate-control a{ background:#fff !important; color:#111 !important; border:1px solid var(--line) !important;
+                      border-radius:0 !important; font-size:1rem !important; line-height:26px !important;
+                      width:26px !important; height:26px !important; display:block; text-align:center;
+                      text-decoration:none !important; }
+  .locate-control a:hover{ background:var(--hover) !important; }
+
   .user-dot{ position:relative; width:14px; height:14px; border-radius:50%; background:#3B82F6; border:2px solid #fff;
              box-shadow:0 0 0 4px rgba(59,130,246,0.28); }
   .user-dot::after{ content:''; position:absolute; inset:-8px; border-radius:50%;
@@ -517,6 +523,23 @@ function initMap(){
     if (typeof L === 'undefined') throw new Error('Leaflet não carregou');
     map = L.map('map', { scrollWheelZoom:true, doubleClickZoom:false, zoomControl:false }).setView([-22.9065, -43.1795], 15);
     L.control.zoom({ position:'bottomright' }).addTo(map);
+
+    const LocateControl = L.Control.extend({
+      options: { position: 'bottomright' },
+      onAdd: function(){
+        const container = L.DomUtil.create('div', 'leaflet-bar locate-control');
+        const link = L.DomUtil.create('a', '', container);
+        link.href = '#';
+        link.title = 'Minha localização';
+        link.setAttribute('role', 'button');
+        link.setAttribute('aria-label', 'Centralizar o mapa na minha localização');
+        link.innerHTML = '◎';
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.on(link, 'click', (e) => { e.preventDefault(); goToUserLocation(link); });
+        return container;
+      }
+    });
+    new LocateControl().addTo(map);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19
     }).addTo(map);
@@ -576,24 +599,79 @@ function initMap(){
   }
 }
 
-// ---------------- localização do visitante (automática, sem botão) ----------------
-// O navegador exibe seu próprio prompt nativo de permissão — não pedimos nada
-// além disso. Se a pessoa negar, ou o navegador não suportar, falha em
-// silêncio (sem alertas), já que isso roda sozinho ao carregar a página.
+// ---------------- localização do visitante ----------------
+// Automática ao carregar (sem botão) — o navegador exibe seu próprio prompt
+// nativo de permissão. Se a pessoa negar, ou o navegador não suportar, falha
+// em silêncio. Além disso, um botão no mapa permite centralizar nela quando
+// quiser, sem precisar pedir localização de novo se já a tivermos.
+let userMarker = null;
+let userLatLng = null;
+
+function placeUserMarker(latitude, longitude){
+  userLatLng = L.latLng(latitude, longitude);
+  if (userMarker){
+    userMarker.setLatLng(userLatLng);
+  } else {
+    const icon = L.divIcon({
+      className: '',
+      html: '<div class="user-dot"></div>',
+      iconSize: [16, 16],
+      iconAnchor: [8, 8]
+    });
+    userMarker = L.marker(userLatLng, { icon, zIndexOffset: 1000 }).addTo(map);
+  }
+}
+
+// Botão "minha localização": se já sabemos onde a pessoa está (localização
+// automática já resolvida), só centraliza — rápido, sem pedir de novo. Caso
+// contrário (ainda carregando, ou falhou antes), tenta obter na hora.
+function goToUserLocation(triggerEl){
+  if (!map) return;
+
+  if (userLatLng){
+    map.flyTo(userLatLng, Math.max(map.getZoom(), 16), { duration: 0.6 });
+    return;
+  }
+
+  if (!navigator.geolocation){
+    alert('Este navegador não suporta geolocalização.');
+    return;
+  }
+
+  const originalText = triggerEl ? triggerEl.innerHTML : null;
+  if (triggerEl) triggerEl.innerHTML = '···';
+
+  try{
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (triggerEl) triggerEl.innerHTML = originalText;
+        placeUserMarker(pos.coords.latitude, pos.coords.longitude);
+        map.flyTo(userLatLng, Math.max(map.getZoom(), 16), { duration: 0.6 });
+      },
+      (err) => {
+        if (triggerEl) triggerEl.innerHTML = originalText;
+        console.warn('Falha ao obter localização:', err);
+        if (err.code === err.PERMISSION_DENIED){
+          alert('Permissão de localização negada. Libere o acesso à localização para este site nas configurações do navegador.');
+        } else {
+          alert('Não foi possível obter sua localização agora. Tente novamente em instantes.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  } catch(err){
+    if (triggerEl) triggerEl.innerHTML = originalText;
+    console.warn('Geolocalização indisponível neste contexto:', err);
+  }
+}
+
 function locateUserAutomatically(){
   if (!map || !navigator.geolocation) return;
 
   try{
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const icon = L.divIcon({
-          className: '',
-          html: '<div class="user-dot"></div>',
-          iconSize: [16, 16],
-          iconAnchor: [8, 8]
-        });
-        L.marker([latitude, longitude], { icon, zIndexOffset: 1000 }).addTo(map);
+        placeUserMarker(pos.coords.latitude, pos.coords.longitude);
         // não move a câmera automaticamente — só mostra o ponto, sem tirar
         // o usuário do centro do mapa que ele já está vendo
       },
