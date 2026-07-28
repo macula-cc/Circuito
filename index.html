@@ -786,13 +786,19 @@ let heroShrunk = false;
 
 function shrinkHero(e){
   if (heroShrunk) return;
+  // ignora eventos sintéticos (disparados por script, não por uma ação real
+  // da pessoa) — algumas extensões de navegador injetam eventos de teclado
+  // na página, e isso não deve contar como "o usuário interagiu".
+  if (e && e.isTrusted === false) return;
   heroShrunk = true;
-  console.log('[diagnóstico] hero encolheu por causa de:', e ? e.type : '(sem evento)', 'em', (performance.now()/1000).toFixed(2)+'s desde o carregamento, alvo:', e ? e.target : null);
   heroTitle.classList.add('shrunk');
+  document.removeEventListener('pointerdown', shrinkHero);
+  document.removeEventListener('wheel', shrinkHero);
+  document.removeEventListener('keydown', shrinkHero);
 }
-document.addEventListener('pointerdown', shrinkHero, { once:true, passive:true });
-document.addEventListener('wheel', shrinkHero, { once:true, passive:true });
-document.addEventListener('keydown', shrinkHero, { once:true });
+document.addEventListener('pointerdown', shrinkHero, { passive:true });
+document.addEventListener('wheel', shrinkHero, { passive:true });
+document.addEventListener('keydown', shrinkHero);
 
 // ---------------- view switch (mapa / lista) ----------------
 const listOverlay = document.getElementById('list-overlay');
