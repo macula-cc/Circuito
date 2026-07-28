@@ -523,7 +523,14 @@ function addStationMarkers(){
 function initMap(){
   try{
     if (typeof L === 'undefined') throw new Error('Leaflet não carregou');
-    map = L.map('map', { scrollWheelZoom:true, doubleClickZoom:true, zoomControl:false }).setView([-22.9065, -43.1795], 15);
+    // zoomSnap fracionário: por padrão o Leaflet só faz zoom em níveis inteiros,
+    // o que soa bem no scroll do mouse (poucos "cliques" discretos) mas engasga
+    // no trackpad, que manda uma rajada contínua de eventos — cada nível inteiro
+    // cruzado disparava um salto de zoom animado (recarregando tiles). Com
+    // zoomSnap fracionário o mapa acompanha o gesto de forma contínua.
+    // wheelPxPerZoomLevel mais baixo que o padrão (60) compensa: cada incremento
+    // fracionário passa a valer mais zoom, pra não sentir "fraquinho" no pinch.
+    map = L.map('map', { scrollWheelZoom:true, doubleClickZoom:true, zoomControl:false, zoomSnap:0.25, wheelPxPerZoomLevel:20 }).setView([-22.9065, -43.1795], 15);
     L.control.zoom({ position:'bottomright' }).addTo(map);
 
     const LocateControl = L.Control.extend({
