@@ -521,27 +521,50 @@ function initMap(){
       attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19
     }).addTo(map);
 
-    // Duplo-toque pra dar zoom: implementado manualmente em cima do evento
-    // 'click' (que já sabemos que dispara de forma confiável em toques),
-    // em vez de depender do 'dblclick' nativo do navegador — que em alguns
-    // navegadores mobile não é sintetizado a partir de um duplo toque
-    // quando a área já tem gestos customizados de arrastar/zoom.
+    // Duplo-toque pra dar zoom: escuta touchstart/touchend crus, direto no
+    // elemento do mapa — o Leaflet parece "engolir" o segundo toque de um
+    // duplo-toque antes que ele chegue como 'click', então precisamos ouvir
+    // no nível mais baixo possível. Cuidados: ignora gestos com mais de um
+    // dedo (pinça) e ignora toques que se moveram (arrastar o mapa).
+    const mapContainer = map.getContainer();
+    let tapStartPoint = null;
     let lastTapTime = 0;
-    let lastTapLatLng = null;
-    map.on('click', (e) => {
+    let lastTapPoint = null;
+
+    mapContainer.addEventListener('touchstart', (e) => {
+      tapStartPoint = e.touches.length === 1
+        ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+        : null;
+    }, { passive: true });
+
+    mapContainer.addEventListener('touchend', (e) => {
+      if (!tapStartPoint || e.changedTouches.length !== 1 || e.touches.length !== 0){
+        tapStartPoint = null;
+        return;
+      }
+      const touch = e.changedTouches[0];
+      const moved = Math.hypot(touch.clientX - tapStartPoint.x, touch.clientY - tapStartPoint.y);
+      tapStartPoint = null;
+      if (moved > 12) return; // foi um arrastar, não um toque
+
       const now = Date.now();
-      const isDoubleTap = lastTapLatLng &&
+      const point = { x: touch.clientX, y: touch.clientY };
+      const isDoubleTap = lastTapPoint &&
         (now - lastTapTime) < 350 &&
-        map.latLngToContainerPoint(e.latlng).distanceTo(map.latLngToContainerPoint(lastTapLatLng)) < 40;
+        Math.hypot(point.x - lastTapPoint.x, point.y - lastTapPoint.y) < 40;
+
       if (isDoubleTap){
-        map.setZoomAround(e.latlng, map.getZoom() + 1, { animate: true });
+        e.preventDefault();
+        const containerPoint = map.mouseEventToContainerPoint(touch);
+        const latlng = map.containerPointToLatLng(containerPoint);
+        map.setZoomAround(latlng, map.getZoom() + 1, { animate: true });
         lastTapTime = 0;
-        lastTapLatLng = null;
+        lastTapPoint = null;
       } else {
         lastTapTime = now;
-        lastTapLatLng = e.latlng;
+        lastTapPoint = point;
       }
-    });
+    }, { passive: false });
 
     LOCATIONS.forEach((loc) => addMarkerForLocation(loc));
     addStationMarkers();
