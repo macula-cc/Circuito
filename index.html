@@ -515,11 +515,33 @@ function addStationMarkers(){
 function initMap(){
   try{
     if (typeof L === 'undefined') throw new Error('Leaflet não carregou');
-    map = L.map('map', { scrollWheelZoom:true, doubleClickZoom:true, zoomControl:false }).setView([-22.9065, -43.1795], 15);
+    map = L.map('map', { scrollWheelZoom:true, doubleClickZoom:false, zoomControl:false }).setView([-22.9065, -43.1795], 15);
     L.control.zoom({ position:'bottomright' }).addTo(map);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19
     }).addTo(map);
+
+    // Duplo-toque pra dar zoom: implementado manualmente em cima do evento
+    // 'click' (que já sabemos que dispara de forma confiável em toques),
+    // em vez de depender do 'dblclick' nativo do navegador — que em alguns
+    // navegadores mobile não é sintetizado a partir de um duplo toque
+    // quando a área já tem gestos customizados de arrastar/zoom.
+    let lastTapTime = 0;
+    let lastTapLatLng = null;
+    map.on('click', (e) => {
+      const now = Date.now();
+      const isDoubleTap = lastTapLatLng &&
+        (now - lastTapTime) < 350 &&
+        map.latLngToContainerPoint(e.latlng).distanceTo(map.latLngToContainerPoint(lastTapLatLng)) < 40;
+      if (isDoubleTap){
+        map.setZoomAround(e.latlng, map.getZoom() + 1, { animate: true });
+        lastTapTime = 0;
+        lastTapLatLng = null;
+      } else {
+        lastTapTime = now;
+        lastTapLatLng = e.latlng;
+      }
+    });
 
     LOCATIONS.forEach((loc) => addMarkerForLocation(loc));
     addStationMarkers();
