@@ -1,0 +1,1423 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Circuito de Ateliês do Centro do Rio de Janeiro</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --serif: 'Instrument Serif', Georgia, 'Iowan Old Style', 'Times New Roman', ui-serif, serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --ink:#111;
+    --line: rgba(0,0,0,0.15);
+    --gray: #6b6b6b;
+    --hover: #f0f0f0;
+    --paper:#fff;
+  }
+  *{ box-sizing:border-box; }
+  html, body{ height:100%; overflow:hidden; }
+  body{ margin:0; color:var(--ink); font-family:var(--sans); background:var(--paper); }
+  a{ color:inherit; }
+  button{ font:inherit; touch-action:manipulation; }
+  .row, .drawer-close, .switcher button, .sort-switch button{ -webkit-tap-highlight-color:transparent; }
+
+  /* ---------------- Hero: full-bleed map (always mounted) ---------------- */
+  .hero{ position:fixed; inset:0; }
+  #map{ position:absolute; inset:0; width:100%; height:100%; background:#e9e9e9; z-index:1; isolation:isolate; }
+  #snake-overlay{ position:absolute; inset:0; width:100%; height:100%; z-index:250; pointer-events:none; }
+  /* filtro aplicado por tile individual (não na pane inteira) — cada tile é só
+     256x256px, então cada rasterização do filtro é barata; aplicar na pane
+     inteira forçava recalcular o filtro da área visível toda a cada tile novo
+     que chegava, causando as travinhas no zoom */
+  .leaflet-tile-pane img{ filter: grayscale(1) contrast(1.05) brightness(1.03); }
+  .leaflet-container{ background:#e9e9e9; font-family:var(--sans); }
+
+  .hero-title{ position:absolute; top:0; left:0; right:0;
+               padding:calc(1.6rem + env(safe-area-inset-top)) calc(1.6rem + env(safe-area-inset-right)) 0 calc(1.6rem + env(safe-area-inset-left));
+               z-index:260; pointer-events:none;
+               transition:padding-top 0.75s cubic-bezier(.16,1,.3,1); }
+  .hero-title h1{ font-family:var(--serif); font-weight:400; color:var(--ink);
+                  font-size:clamp(3.8rem, 12vw, 9.5rem);
+                  line-height:0.94; margin:0; white-space:nowrap; letter-spacing:-0.01em;
+                  transition:font-size 0.75s cubic-bezier(.16,1,.3,1), line-height 0.75s cubic-bezier(.16,1,.3,1); }
+  .hero-date{ font-family:var(--serif); font-weight:400; color:#cfcfcf;
+              font-size:clamp(3.8rem, 12vw, 9.5rem);
+              line-height:0.94; margin-top:0.05em; white-space:nowrap;
+              transition:font-size 0.75s cubic-bezier(.16,1,.3,1), margin-top 0.75s cubic-bezier(.16,1,.3,1), color 0.4s ease; }
+
+  .hero-title.shrunk h1{ font-size:clamp(1.43rem, 3.3vw, 2.09rem) !important; line-height:1.25; max-width:14ch; white-space:normal; }
+  .hero-title.shrunk .hero-date{ font-size:clamp(1.43rem, 3.3vw, 2.09rem) !important; margin-top:0.2rem; color:var(--gray); }
+
+  /* Mobile: fixed sizes per breakpoint, calculated conservatively against the
+     longest line ("18 – 19 de Setembro") so it never wraps or overflows, even
+     accounting for Instrument Serif's wider letterforms. Vertical clearance
+     (padding-top) keeps the block below the mapa/lista toggle. */
+  @media (max-width:780px){
+    .hero-title{ padding-top:calc(4.8rem + env(safe-area-inset-top)); }
+    .hero-title.shrunk{ padding-top:calc(1.6rem + env(safe-area-inset-top)); }
+    .hero-title h1{ font-size:2rem; white-space:normal; }
+    .hero-date{ font-size:2rem; }
+  }
+  @media (max-width:430px){
+    .hero-title h1{ font-size:1.7rem; }
+    .hero-date{ font-size:1.7rem; }
+  }
+  @media (max-width:380px){
+    .hero-title h1{ font-size:1.5rem; }
+    .hero-date{ font-size:1.5rem; }
+  }
+
+  .hero-count{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:calc(1.6rem + env(safe-area-inset-left)); z-index:200;
+               font-family:var(--mono); font-size:0.79rem; color:var(--gray); pointer-events:none; }
+
+  /* ---------------- View switcher (glass pill toggle) ---------------- */
+  .switcher{ position:absolute; top:calc(1.1rem + env(safe-area-inset-top)); right:calc(0.9rem + env(safe-area-inset-right)); z-index:600;
+             display:flex; gap:2px; font-family:var(--mono); font-size:0.79rem;
+             background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
+             -webkit-backdrop-filter:blur(18px) saturate(180%);
+             border:1px solid rgba(255,255,255,0.4); border-radius:999px; padding:3px;
+             box-shadow:0 2px 10px rgba(0,0,0,0.08); }
+  .switcher button{ background:transparent; border:none; cursor:pointer; color:var(--ink);
+                     padding:0.55rem 0.9rem; min-height:38px; border-radius:999px;
+                     transition:background 0.2s ease, color 0.2s ease; }
+  .switcher button.active{ background:#111; color:#fff; }
+  .switcher button:not(.active):hover{ background:rgba(255,255,255,0.35); }
+
+  .sort-switch{ position:absolute; top:calc(4rem + env(safe-area-inset-top)); right:calc(0.9rem + env(safe-area-inset-right)); z-index:600;
+                display:flex; gap:2px; font-family:var(--mono); font-size:0.73rem;
+                background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
+                -webkit-backdrop-filter:blur(18px) saturate(180%);
+                border:1px solid rgba(255,255,255,0.4); border-radius:999px; padding:3px;
+                box-shadow:0 2px 10px rgba(0,0,0,0.08);
+                opacity:0; pointer-events:none; transition:opacity 0.2s ease; }
+  .sort-switch.visible{ opacity:1; pointer-events:auto; }
+  .sort-switch button{ background:transparent; border:none; cursor:pointer; color:var(--ink);
+                        padding:0.5rem 0.7rem; min-height:34px; border-radius:999px;
+                        transition:background 0.2s ease, color 0.2s ease; }
+  .sort-switch button.active{ background:#111; color:#fff; }
+  .sort-switch button:not(.active):hover{ background:rgba(255,255,255,0.35); }
+
+  /* pins: 40px invisible tap target, badge circle with initials centered inside */
+  .pin-hit{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .pin{ width:24px; height:24px; border-radius:50%; background:#111; border:1.5px solid #fff;
+        box-shadow:0 0 0 1px rgba(0,0,0,0.4);
+        display:flex; align-items:center; justify-content:center;
+        font-family:var(--mono); font-size:0.6rem; font-weight:500; color:#fff; letter-spacing:0.01em;
+        transition:transform 0.18s cubic-bezier(.4,0,.2,1); transform:scale(1); }
+  .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.18); }
+  .pin.active{ transform:scale(1.18); box-shadow:0 0 0 3px rgba(0,0,0,0.18); }
+
+  /* transit stations (metrô/VLT): blue circular badge with letter — click
+     to see the name and type in a popup. Two distinct blue tones (not a
+     reproduction of the transit agency's own logo artwork) so metro and
+     VLT read apart from each other at a glance, echoing each service's
+     real-world color without copying the exact mark. */
+  .station-hit{ width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .station-badge{ width:20px; height:20px; border-radius:50%; border:2px solid #fff;
+                   box-shadow:0 1px 4px rgba(0,0,0,0.35);
+                   display:flex; align-items:center; justify-content:center;
+                   transition:transform 0.18s cubic-bezier(.4,0,.2,1); }
+  .station-badge.metro{ background:#1565C0; }
+  .station-badge.vlt{ background:#0F3D7A; }
+  .station-badge span{ font-family:var(--sans); font-weight:700; font-size:0.62rem; color:#fff; }
+  .station-hit:hover .station-badge{ transform:scale(1.15); }
+
+  .leaflet-popup-content-wrapper{ border-radius:2px !important; box-shadow:0 8px 24px rgba(0,0,0,0.18) !important; }
+  .leaflet-popup-content{ font-family:var(--mono); font-size:0.79rem; color:var(--ink); margin:0.7rem 0.9rem !important; }
+  .leaflet-popup-tip{ box-shadow:0 8px 24px rgba(0,0,0,0.1) !important; }
+
+  .leaflet-control-zoom{ border:none !important; }
+  .leaflet-control-zoom a{ background:#fff !important; color:#111 !important; border:1px solid var(--line) !important;
+                            border-radius:0 !important; font-family:var(--mono) !important; }
+  .leaflet-control-attribution{ font-family:var(--mono); font-size:0.68rem !important; background:rgba(255,255,255,0.75) !important; }
+
+  .locate-control a{ background:#fff !important; color:#111 !important; border:1px solid var(--line) !important;
+                      border-radius:0 !important; font-size:1rem !important; line-height:26px !important;
+                      width:26px !important; height:26px !important; display:block; text-align:center;
+                      text-decoration:none !important; }
+  .locate-control a:hover{ background:var(--hover) !important; }
+
+  .user-dot{ position:relative; width:14px; height:14px; border-radius:50%; background:#3B82F6; border:2px solid #fff;
+             box-shadow:0 0 0 4px rgba(59,130,246,0.28); }
+  .user-dot::after{ content:''; position:absolute; inset:-8px; border-radius:50%;
+                     background:rgba(59,130,246,0.28); animation:user-dot-pulse 2.2s ease-out infinite; }
+  @keyframes user-dot-pulse{
+    0%{ transform:scale(0.4); opacity:0.8; }
+    100%{ transform:scale(1.6); opacity:0; }
+  }
+
+  /* ---------------- List overlay (modal, same glass treatment as lightbox) ---------------- */
+  .list-overlay{ position:fixed; inset:0; z-index:400;
+                 background:transparent;
+                 opacity:0; pointer-events:none;
+                 transition:opacity 0.25s ease;
+                 display:flex; align-items:center; justify-content:center;
+                 padding:calc(1rem + env(safe-area-inset-top)) calc(1rem + env(safe-area-inset-right))
+                         calc(1rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left)); }
+  .list-overlay.open{ opacity:1; pointer-events:auto; }
+
+  .list-modal{ position:relative; width:100%; height:100%;
+               background:rgba(255,255,255,0.35);
+               backdrop-filter:blur(32px) saturate(180%);
+               -webkit-backdrop-filter:blur(32px) saturate(180%);
+               border:1px solid rgba(255,255,255,0.6);
+               border-radius:10px;
+               box-shadow:0 24px 70px rgba(0,0,0,0.25);
+               display:flex; flex-direction:column; overflow:hidden;
+               transform:scale(0.97); transition:transform 0.25s ease; }
+  .list-overlay.open .list-modal{ transform:scale(1); }
+
+  .list-head{ padding:1.6rem 1.6rem 1rem; border-bottom:1px solid rgba(0,0,0,0.12); flex-shrink:0; }
+  .list-head h2{ font-family:var(--serif); font-weight:400; font-size:1.32rem; margin:0 0 0.2rem; }
+
+  .rows{ overflow-y:auto; -webkit-overflow-scrolling:touch; flex-grow:1; max-width:920px; width:100%; margin:0 auto;
+         padding:0 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); }
+  .row{ display:flex; align-items:baseline; gap:1rem; padding:0.85rem 0.2rem; border-bottom:1px solid var(--line);
+        cursor:pointer; background:none; border-left:none; border-right:none; border-top:none; width:100%;
+        text-align:left; font-family:inherit; transition:background 0.15s ease, padding-left 0.15s ease; }
+  .row:hover{ background:var(--hover); padding-left:0.6rem; }
+  .row.pending{ color:var(--gray); font-style:italic; }
+  .row-num{ font-family:var(--mono); font-size:0.83rem; color:var(--gray); width:1.6rem; flex-shrink:0; }
+  .row-main{ flex-grow:1; min-width:0; }
+  .row-title{ font-family:var(--serif); font-size:1.16rem; }
+  .row-sub{ font-family:var(--mono); font-size:0.79rem; color:var(--gray); display:block; margin-top:0.15rem; }
+  .row-count{ font-family:var(--mono); font-size:0.79rem; color:var(--gray); white-space:nowrap; }
+
+  /* ---------------- Drawer ---------------- */
+  .overlay{ position:fixed; inset:0; background:rgba(0,0,0,0.15); opacity:0; pointer-events:none;
+            transition:opacity 0.25s ease; z-index:900; }
+  .overlay.open{ opacity:1; pointer-events:auto; }
+
+  .drawer{ position:fixed; z-index:950; display:flex; flex-direction:column;
+           transition:transform 0.35s cubic-bezier(.4,0,.2,1);
+           background:rgba(255,255,255,0.35);
+           backdrop-filter:blur(32px) saturate(180%);
+           -webkit-backdrop-filter:blur(32px) saturate(180%);
+           border:1px solid rgba(255,255,255,0.6);
+           border-radius:10px;
+           box-shadow:0 24px 70px rgba(0,0,0,0.25); }
+  @media (min-width:781px){
+    .drawer{ top:calc(1rem + env(safe-area-inset-top)); right:calc(1rem + env(safe-area-inset-right));
+             bottom:calc(1rem + env(safe-area-inset-bottom)); width:440px;
+             transform:translateX(calc(100% + 2rem)); }
+    .drawer.open{ transform:translateX(0); }
+  }
+  @media (max-width:780px){
+    .drawer{ left:0; right:0; bottom:0; max-height:82vh; transform:translateY(100%);
+             border-bottom-left-radius:0; border-bottom-right-radius:0; }
+    .drawer.open{ transform:translateY(0); }
+  }
+
+  .drawer-head{ padding:1.5rem 1.6rem 1.1rem; border-bottom:1px solid var(--line); flex-shrink:0; position:relative; }
+  .drawer-title{ font-family:var(--serif); font-size:1.54rem; margin:0 0 0.15rem; line-height:1.2; }
+  .drawer-addr{ font-family:var(--mono); font-size:0.83rem; color:var(--gray); }
+  .drawer-directions{ display:inline-block; font-family:var(--mono); font-size:0.94rem; color:var(--ink);
+                       text-decoration:underline; text-underline-offset:2px; margin-top:0.4rem; }
+  .drawer-directions:hover{ opacity:0.6; }
+  .drawer-directions.hidden{ display:none; }
+
+  .drawer-close{ position:absolute; top:0.9rem; right:0.9rem; background:none; border:none; cursor:pointer;
+                 padding:0.7rem; min-height:44px;
+                 font-family:var(--mono); font-size:0.79rem; color:var(--ink); transition:opacity 0.15s ease; }
+  .drawer-close:hover{ opacity:0.5; }
+
+  .drawer-list{ overflow-y:auto; -webkit-overflow-scrolling:touch; padding:1rem 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); }
+  .artist-grid{ display:grid; grid-template-columns:1fr 1fr; gap:1.1rem 0.9rem; }
+
+  .artist-card{ display:flex; flex-direction:column; }
+  .artist-photo{ width:100%; aspect-ratio:4/3; background:#e4e4e4; border:1px solid var(--ink);
+                 background-size:cover; background-position:center;
+                 display:flex; align-items:center; justify-content:center;
+                 font-family:var(--mono); font-size:0.94rem; color:var(--gray);
+                 cursor:zoom-in; transition:opacity 0.15s ease; }
+  .artist-photo:hover{ opacity:0.85; }
+
+  /* fixed min-height reserved for the whole text block, so cards line up
+     whether or not the 'sala' line exists — the room element is fully
+     removed from the DOM when empty rather than leaving a blank line. */
+  .artist-body{ display:flex; flex-direction:column; min-height:6.1rem; }
+
+  .artist-name{ font-family:var(--serif); font-size:1.04rem; margin:0.55rem 0 0.15rem; line-height:1.2; }
+  .artist-meta{ font-family:var(--mono); font-size:0.77rem; color:var(--gray); display:flex; flex-wrap:wrap; gap:0.4rem; align-items:center; }
+  .artist-meta a{ color:var(--ink); text-decoration:underline; text-underline-offset:2px; }
+  .artist-meta a:hover{ opacity:0.6; }
+  .artist-room{ font-family:var(--mono); font-size:0.75rem; color:var(--gray); margin-top:0.3rem; }
+  .artist-room .artist-obs{ border:1px solid var(--line); padding:0.05rem 0.3rem; }
+  .day-badges{ display:flex; gap:0.35rem; margin-top:0.45rem; flex-wrap:wrap; }
+  .day-pill{ font-family:var(--mono); font-size:0.68rem; padding:0.15rem 0.45rem; border-radius:3px; border:1px solid transparent; }
+  .day-pill.present{ background:#DFF3E3; color:#1F6B33; border-color:#B9E0C2; }
+  .day-pill.absent{ background:#FBE2E0; color:#9A3324; border-color:#F0C4C0; }
+  .photo-note{ font-family:var(--mono); font-size:0.75rem; color:var(--gray); font-style:italic; margin-top:0.9rem; grid-column:1 / -1; }
+
+  .map-error{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+              font-family:var(--mono); font-size:0.88rem; color:var(--gray); text-align:center; padding:2rem; }
+
+  /* ---------------- Lightbox (modal, glassmorphism) ---------------- */
+  .lightbox{ position:fixed; inset:0; z-index:1000;
+             background:transparent;
+             display:flex; align-items:center; justify-content:center;
+             opacity:0; pointer-events:none; transition:opacity 0.25s ease;
+             padding:calc(1rem + env(safe-area-inset-top)) calc(1rem + env(safe-area-inset-right))
+                     calc(1rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left)); }
+  .lightbox.open{ opacity:1; pointer-events:auto; }
+
+  .lightbox-modal{ position:relative; width:100%; height:100%;
+                    overflow-y:auto; -webkit-overflow-scrolling:touch;
+                    background:rgba(255,255,255,0.35);
+                    backdrop-filter:blur(32px) saturate(180%);
+                    -webkit-backdrop-filter:blur(32px) saturate(180%);
+                    border:1px solid rgba(255,255,255,0.6);
+                    border-radius:10px;
+                    padding:2.2rem 1.8rem;
+                    box-shadow:0 24px 70px rgba(0,0,0,0.25);
+                    display:flex; flex-direction:column; align-items:center; justify-content:center;
+                    transform:scale(0.97); transition:transform 0.25s ease; }
+  .lightbox.open .lightbox-modal{ transform:scale(1); }
+
+  .lightbox-modal img{ max-width:100%; max-height:70vh; object-fit:contain; border:1px solid rgba(0,0,0,0.1); }
+  .lightbox-placeholder{ display:none; width:100%; max-width:520px; aspect-ratio:4/3; background:rgba(0,0,0,0.05);
+                          align-items:center; justify-content:center;
+                          font-family:var(--mono); font-size:1.21rem; color:var(--gray); border:1px solid rgba(0,0,0,0.12); }
+  .lightbox-placeholder.show{ display:flex; }
+  .lightbox-caption{ max-width:520px; margin-top:1.4rem; text-align:center; }
+  .lightbox-caption .lb-name{ font-family:var(--serif); font-size:1.32rem; color:var(--ink); margin:0 0 0.4rem; }
+  .lightbox-caption .lb-room{ font-family:var(--mono); font-size:0.83rem; color:var(--gray); margin-bottom:0.5rem; }
+  .lightbox-caption .lb-bio{ font-family:var(--sans); font-size:0.97rem; line-height:1.55; color:var(--gray); margin:0.8rem 0 0; }
+  .lightbox-close{ position:absolute; top:1rem; right:1rem;
+                    background:none; border:none; cursor:pointer; padding:0.6rem; min-height:36px;
+                    font-family:var(--mono); font-size:0.79rem; color:var(--ink); }
+  .lightbox-close:hover{ opacity:0.6; }
+</style>
+
+</head>
+<body>
+
+<div class="hero">
+  <div id="map"></div>
+  <canvas id="snake-overlay"></canvas>
+  <div class="hero-title" id="hero-title">
+    <h1><span id="htl-1">Circuito de</span><br><span id="htl-2">Ateliês do Centro</span></h1>
+    <div class="hero-date" id="hero-date">18 – 19 de Setembro</div>
+  </div>
+  <div class="hero-count" id="hero-count">— endereços · — artistas</div>
+</div>
+
+<div class="switcher">
+  <button id="switch-map" class="active">mapa</button>
+  <button id="switch-list">lista</button>
+</div>
+<div class="sort-switch" id="sort-switch">
+  <button id="sort-endereco" class="active">por endereço</button>
+  <button id="sort-artista">por artista</button>
+</div>
+
+<div class="list-overlay" id="list-overlay">
+  <div class="list-modal">
+    <div class="list-head"><h2>Índice do circuito</h2></div>
+    <div class="rows" id="rows"></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <button class="drawer-close" id="drawer-close" aria-label="Fechar">fechar ×</button>
+    <div class="drawer-title" id="drawer-local">—</div>
+    <div class="drawer-addr" id="drawer-endereco">—</div>
+    <a class="drawer-directions" id="drawer-directions" href="#" target="_blank" rel="noopener">Como chegar →</a>
+  </div>
+  <div class="drawer-list" id="drawer-list"></div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <div class="lightbox-modal">
+    <button class="lightbox-close" id="lightbox-close" aria-label="Fechar imagem">fechar ×</button>
+    <img id="lightbox-img" src="" alt="">
+    <div class="lightbox-placeholder" id="lightbox-placeholder"></div>
+    <div class="lightbox-caption" id="lightbox-caption">
+      <p class="lb-name" id="lightbox-name"></p>
+      <div class="lb-room" id="lightbox-room"></div>
+      <div class="day-badges" id="lightbox-days" style="justify-content:center;"></div>
+      <p class="lb-bio" id="lightbox-bio"></p>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+/* ============================================================
+   DATA SOURCE
+   Hoje: dados embutidos (gerados a partir do documento original).
+   Depois: trocar por fetch() da planilha do Google publicada em CSV.
+   ============================================================ */
+let LOCATIONS = [];
+
+const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
+
+// simple RFC4180-ish CSV parser: handles quoted fields, embedded commas, escaped quotes ("")
+function parseCSV(text){
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (inQuotes){
+      if (c === '"'){
+        if (text[i+1] === '"'){ field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += c;
+      }
+    } else {
+      if (c === '"'){ inQuotes = true; }
+      else if (c === ','){ row.push(field); field = ''; }
+      else if (c === '\r'){ /* ignore */ }
+      else if (c === '\n'){ row.push(field); field = ''; rows.push(row); row = []; }
+      else { field += c; }
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+async function loadLocationsFromSheet(){
+  const res = await fetch(SHEET_CSV_URL);
+  if (!res.ok) throw new Error('Falha ao buscar a planilha: HTTP ' + res.status);
+  const text = await res.text();
+  const table = parseCSV(text).filter(r => r.some(c => c !== undefined && c.trim() !== ''));
+  if (table.length < 2) throw new Error('Planilha vazia ou em formato inesperado');
+
+  const headers = table[0].map(h => h.trim());
+  const hIdx = {};
+  headers.forEach((h, i) => { hIdx[h] = i; });
+  const get = (row, name) => {
+    const i = hIdx[name];
+    return (i != null && row[i] != null) ? row[i].trim() : '';
+  };
+
+  const locMap = {};
+  const order = [];
+
+  table.slice(1).forEach(row => {
+    const local = get(row, 'Local / Coletivo');
+    const endereco = get(row, 'Endereço');
+    const nome = get(row, 'Nome do Artista');
+    if (!endereco && !nome) return; // linha em branco
+
+    const instagram = get(row, 'Instagram').replace(/^@/, '');
+    const foto = get(row, 'Foto do trabalho (URL)');
+    const bio = get(row, 'Mini bio (1 parágrafo curto)');
+    const obs = get(row, 'Observações');
+    const latRaw = get(row, 'Latitude');
+    const lngRaw = get(row, 'Longitude');
+    const d18Raw = get(row, 'Presente dia 18/09 (X)');
+    const d19Raw = get(row, 'Presente dia 19/09 (X)');
+
+    const key = endereco;
+    if (!locMap[key]){
+      locMap[key] = {
+        id: 'loc' + order.length,
+        local, endereco,
+        lat: latRaw ? parseFloat(latRaw.replace(',', '.')) : null,
+        lng: lngRaw ? parseFloat(lngRaw.replace(',', '.')) : null,
+        artistas: []
+      };
+      order.push(key);
+    }
+    locMap[key].artistas.push({
+      nome, instagram, obs, foto, bio,
+      dia18: d18Raw.trim() !== '',
+      dia19: d19Raw.trim() !== ''
+    });
+  });
+
+  return order.map(k => locMap[k]);
+}
+
+function initials(name){
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0,2).toUpperCase();
+  return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
+}
+
+// Numbering shown on map pins: assigned once, in alphabetical order of the
+// space/collective name (falling back to the address when there's no name).
+// This is the exact same order used by the "por endereço" list, and the map
+// is populated once after data loads so every part of the UI agrees on the
+// same number for the same location.
+let locationNumberMap = {};
+function computeLocationNumbers(){
+  const sorted = LOCATIONS.slice()
+    .sort((a,b) => (a.local || a.endereco).localeCompare(b.local || b.endereco, 'pt-BR', { sensitivity:'base' }));
+  locationNumberMap = {};
+  sorted.forEach((loc, i) => { locationNumberMap[loc.id] = i + 1; });
+}
+function pinLabel(loc){
+  const n = locationNumberMap[loc.id];
+  return n ? String(n).padStart(2, '0') : '?';
+}
+
+function updateHeroCount(){
+  document.getElementById('hero-count').textContent =
+    `${LOCATIONS.length} endereços · ${LOCATIONS.reduce((s,l)=>s+l.artistas.length,0)} artistas`;
+}
+
+// ---------------- map (isolated in try/catch so a load failure doesn't break the rest) ----------------
+let map = null;
+const markers = {};
+function makePinIcon(label, active){
+  return L.divIcon({
+    className:'',
+    html:`<div class="pin-hit"><div class="pin${active?' active':''}">${label}</div></div>`,
+    iconSize:[40,40],
+    iconAnchor:[20,20]
+  });
+}
+
+function addMarkerForLocation(loc){
+  if (!map || loc.lat == null || loc.lng == null) return;
+  if (markers[loc.id]) return; // already placed
+  const marker = L.marker([loc.lat, loc.lng], { icon: makePinIcon(pinLabel(loc), false) }).addTo(map);
+  marker.on('click', () => openDrawer(loc.id));
+  markers[loc.id] = marker;
+}
+
+// ---------------- estações de metrô e VLT (curadas manualmente) ----------------
+// Poucas estações fixas no Centro — mais simples e confiável curar à mão do
+// que depender de mais uma API externa em tempo real no dia do evento.
+const STATIONS = [
+  { nome: 'Central',            tipo: 'metro', lat: -22.9049227, lng: -43.1908422 },
+  { nome: 'Presidente Vargas',   tipo: 'metro', lat: -22.9033525, lng: -43.186042  },
+  { nome: 'Uruguaiana',          tipo: 'metro', lat: -22.9029900, lng: -43.1817000 },
+  { nome: 'Carioca',             tipo: 'metro', lat: -22.9081555, lng: -43.1784408 },
+  { nome: 'Cinelândia',          tipo: 'metro', lat: -22.9111200, lng: -43.1756600 },
+  { nome: 'Gamboa',              tipo: 'vlt',   lat: -22.8979897, lng: -43.1993772 },
+  { nome: 'Candelária',          tipo: 'vlt',   lat: -22.9016863, lng: -43.1788611 },
+  { nome: 'Sete de Setembro',    tipo: 'vlt',   lat: -22.9052875, lng: -43.1775573 },
+  { nome: 'Carioca',             tipo: 'vlt',   lat: -22.9079900, lng: -43.1765500 },
+  { nome: 'Cinelândia',          tipo: 'vlt',   lat: -22.9105900, lng: -43.1755931 },
+  { nome: 'Praça XV',            tipo: 'vlt',   lat: -22.9021792, lng: -43.1730718 },
+];
+
+function addStationMarkers(){
+  STATIONS.forEach(st => {
+    const label = st.tipo === 'metro' ? 'M' : 'V';
+    const icon = L.divIcon({
+      className:'',
+      html:`<div class="station-hit"><div class="station-badge ${st.tipo}"><span>${label}</span></div></div>`,
+      iconSize:[28,28],
+      iconAnchor:[14,14]
+    });
+    const marker = L.marker([st.lat, st.lng], { icon, zIndexOffset:-100 }).addTo(map);
+    const tipoLabel = st.tipo === 'metro' ? 'Estação de Metrô' : 'Parada de VLT';
+    marker.bindPopup(`<strong>${st.nome}</strong><br>${tipoLabel}`, { closeButton:true });
+  });
+}
+
+function initMap(){
+  try{
+    if (typeof L === 'undefined') throw new Error('Leaflet não carregou');
+    // zoomSnap fracionário: por padrão o Leaflet só faz zoom em níveis inteiros,
+    // o que soa bem no scroll do mouse (poucos "cliques" discretos) mas engasga
+    // no trackpad, que manda uma rajada contínua de eventos — cada nível inteiro
+    // cruzado disparava um salto de zoom animado (recarregando tiles). Com
+    // zoomSnap fracionário o mapa acompanha o gesto de forma contínua.
+    // wheelPxPerZoomLevel mais baixo que o padrão (60) compensa: cada incremento
+    // fracionário passa a valer mais zoom, pra não sentir "fraquinho" no pinch.
+    map = L.map('map', { scrollWheelZoom:true, doubleClickZoom:true, zoomControl:false, zoomSnap:0.25, wheelPxPerZoomLevel:20 });
+    // enquadramento inicial: em vez de um centro/zoom fixos, calcula a partir
+    // dos pontos reais, com padding maior em cima — reserva "campo livre" pro
+    // hero title grande sem os pins ficarem embaixo dele
+    frameForSnake(false);
+    L.control.zoom({ position:'bottomright' }).addTo(map);
+
+    const LocateControl = L.Control.extend({
+      options: { position: 'bottomright' },
+      onAdd: function(){
+        const container = L.DomUtil.create('div', 'leaflet-bar locate-control');
+        const link = L.DomUtil.create('a', '', container);
+        link.href = '#';
+        link.title = 'Minha localização';
+        link.setAttribute('role', 'button');
+        link.setAttribute('aria-label', 'Centralizar o mapa na minha localização');
+        link.innerHTML = '◎';
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.on(link, 'click', (e) => { e.preventDefault(); goToUserLocation(link); });
+        return container;
+      }
+    });
+    new LocateControl().addTo(map);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19,
+      updateWhenZooming:false // evita buscar/desenhar tiles no meio da animação de zoom
+                               // (o filtro grayscale na tile-pane força re-rasterizar a
+                               // pane inteira a cada tile que chega — isso é o que causava
+                               // as pequenas travas "tipo carregando aos poucos" durante o zoom)
+    }).addTo(map);
+
+    // Duplo-toque pra dar zoom: escuta touchstart/touchend crus, direto no
+    // elemento do mapa — o Leaflet parece "engolir" o segundo toque de um
+    // duplo-toque antes que ele chegue como 'click', então precisamos ouvir
+    // no nível mais baixo possível. Cuidados: ignora gestos com mais de um
+    // dedo (pinça) e ignora toques que se moveram (arrastar o mapa).
+    const mapContainer = map.getContainer();
+    let tapStartPoint = null;
+    let lastTapTime = 0;
+    let lastTapPoint = null;
+
+    mapContainer.addEventListener('touchstart', (e) => {
+      tapStartPoint = e.touches.length === 1
+        ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+        : null;
+    }, { passive: true });
+
+    mapContainer.addEventListener('touchend', (e) => {
+      if (!tapStartPoint || e.changedTouches.length !== 1 || e.touches.length !== 0){
+        tapStartPoint = null;
+        return;
+      }
+      const touch = e.changedTouches[0];
+      const moved = Math.hypot(touch.clientX - tapStartPoint.x, touch.clientY - tapStartPoint.y);
+      tapStartPoint = null;
+      if (moved > 12) return; // foi um arrastar, não um toque
+
+      const now = Date.now();
+      const point = { x: touch.clientX, y: touch.clientY };
+      const isDoubleTap = lastTapPoint &&
+        (now - lastTapTime) < 350 &&
+        Math.hypot(point.x - lastTapPoint.x, point.y - lastTapPoint.y) < 40;
+
+      if (isDoubleTap){
+        e.preventDefault();
+        const containerPoint = map.mouseEventToContainerPoint(touch);
+        const latlng = map.containerPointToLatLng(containerPoint);
+        map.setZoomAround(latlng, map.getZoom() + 1, { animate: true });
+        lastTapTime = 0;
+        lastTapPoint = null;
+      } else {
+        lastTapTime = now;
+        lastTapPoint = point;
+      }
+    }, { passive: false });
+
+    LOCATIONS.forEach((loc) => addMarkerForLocation(loc));
+    addStationMarkers();
+    locateUserAutomatically();
+    beginSnakeIntro();
+  } catch(err){
+    console.error('Mapa indisponível:', err);
+    const mapEl = document.getElementById('map');
+    mapEl.innerHTML = '<div class="map-error">Não foi possível carregar o mapa agora.<br>A lista de endereços continua disponível.</div>';
+  }
+}
+
+// ---------------- localização do visitante ----------------
+// Automática ao carregar (sem botão) — o navegador exibe seu próprio prompt
+// nativo de permissão. Se a pessoa negar, ou o navegador não suportar, falha
+// em silêncio. Além disso, um botão no mapa permite centralizar nela quando
+// quiser, sem precisar pedir localização de novo se já a tivermos.
+let userMarker = null;
+let userLatLng = null;
+
+function placeUserMarker(latitude, longitude){
+  userLatLng = L.latLng(latitude, longitude);
+  if (userMarker){
+    userMarker.setLatLng(userLatLng);
+  } else {
+    const icon = L.divIcon({
+      className: '',
+      html: '<div class="user-dot"></div>',
+      iconSize: [16, 16],
+      iconAnchor: [8, 8]
+    });
+    userMarker = L.marker(userLatLng, { icon, zIndexOffset: 1000 }).addTo(map);
+  }
+}
+
+// Botão "minha localização": se já sabemos onde a pessoa está (localização
+// automática já resolvida), só centraliza — rápido, sem pedir de novo. Caso
+// contrário (ainda carregando, ou falhou antes), tenta obter na hora.
+function goToUserLocation(triggerEl){
+  if (!map) return;
+
+  if (userLatLng){
+    map.flyTo(userLatLng, Math.max(map.getZoom(), 16), { duration: 0.6 });
+    return;
+  }
+
+  if (!navigator.geolocation){
+    alert('Este navegador não suporta geolocalização.');
+    return;
+  }
+
+  const originalText = triggerEl ? triggerEl.innerHTML : null;
+  if (triggerEl) triggerEl.innerHTML = '···';
+
+  try{
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (triggerEl) triggerEl.innerHTML = originalText;
+        placeUserMarker(pos.coords.latitude, pos.coords.longitude);
+        map.flyTo(userLatLng, Math.max(map.getZoom(), 16), { duration: 0.6 });
+      },
+      (err) => {
+        if (triggerEl) triggerEl.innerHTML = originalText;
+        console.warn('Falha ao obter localização:', err);
+        if (err.code === err.PERMISSION_DENIED){
+          alert('Permissão de localização negada. Libere o acesso à localização para este site nas configurações do navegador.');
+        } else {
+          alert('Não foi possível obter sua localização agora. Tente novamente em instantes.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  } catch(err){
+    if (triggerEl) triggerEl.innerHTML = originalText;
+    console.warn('Geolocalização indisponível neste contexto:', err);
+  }
+}
+
+function locateUserAutomatically(){
+  if (!map || !navigator.geolocation) return;
+
+  try{
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        placeUserMarker(pos.coords.latitude, pos.coords.longitude);
+        // não move a câmera automaticamente — só mostra o ponto, sem tirar
+        // o usuário do centro do mapa que ele já está vendo
+      },
+      (err) => {
+        console.warn('Localização não disponível:', err);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  } catch(err){
+    // getCurrentPosition pode lançar de forma síncrona em contextos restritos
+    // (ex: iframe sem permissão de geolocalização) — isso não deve afetar o
+    // resto do mapa, que já está funcionando nesse ponto.
+    console.warn('Geolocalização indisponível neste contexto:', err);
+  }
+}
+
+// ---------------- geocodificação automática (fallback) ----------------
+// Para endereços novos que ainda não têm latitude/longitude preenchidas na
+// planilha, calculamos automaticamente via Nominatim (OpenStreetMap, gratuito).
+// Endereços com coordenadas já preenchidas nunca passam por aqui — isso mantém
+// o carregamento rápido para o caso comum e só busca online o que falta.
+async function geocodeAddress(query){
+  try{
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('geocode http error ' + res.status);
+    const results = await res.json();
+    if (results && results.length){
+      return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
+    }
+  } catch(err){
+    console.warn('Falha ao geocodificar endereço:', query, err);
+  }
+  return null;
+}
+
+async function resolveMissingCoordinates(){
+  const pending = LOCATIONS.filter(l =>
+    (l.lat == null || l.lng == null) && !/confirmar/i.test(l.endereco)
+  );
+  for (const loc of pending){
+    const query = `${loc.endereco}, Centro, Rio de Janeiro, Brasil`;
+    const coords = await geocodeAddress(query);
+    if (coords){
+      loc.lat = coords.lat;
+      loc.lng = coords.lng;
+      addMarkerForLocation(loc);
+      renderRows(); // atualiza a lista, tirando o endereço do estado "pendente"
+    }
+    // pequena pausa entre chamadas por educação com o serviço gratuito
+    await new Promise(r => setTimeout(r, 1100));
+  }
+}
+
+
+function setActivePin(activeId){
+  LOCATIONS.forEach((loc) => {
+    const m = markers[loc.id];
+    if (!m) return;
+    m.setIcon(makePinIcon(pinLabel(loc), loc.id === activeId));
+  });
+}
+
+// ---------------- drawer ----------------
+const overlay = document.getElementById('overlay');
+const drawer = document.getElementById('drawer');
+
+function openDrawer(locId){
+  const loc = LOCATIONS.find(l => l.id === locId);
+  if (!loc) return;
+
+  document.getElementById('drawer-local').textContent = loc.local || loc.endereco;
+  document.getElementById('drawer-endereco').textContent = loc.local ? loc.endereco : '';
+
+  const directionsLink = document.getElementById('drawer-directions');
+  if (loc.lat != null && loc.lng != null){
+    directionsLink.href = `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`;
+    directionsLink.classList.remove('hidden');
+  } else {
+    directionsLink.classList.add('hidden');
+  }
+
+  const list = document.getElementById('drawer-list');
+  list.innerHTML = '';
+
+  const grid = document.createElement('div');
+  grid.className = 'artist-grid';
+
+  loc.artistas.forEach(art => {
+    const card = document.createElement('div');
+    card.className = 'artist-card';
+
+    const photo = document.createElement('div');
+    photo.className = 'artist-photo';
+    if (art.foto){ photo.style.backgroundImage = `url('${art.foto}')`; }
+    else { photo.textContent = initials(art.nome); }
+    photo.addEventListener('click', () => openLightbox(art));
+
+    const body = document.createElement('div');
+    body.className = 'artist-body';
+
+    const name = document.createElement('p');
+    name.className = 'artist-name';
+    name.textContent = art.nome;
+
+    const meta = document.createElement('div');
+    meta.className = 'artist-meta';
+    if (art.instagram){
+      const a = document.createElement('a');
+      a.href = `https://instagram.com/${art.instagram}`;
+      a.target = '_blank'; a.rel = 'noopener';
+      a.textContent = '@' + art.instagram;
+      meta.appendChild(a);
+    }
+
+    body.appendChild(name);
+    body.appendChild(meta);
+
+    // sala/ateliê: only added to the DOM when it actually exists (no blank line otherwise)
+    if (art.obs){
+      const room = document.createElement('div');
+      room.className = 'artist-room';
+      const tag = document.createElement('span');
+      tag.className = 'artist-obs';
+      tag.textContent = art.obs;
+      room.appendChild(tag);
+      body.appendChild(room);
+    }
+
+    // dias de presença: always shown once informed
+    const badges = document.createElement('div');
+    badges.className = 'day-badges';
+    if (art.dia18 != null){
+      const b = document.createElement('span');
+      b.className = 'day-pill ' + (art.dia18 ? 'present' : 'absent');
+      b.textContent = '18/09';
+      badges.appendChild(b);
+    }
+    if (art.dia19 != null){
+      const b = document.createElement('span');
+      b.className = 'day-pill ' + (art.dia19 ? 'present' : 'absent');
+      b.textContent = '19/09';
+      badges.appendChild(b);
+    }
+    body.appendChild(badges);
+
+    card.appendChild(photo);
+    card.appendChild(body);
+
+    grid.appendChild(card);
+  });
+
+  list.appendChild(grid);
+
+  if (loc.artistas.every(a => !a.foto)){
+    const note = document.createElement('p');
+    note.className = 'photo-note';
+    note.textContent = 'Fotos dos trabalhos em breve.';
+    list.appendChild(note);
+  }
+
+  setActivePin(locId);
+  overlay.classList.add('open');
+  drawer.classList.add('open');
+}
+function closeDrawer(){
+  overlay.classList.remove('open');
+  drawer.classList.remove('open');
+  setActivePin(null);
+}
+document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+overlay.addEventListener('click', closeDrawer);
+
+// ---------------- lightbox ----------------
+const lightbox = document.getElementById('lightbox');
+const lightboxImg = document.getElementById('lightbox-img');
+const lightboxPlaceholder = document.getElementById('lightbox-placeholder');
+const lightboxName = document.getElementById('lightbox-name');
+const lightboxRoom = document.getElementById('lightbox-room');
+const lightboxDays = document.getElementById('lightbox-days');
+const lightboxBio = document.getElementById('lightbox-bio');
+function openLightbox(art){
+  if (art.foto){
+    lightboxImg.src = art.foto;
+    lightboxImg.alt = art.nome || '';
+    lightboxImg.style.display = 'block';
+    lightboxPlaceholder.classList.remove('show');
+  } else {
+    lightboxImg.style.display = 'none';
+    lightboxImg.src = '';
+    lightboxPlaceholder.textContent = initials(art.nome) + ' — sem foto ainda';
+    lightboxPlaceholder.classList.add('show');
+  }
+  lightboxName.textContent = art.nome || '';
+
+  lightboxRoom.textContent = art.obs || '';
+
+  lightboxDays.innerHTML = '';
+  if (art.dia18 != null){
+    const b = document.createElement('span');
+    b.className = 'day-pill ' + (art.dia18 ? 'present' : 'absent');
+    b.textContent = '18/09';
+    lightboxDays.appendChild(b);
+  }
+  if (art.dia19 != null){
+    const b = document.createElement('span');
+    b.className = 'day-pill ' + (art.dia19 ? 'present' : 'absent');
+    b.textContent = '19/09';
+    lightboxDays.appendChild(b);
+  }
+
+  lightboxBio.textContent = (art.bio && art.bio.trim()) ? art.bio : 'Mini bio em breve.';
+  lightbox.classList.add('open');
+}
+function closeLightbox(){
+  lightbox.classList.remove('open');
+  lightboxImg.src = '';
+}
+document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
+lightbox.addEventListener('click', (e) => { if (e.target === lightbox) closeLightbox(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLightbox(); });
+
+function goToLocation(loc){
+  setView('map');
+  if (map && loc.lat != null){
+    setTimeout(() => map.flyTo([loc.lat, loc.lng], 17, { duration:0.6 }), 50);
+  }
+  openDrawer(loc.id);
+}
+
+/* ============================================================
+   [TESTE] "cobrinha" ambiente — desenha o circuito real sobre o mapa,
+   partindo de um ponto aleatório, e some num movimento único de elástico
+   solto antes de recomeçar de outro ponto. Aparece na carga inicial
+   (mapa congelado, título grande) e some na primeira interação real;
+   volta como "screensaver" depois de 5min de inatividade (ver bloco de
+   interação mais abaixo). Reaproveita a mesma técnica de fita+texto+
+   "negativo" no título do gerador-video.html, só que projetando os
+   pontos com o próprio Leaflet (map.latLngToContainerPoint) em vez de
+   reimplementar a projeção — assim fica sempre alinhada ao mapa real.
+   ============================================================ */
+const SNAKE_LEG_DURATION = 0.32; // s — tempo de cada trecho ao desenhar
+const SNAKE_ERASE_DURATION = 3;  // s — tempo do circuito INTEIRO ao apagar, num movimento só
+function snakeEaseOutSnap(t){ return t >= 1 ? 1 : 1 - Math.pow(2, -10*t); }
+
+function snakeShuffledIndices(n){
+  const arr = Array.from({length:n}, (_,i)=>i);
+  for (let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  return arr;
+}
+function snakeBuildLegPath(a, b){
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  if (Math.random() < 0.35 || len < 90){
+    return [ { x:a.x, y:a.y }, { x:b.x, y:b.y } ];
+  }
+  const nx = -dy/len, ny = dx/len;
+  const side = Math.random() < 0.5 ? 1 : -1;
+  const offset = len * (0.08 + Math.random()*0.14) * side;
+  const mx = (a.x+b.x)/2 + nx*offset;
+  const my = (a.y+b.y)/2 + ny*offset;
+  const N = Math.max(18, Math.round(len/16));
+  const pts = [];
+  for (let i=0;i<=N;i++){
+    const t = i/N;
+    const it = 1-t;
+    pts.push({ x: it*it*a.x + 2*it*t*mx + t*t*b.x, y: it*it*a.y + 2*it*t*my + t*t*b.y });
+  }
+  return pts;
+}
+function snakePathLength(points){
+  let len = 0;
+  for (let i=1;i<points.length;i++) len += Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+  return len;
+}
+function snakePointAtDistance(points, dist){
+  let d = 0;
+  for (let i = 1; i < points.length; i++){
+    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+    if (d + seg >= dist){
+      const t = seg === 0 ? 0 : (dist-d)/seg;
+      return {
+        x: points[i-1].x + (points[i].x-points[i-1].x)*t,
+        y: points[i-1].y + (points[i].y-points[i-1].y)*t,
+        angle: Math.atan2(points[i].y-points[i-1].y, points[i].x-points[i-1].x)
+      };
+    }
+    d += seg;
+  }
+  const last = points[points.length-1];
+  return { x:last.x, y:last.y, angle:0 };
+}
+function snakeSubPathUpTo(points, dist){
+  const out = [points[0]];
+  let d = 0;
+  for (let i = 1; i < points.length; i++){
+    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+    if (d + seg >= dist){
+      const t = seg === 0 ? 0 : (dist-d)/seg;
+      out.push({ x: points[i-1].x + (points[i].x-points[i-1].x)*t, y: points[i-1].y + (points[i].y-points[i-1].y)*t });
+      return out;
+    }
+    out.push(points[i]);
+    d += seg;
+  }
+  return out;
+}
+function snakeSubPathFrom(points, dist){
+  if (dist <= 0) return points;
+  let d = 0;
+  for (let i = 1; i < points.length; i++){
+    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+    if (d + seg >= dist){
+      const t = seg === 0 ? 0 : (dist-d)/seg;
+      const cut = { x: points[i-1].x + (points[i].x-points[i-1].x)*t, y: points[i-1].y + (points[i].y-points[i-1].y)*t };
+      return [cut, ...points.slice(i)];
+    }
+    d += seg;
+  }
+  return [points[points.length-1]];
+}
+function snakeExtractRange(points, dStart, dEnd){
+  return snakeSubPathFrom(snakeSubPathUpTo(points, dEnd), dStart);
+}
+function snakeFlattenLegs(legs){
+  const out = [];
+  legs.forEach(leg => { if (leg.length) out.push(...(out.length ? leg.slice(1) : leg)); });
+  return out;
+}
+function snakeTotalLegsLength(legs){ return legs.reduce((s,leg) => s + snakePathLength(leg), 0); }
+
+// enquadra o mapa a partir dos pontos reais, com padding maior em cima —
+// deixa "campo livre" pro hero title grande sem os pins ficarem por baixo
+// dele. animate:true é usado quando o screensaver reenquadra depois da
+// pessoa ter navegado o mapa livremente.
+function frameForSnake(animate){
+  const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
+  if (withCoords.length < 2){
+    map.setView([-22.9065, -43.1795], 15, { animate: !!animate });
+    return;
+  }
+  const bounds = L.latLngBounds(withCoords.map(l => [l.lat, l.lng]));
+  map.fitBounds(bounds, {
+    paddingTopLeft: [30, 220],
+    paddingBottomRight: [30, 50],
+    animate: !!animate,
+    duration: 1.1
+  });
+}
+
+function freezeMapForSnake(){
+  map.dragging.disable();
+  map.scrollWheelZoom.disable();
+  map.doubleClickZoom.disable();
+  if (map.touchZoom) map.touchZoom.disable();
+}
+function unfreezeMap(){
+  map.dragging.enable();
+  map.scrollWheelZoom.enable();
+  map.doubleClickZoom.enable();
+  if (map.touchZoom) map.touchZoom.enable();
+}
+
+const snakeCanvas = document.getElementById('snake-overlay');
+const snakeCtx = snakeCanvas.getContext('2d');
+let snakeDPR = 1, snakeW = 0, snakeH = 0;
+function resizeSnakeCanvas(){
+  snakeDPR = Math.min(window.devicePixelRatio || 1, 3);
+  snakeW = window.innerWidth;
+  snakeH = window.innerHeight;
+  snakeCanvas.width = snakeW * snakeDPR;
+  snakeCanvas.height = snakeH * snakeDPR;
+  snakeCtx.setTransform(snakeDPR, 0, 0, snakeDPR, 0, 0);
+}
+window.addEventListener('resize', () => { resizeSnakeCanvas(); if (snakeActive) drawSnakeFrame(); });
+
+function snakeStrokeWidth(){
+  return Math.max(8, Math.min(24, Math.min(window.innerWidth, window.innerHeight) * 0.026));
+}
+function collectSnakeScreenPoints(){
+  return LOCATIONS
+    .filter(l => l.lat != null && l.lng != null)
+    .map(l => map.latLngToContainerPoint([l.lat, l.lng]));
+}
+function buildSnakeLegs(){
+  const pts = collectSnakeScreenPoints();
+  if (pts.length < 2) return [];
+  const order = snakeShuffledIndices(pts.length);
+  const legs = [];
+  for (let i = 1; i < order.length; i++) legs.push(snakeBuildLegPath(pts[order[i-1]], pts[order[i]]));
+  return legs;
+}
+
+let snakeActive = false;
+let snakeLegs = [], snakeFlat = [], snakeLegOffsets = [];
+let snakeTotal = 0, snakeLegIndex = 0, snakeLegElapsed = 0, snakeEraseElapsed = 0;
+let snakeProgress = 0, snakeErase = 0;
+let snakePhase = 'drawing'; // drawing | erasing
+let snakeRafId = null, snakeLastTs = null;
+
+function startSnakeCycle(){
+  snakeLegs = buildSnakeLegs();
+  if (snakeLegs.length < 1) return; // ainda sem pontos suficientes com coordenada
+  snakeFlat = snakeFlattenLegs(snakeLegs);
+  snakeTotal = snakeTotalLegsLength(snakeLegs);
+  snakeLegOffsets = [];
+  let acc = 0;
+  snakeLegs.forEach(leg => { snakeLegOffsets.push(acc); acc += snakePathLength(leg); });
+  snakeLegIndex = 0; snakeLegElapsed = 0; snakeEraseElapsed = 0;
+  snakeProgress = 0; snakeErase = 0;
+  snakePhase = 'drawing';
+  snakeLastTs = null;
+  if (!snakeRafId) snakeRafId = requestAnimationFrame(snakeLoop);
+}
+
+function advanceSnakeLegs(dt){
+  snakeLegElapsed += dt;
+  let t = Math.min(1, snakeLegElapsed / SNAKE_LEG_DURATION);
+  while (t >= 1 && snakeLegIndex < snakeLegs.length - 1){
+    snakeLegIndex++;
+    snakeLegElapsed -= SNAKE_LEG_DURATION;
+    t = Math.min(1, Math.max(0, snakeLegElapsed) / SNAKE_LEG_DURATION);
+  }
+  const legLen = snakePathLength(snakeLegs[snakeLegIndex]);
+  const dist = snakeLegOffsets[snakeLegIndex] + snakeEaseOutSnap(t) * legLen;
+  const finished = t >= 1 && snakeLegIndex === snakeLegs.length - 1;
+  return { dist, finished };
+}
+
+function snakeLoop(ts){
+  if (!snakeActive){ snakeRafId = null; return; }
+  snakeRafId = requestAnimationFrame(snakeLoop);
+  if (snakeLastTs == null) snakeLastTs = ts;
+  const dt = Math.min(0.1, (ts - snakeLastTs) / 1000);
+  snakeLastTs = ts;
+
+  if (snakePhase === 'drawing'){
+    const { dist, finished } = advanceSnakeLegs(dt);
+    snakeProgress = dist;
+    if (finished){ snakePhase = 'erasing'; snakeEraseElapsed = 0; }
+  } else {
+    snakeEraseElapsed += dt;
+    const t = Math.min(1, snakeEraseElapsed / SNAKE_ERASE_DURATION);
+    snakeErase = snakeEaseOutSnap(t) * snakeTotal;
+    if (t >= 1){ startSnakeCycle(); return; }
+  }
+  drawSnakeFrame();
+}
+
+function snakeStrokeLegsInRange(ctx2d, legs, dStart, dEnd, strokeWidth){
+  let offset = 0;
+  legs.forEach(leg => {
+    if (leg.length < 2) return;
+    const legLen = snakePathLength(leg);
+    const localStart = Math.max(0, dStart - offset);
+    const localEnd = Math.min(legLen, dEnd - offset);
+    if (localEnd > localStart){
+      const sub = snakeExtractRange(leg, localStart, localEnd);
+      if (sub.length >= 2){
+        ctx2d.lineWidth = strokeWidth;
+        ctx2d.lineCap = 'round'; ctx2d.lineJoin = 'round';
+        ctx2d.strokeStyle = '#111';
+        ctx2d.beginPath();
+        sub.forEach((p,i) => { if (i===0) ctx2d.moveTo(p.x,p.y); else ctx2d.lineTo(p.x,p.y); });
+        ctx2d.stroke();
+      }
+    }
+    offset += legLen;
+  });
+}
+// o #map tem isolation:isolate (corrige um bug antigo de z-index durante
+// zoom — ver CLAUDE.md) e isso faz o mapa inteiro (tiles + pins) virar uma
+// única camada vista de fora. Como o canvas da cobrinha fica por cima dessa
+// camada inteira, os pins reais do Leaflet ficariam escondidos atrás do
+// traço. Solução: redesenhar réplicas dos pins (mesmo visual, mesmas
+// coordenadas) por cima do traço neste mesmo canvas — os pins de verdade
+// continuam lá, intocados, só temporariamente "cobertos" por uma cópia sua.
+function snakeDrawPins(ctx2d){
+  LOCATIONS.forEach(loc => {
+    if (loc.lat == null || loc.lng == null) return;
+    const p = map.latLngToContainerPoint([loc.lat, loc.lng]);
+    const label = String(locationNumberMap[loc.id] || '?').padStart(2, '0');
+    ctx2d.beginPath();
+    ctx2d.arc(p.x, p.y, 12, 0, Math.PI*2);
+    ctx2d.fillStyle = '#111';
+    ctx2d.fill();
+    ctx2d.lineWidth = 1.5;
+    ctx2d.strokeStyle = '#fff';
+    ctx2d.stroke();
+    ctx2d.fillStyle = '#fff';
+    ctx2d.font = "10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+    ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'middle';
+    ctx2d.fillText(label, p.x, p.y + 0.5);
+  });
+  STATIONS.forEach(st => {
+    const p = map.latLngToContainerPoint([st.lat, st.lng]);
+    ctx2d.beginPath();
+    ctx2d.arc(p.x, p.y, 10, 0, Math.PI*2);
+    ctx2d.fillStyle = st.tipo === 'metro' ? '#1565C0' : '#0F3D7A';
+    ctx2d.fill();
+    ctx2d.lineWidth = 2;
+    ctx2d.strokeStyle = '#fff';
+    ctx2d.stroke();
+    ctx2d.fillStyle = '#fff';
+    ctx2d.font = "bold 9px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+    ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'middle';
+    ctx2d.fillText(st.tipo === 'metro' ? 'M' : 'V', p.x, p.y + 0.5);
+  });
+  ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'alphabetic';
+}
+
+function drawSnakeFrame(){
+  snakeCtx.clearRect(0, 0, snakeW, snakeH);
+  if (!snakeActive || !snakeLegs.length) return;
+  const strokeWidth = snakeStrokeWidth();
+  const dStart = snakePhase === 'erasing' ? snakeErase : 0;
+  const dEnd = snakePhase === 'erasing' ? snakeTotal : snakeProgress;
+
+  // [TESTE] escurece o quadro pra reduzir a "informação" do mapa por baixo
+  // e destacar o traço branco por cima
+  snakeCtx.fillStyle = 'rgba(0,0,0,0.5)';
+  snakeCtx.fillRect(0, 0, snakeW, snakeH);
+
+  snakeStrokeLegsInRange(snakeCtx, snakeLegs, dStart, dEnd, strokeWidth);
+
+  if (snakePhase === 'drawing' && snakeProgress < snakeTotal){
+    const head = snakePointAtDistance(snakeFlat, snakeProgress);
+    const pulse = 1 + Math.sin(performance.now()/260) * 0.18;
+    snakeCtx.beginPath();
+    snakeCtx.arc(head.x, head.y, strokeWidth*0.45*pulse, 0, Math.PI*2);
+    snakeCtx.fillStyle = 'rgba(255,255,255,0.3)';
+    snakeCtx.fill();
+    snakeCtx.beginPath();
+    snakeCtx.arc(head.x, head.y, strokeWidth*0.2, 0, Math.PI*2);
+    snakeCtx.fillStyle = '#fff';
+    snakeCtx.fill();
+  }
+
+  snakeDrawPins(snakeCtx);
+}
+
+function stopSnake(){
+  snakeActive = false;
+  if (snakeRafId){ cancelAnimationFrame(snakeRafId); snakeRafId = null; }
+  snakeCtx.clearRect(0, 0, snakeW, snakeH);
+}
+// chamado uma vez no boot, logo depois do mapa/marcadores existirem — a
+// view já foi enquadrada dentro do próprio initMap() via frameForSnake(false)
+function beginSnakeIntro(){
+  resizeSnakeCanvas();
+  snakeActive = true;
+  freezeMapForSnake();
+  startSnakeCycle();
+}
+// screensaver: reaparece depois de 5min parado — reenquadra (a pessoa pode
+// ter navegado o mapa livremente) e faz o título grande "voltar"
+function beginScreensaver(){
+  heroShrunk = false;
+  heroTitle.classList.remove('shrunk');
+  armInteractionListeners();
+  frameForSnake(true);
+  snakeActive = true;
+  freezeMapForSnake();
+  startSnakeCycle();
+}
+
+// ---------------- hero title: starts large (fixed CSS breakpoint sizes), shrinks to the corner on first interaction ----------------
+const heroTitle = document.getElementById('hero-title');
+let heroShrunk = false;
+
+// primeira interação real (mapa+título grande / screensaver): encolhe o
+// título, some com a cobrinha e libera o mapa pra navegação normal — tudo
+// no mesmo gatilho, porque semanticamente é o mesmo evento ("a pessoa
+// começou a usar o site de verdade"). Reatachável, porque o screensaver
+// precisa rearmar esse mesmo comportamento depois de cada vez que aparece.
+function onFirstInteraction(e){
+  // ignora eventos sintéticos (disparados por script, não por uma ação real
+  // da pessoa) — algumas extensões de navegador injetam eventos de teclado
+  // na página, e isso não deve contar como "o usuário interagiu".
+  if (e && e.isTrusted === false) return;
+  if (!heroShrunk){
+    heroShrunk = true;
+    heroTitle.classList.add('shrunk');
+  }
+  if (snakeActive){
+    stopSnake();
+    unfreezeMap();
+  }
+  document.removeEventListener('pointerdown', onFirstInteraction);
+  document.removeEventListener('wheel', onFirstInteraction);
+  document.removeEventListener('keydown', onFirstInteraction);
+  resetInactivityTimer();
+}
+function armInteractionListeners(){
+  document.addEventListener('pointerdown', onFirstInteraction, { passive:true });
+  document.addEventListener('wheel', onFirstInteraction, { passive:true });
+  document.addEventListener('keydown', onFirstInteraction);
+}
+armInteractionListeners();
+
+// ---------------- inatividade (5 min) → cobrinha volta como "screensaver" ----------------
+// qualquer interação real reseta a contagem; se algo estiver aberto (drawer,
+// lightbox, lista) quando os 5 min completarem, não conta como inatividade —
+// só tenta de novo mais adiante.
+const INACTIVITY_MS = 5 * 60 * 1000;
+let inactivityTimer = null;
+function anythingOpen(){
+  return overlay.classList.contains('open') || listOverlay.classList.contains('open') || lightbox.classList.contains('open');
+}
+function resetInactivityTimer(){
+  clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(tryStartScreensaver, INACTIVITY_MS);
+}
+function tryStartScreensaver(){
+  if (anythingOpen()){ resetInactivityTimer(); return; }
+  beginScreensaver();
+}
+['pointerdown','wheel','keydown','touchstart'].forEach(evt => {
+  document.addEventListener(evt, (e) => { if (e && e.isTrusted === false) return; resetInactivityTimer(); }, { passive:true });
+});
+resetInactivityTimer();
+
+// ---------------- view switch (mapa / lista) ----------------
+const listOverlay = document.getElementById('list-overlay');
+const switchMapBtn = document.getElementById('switch-map');
+const switchListBtn = document.getElementById('switch-list');
+const sortSwitch = document.getElementById('sort-switch');
+const sortEnderecoBtn = document.getElementById('sort-endereco');
+const sortArtistaBtn = document.getElementById('sort-artista');
+
+let currentView = 'map';
+let currentSort = 'endereco';
+
+function setView(v){
+  currentView = v;
+  const isList = v === 'list';
+  listOverlay.classList.toggle('open', isList);
+  switchMapBtn.classList.toggle('active', !isList);
+  switchListBtn.classList.toggle('active', isList);
+  sortSwitch.classList.toggle('visible', isList);
+}
+function setSort(s){
+  currentSort = s;
+  sortEnderecoBtn.classList.toggle('active', s === 'endereco');
+  sortArtistaBtn.classList.toggle('active', s === 'artista');
+  renderRows();
+}
+
+switchMapBtn.addEventListener('click', () => setView('map'));
+switchListBtn.addEventListener('click', () => setView('list'));
+sortEnderecoBtn.addEventListener('click', () => setSort('endereco'));
+sortArtistaBtn.addEventListener('click', () => setSort('artista'));
+
+// ---------------- rows rendering ----------------
+const rowsEl = document.getElementById('rows');
+
+function renderRowsByEndereco(){
+  rowsEl.innerHTML = '';
+  const sorted = LOCATIONS
+    .map((loc) => loc)
+    .sort((a,b) => (a.local || a.endereco).localeCompare(b.local || b.endereco, 'pt-BR', { sensitivity:'base' }));
+
+  sorted.forEach((loc) => {
+    const btn = document.createElement('button');
+    btn.className = 'row' + (loc.lat == null ? ' pending' : '');
+    btn.innerHTML = `
+      <span class="row-num">${pinLabel(loc)}</span>
+      <span class="row-main">
+        <span class="row-title">${loc.local || loc.endereco}</span>
+        ${loc.local ? `<span class="row-sub">${loc.endereco}</span>` : ''}
+      </span>
+      <span class="row-count">${loc.artistas.length}</span>
+    `;
+    btn.addEventListener('click', () => goToLocation(loc));
+    rowsEl.appendChild(btn);
+  });
+}
+
+function renderRowsByArtista(){
+  rowsEl.innerHTML = '';
+  let flat = [];
+  LOCATIONS.forEach((loc) => {
+    loc.artistas.forEach(art => {
+      flat.push({ nome: art.nome, instagram: art.instagram, loc });
+    });
+  });
+  flat.sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity:'base' }));
+
+  flat.forEach((entry) => {
+    const btn = document.createElement('button');
+    btn.className = 'row' + (entry.loc.lat == null ? ' pending' : '');
+    btn.innerHTML = `
+      <span class="row-main">
+        <span class="row-title">${entry.nome}</span>
+        <span class="row-sub">${entry.loc.local || entry.loc.endereco}</span>
+      </span>
+      <span class="row-count">${entry.instagram ? '@'+entry.instagram : ''}</span>
+    `;
+    btn.addEventListener('click', () => goToLocation(entry.loc));
+    rowsEl.appendChild(btn);
+  });
+}
+
+function renderRows(){
+  if (currentSort === 'endereco') renderRowsByEndereco();
+  else renderRowsByArtista();
+}
+
+async function boot(){
+  try{
+    LOCATIONS = await loadLocationsFromSheet();
+  } catch(err){
+    console.error('Falha ao carregar a planilha:', err);
+    document.getElementById('map').innerHTML =
+      '<div class="map-error">Não foi possível carregar os dados da planilha agora.<br>Tente recarregar a página em instantes.</div>';
+    document.getElementById('rows').innerHTML =
+      '<p style="font-family:var(--mono);font-size:0.88rem;color:var(--gray);padding:1rem 0.2rem;">Não foi possível carregar os dados agora.</p>';
+    return;
+  }
+  updateHeroCount();
+  computeLocationNumbers();
+  initMap();
+  resolveMissingCoordinates();
+  renderRows();
+}
+boot();
+</script>
+</body>
+</html>
