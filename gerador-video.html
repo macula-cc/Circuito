@@ -1,0 +1,994 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Gerador de Vídeo — Circuito de Ateliês do Centro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --serif: 'Instrument Serif', Georgia, 'Iowan Old Style', 'Times New Roman', ui-serif, serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --ink:#111; --line: rgba(0,0,0,0.15); --gray:#6b6b6b; --hover:#f0f0f0; --paper:#fff;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; color:var(--ink); font-family:var(--sans); background:var(--paper); }
+  a{ color:inherit; text-decoration:none; }
+  button, select{ font:inherit; touch-action:manipulation; }
+
+  .nav{ display:flex; gap:2px; font-family:var(--mono); font-size:0.75rem;
+        background:#f4f4f4; border:1px solid var(--line); border-radius:999px; padding:3px; width:max-content; margin-bottom:1.6rem; }
+  .nav a{ padding:0.5rem 0.9rem; border-radius:999px; color:var(--gray); }
+  .nav a.active{ background:#111; color:#fff; }
+  .nav a:not(.active):hover{ background:var(--hover); color:var(--ink); }
+
+  .wrap{ display:grid; grid-template-columns:400px 1fr; min-height:100vh; }
+  @media (max-width:900px){ .wrap{ grid-template-columns:1fr; } }
+
+  .panel{ padding:calc(1.6rem + env(safe-area-inset-top)) 1.6rem 2rem; border-right:1px solid var(--line);
+          overflow-y:auto; max-height:100vh; }
+  @media (max-width:900px){ .panel{ border-right:none; border-bottom:1px solid var(--line); max-height:none; } }
+
+  h1{ font-family:var(--serif); font-weight:400; font-size:2.1rem; line-height:1.05; margin:0 0 0.2rem; }
+  .sub{ font-family:var(--mono); font-size:0.79rem; color:var(--gray); margin-bottom:1.6rem; }
+
+  .field{ margin-bottom:1.6rem; }
+  .field label{ display:block; font-family:var(--mono); font-size:0.73rem; text-transform:uppercase;
+                letter-spacing:0.04em; color:var(--gray); margin-bottom:0.5rem; }
+
+  .row-btns{ display:flex; gap:0.5rem; flex-wrap:wrap; }
+  .btn{ font-family:var(--mono); font-size:0.79rem; background:#fff; color:var(--ink); border:1px solid var(--ink);
+        padding:0.6rem 0.9rem; cursor:pointer; border-radius:0; transition:background 0.15s ease, color 0.15s ease; }
+  .btn:hover{ background:var(--ink); color:#fff; }
+  .btn.active{ background:var(--ink); color:#fff; }
+  .btn.primary{ background:var(--ink); color:#fff; flex:1; padding:0.85rem; font-size:0.83rem; }
+  .btn.primary:hover{ opacity:0.8; }
+  .btn:disabled{ opacity:0.35; cursor:default; pointer-events:none; }
+
+  .divider{ border:none; border-top:1px solid var(--line); margin:1.8rem 0; }
+
+  .status{ font-family:var(--mono); font-size:0.75rem; color:var(--gray); margin-top:0.9rem; min-height:1.2em; line-height:1.4; }
+  .status.error{ color:#9A3324; }
+  .note{ font-family:var(--mono); font-size:0.73rem; color:var(--gray); line-height:1.4; }
+
+  .stage{ display:flex; align-items:center; justify-content:center; padding:2.4rem; }
+  .canvas-frame{ width:min(74vh, 100%); max-width:640px; aspect-ratio:1/1; border:1px solid var(--line);
+                 box-shadow:0 12px 40px rgba(0,0,0,0.08); background:#fff; position:relative; }
+  #art{ width:100%; height:100%; display:block; }
+  .rec-dot{ position:absolute; top:14px; right:14px; width:10px; height:10px; border-radius:50%; background:#c0392b;
+            box-shadow:0 0 0 3px rgba(192,57,43,0.25); display:none; animation:rec-pulse 1.1s ease-in-out infinite; }
+  .rec-dot.on{ display:block; }
+  @keyframes rec-pulse{ 0%,100%{ opacity:1; } 50%{ opacity:0.3; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="nav">
+      <a href="ferramentas.html">ferramentas</a>
+      <a href="gerador-marca.html">marca</a>
+      <a href="gerador-mascara.html">post</a>
+      <a href="gerador-video.html" class="active">vídeo</a>
+    </div>
+
+    <h1>Gerador de<br>Vídeo</h1>
+    <div class="sub">Circuito de Ateliês do Centro</div>
+
+    <div class="field">
+      <label>Tipo de vídeo</label>
+      <div class="row-btns" id="tipo-row">
+        <button class="btn active" id="tipo-marcas" data-tipo="marcas">troca de marcas</button>
+        <button class="btn" id="tipo-circuito" data-tipo="circuito">cobrinha</button>
+      </div>
+      <div class="note" id="tipo-note" style="margin-top:0.6rem;"></div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="field">
+      <label>Mapa</label>
+      <div class="row-btns">
+        <button class="btn active" id="map-on">mostrar mapa</button>
+        <button class="btn" id="map-off">esconder mapa</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Pontos dos ateliês</label>
+      <div class="row-btns">
+        <button class="btn active" id="pins-on">mostrar</button>
+        <button class="btn" id="pins-off">esconder</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Marca</label>
+      <div class="row-btns">
+        <button class="btn active" id="text-on">com texto</button>
+        <button class="btn" id="text-off">sem texto</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Título do evento</label>
+      <div class="row-btns">
+        <button class="btn active" id="title-on">mostrar</button>
+        <button class="btn" id="title-off">esconder</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Infos secundárias</label>
+      <div class="note" style="margin-bottom:0.5rem;">data e números de endereços e artistas</div>
+      <div class="row-btns">
+        <button class="btn active" id="stats-on">mostrar</button>
+        <button class="btn" id="stats-off">esconder</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Fundo</label>
+      <div class="row-btns">
+        <button class="btn active" id="bg-branco">branco</button>
+        <button class="btn" id="bg-cinza">cinza</button>
+        <button class="btn" id="bg-preto">preto</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Preenchimento</label>
+      <div class="row-btns">
+        <button class="btn active" id="fill-solido">sólido</button>
+        <button class="btn" id="fill-degrade">degradê</button>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="field">
+      <label>Prévia / exportação</label>
+      <div class="row-btns">
+        <button class="btn" id="btn-restart">reiniciar prévia</button>
+        <button class="btn primary" id="btn-gerar-video">gerar vídeo</button>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="canvas-frame">
+      <canvas id="art" width="1000" height="1000"></canvas>
+      <div class="rec-dot" id="rec-dot"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   dados
+   ============================================================ */
+const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
+const LOGICAL = 1000;
+const EVENT_TITLE = 'Circuito de Ateliês do Centro';
+const EVENT_DATES = '18 – 19 de Setembro';
+const MARGIN = 60;
+const EVT_TITLE_L1 = 'Circuito de';
+const EVT_TITLE_L2 = 'Ateliês do Centro';
+const EVT_TITLE_SIZE = 92;
+const EVT_TITLE_Y1 = 126;
+const EVT_TITLE_Y2 = 213;
+const MAP_BOX = { x: 0, y: 0, w: LOGICAL, h: LOGICAL };
+const MARK_WIDTH = 30;
+const STATS_SIZE = 40;
+const STATS_Y1 = 884;
+const STATS_Y2 = 930;
+const DATE_Y = STATS_Y2;
+
+function parseCSV(text){
+  const rows = []; let row = []; let field = ''; let inQuotes = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (inQuotes){
+      if (c === '"'){ if (text[i+1] === '"'){ field += '"'; i++; } else { inQuotes = false; } }
+      else { field += c; }
+    } else {
+      if (c === '"'){ inQuotes = true; }
+      else if (c === ','){ row.push(field); field = ''; }
+      else if (c === '\r'){ /* ignore */ }
+      else if (c === '\n'){ row.push(field); field = ''; rows.push(row); row = []; }
+      else { field += c; }
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+async function loadLocationsFromSheet(){
+  const res = await fetch(SHEET_CSV_URL);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const text = await res.text();
+  const table = parseCSV(text).filter(r => r.some(c => c !== undefined && c.trim() !== ''));
+  if (table.length < 2) throw new Error('planilha vazia');
+  const headers = table[0].map(h => h.trim());
+  const hIdx = {}; headers.forEach((h,i)=>hIdx[h]=i);
+  const get = (row, name) => { const i = hIdx[name]; return (i!=null && row[i]!=null) ? row[i].trim() : ''; };
+  const locMap = {}; const order = [];
+  table.slice(1).forEach(row => {
+    const local = get(row,'Local / Coletivo');
+    const endereco = get(row,'Endereço');
+    const nome = get(row,'Nome do Artista');
+    if (!endereco && !nome) return;
+    const latRaw = get(row,'Latitude');
+    const lngRaw = get(row,'Longitude');
+    const key = endereco;
+    if (!locMap[key]){
+      locMap[key] = {
+        id: 'loc' + order.length, local, endereco,
+        lat: latRaw ? parseFloat(latRaw.replace(',', '.')) : null,
+        lng: lngRaw ? parseFloat(lngRaw.replace(',', '.')) : null,
+        artistas: []
+      };
+      order.push(key);
+    }
+    if (nome) locMap[key].artistas.push(nome);
+  });
+  return order.map(k => locMap[k]);
+}
+
+/* ============================================================
+   geometria com mapa real (mercator + tiles) — mesma matemática
+   usada no index.html e no gerador de post, pra que a posição dos
+   pontos faça sentido geograficamente
+   ============================================================ */
+function expandBounds(b, factor){
+  const cLat = (b.minLat+b.maxLat)/2, cLng = (b.minLng+b.maxLng)/2;
+  const spanLat = Math.max((b.maxLat-b.minLat)*factor, 0.002);
+  const spanLng = Math.max((b.maxLng-b.minLng)*factor, 0.002);
+  return { minLat:cLat-spanLat/2, maxLat:cLat+spanLat/2, minLng:cLng-spanLng/2, maxLng:cLng+spanLng/2 };
+}
+const TILE_SIZE = 256;
+const TILE_URL = (z,x,y,s) => `https://${s}.basemaps.cartocdn.com/light_all/${z}/${x}/${y}.png`;
+const SUBS = ['a','b','c','d'];
+
+function mercProject(lat, lon, zoom){
+  const scale = Math.pow(2, zoom);
+  const x = (lon + 180) / 360 * scale;
+  const rad = lat * Math.PI/180;
+  const y = (1 - Math.log(Math.tan(rad) + 1/Math.cos(rad)) / Math.PI) / 2 * scale;
+  return { x, y };
+}
+function fitZoom(bounds, boxW, boxH, margin){
+  for (let z = 19; z >= 2; z--){
+    const p1 = mercProject(bounds.maxLat, bounds.minLng, z);
+    const p2 = mercProject(bounds.minLat, bounds.maxLng, z);
+    const pxW = (p2.x - p1.x) * TILE_SIZE;
+    const pxH = (p2.y - p1.y) * TILE_SIZE;
+    if (pxW <= (boxW - margin*2) && pxH <= (boxH - margin*2)) return z;
+  }
+  return 2;
+}
+let proj = null; // { zoom, originX, originY, tile }
+function computeProjection(bounds){
+  const expanded = expandBounds(bounds, 1.0);
+  const zoom = fitZoom(expanded, MAP_BOX.w, MAP_BOX.h, 45);
+  const p1 = mercProject(expanded.maxLat, expanded.minLng, zoom);
+  const p2 = mercProject(expanded.minLat, expanded.maxLng, zoom);
+  const pxW = (p2.x - p1.x) * TILE_SIZE;
+  const pxH = (p2.y - p1.y) * TILE_SIZE;
+  const scale = Math.min(8, Math.max(1, Math.min((MAP_BOX.w-90)/pxW, (MAP_BOX.h-90)/pxH)));
+  const tile = TILE_SIZE * scale;
+  const cLat = (expanded.minLat+expanded.maxLat)/2, cLng = (expanded.minLng+expanded.maxLng)/2;
+  const center = mercProject(cLat, cLng, zoom);
+  const originX = center.x - (MAP_BOX.w/2)/tile;
+  const originY = center.y - (MAP_BOX.h/2)/tile;
+  proj = { zoom, originX, originY, tile };
+}
+function pixelOf(lat, lon){
+  const p = mercProject(lat, lon, proj.zoom);
+  return { x: MAP_BOX.x + (p.x - proj.originX)*proj.tile, y: MAP_BOX.y + (p.y - proj.originY)*proj.tile };
+}
+
+let basemapCanvas = null;
+let basemapLoading = false;
+async function fetchBasemapTiles(){
+  if (basemapCanvas || basemapLoading) return;
+  basemapLoading = true;
+  const { zoom, originX, originY, tile } = proj;
+  const off = document.createElement('canvas');
+  off.width = MAP_BOX.w; off.height = MAP_BOX.h;
+  const octx = off.getContext('2d');
+  octx.fillStyle = '#e9e9e9'; octx.fillRect(0,0,MAP_BOX.w,MAP_BOX.h);
+
+  const txStart = Math.floor(originX), txEnd = Math.floor(originX + MAP_BOX.w/tile);
+  const tyStart = Math.floor(originY), tyEnd = Math.floor(originY + MAP_BOX.h/tile);
+  const maxTile = Math.pow(2, zoom);
+  const jobs = [];
+  for (let tx = txStart; tx <= txEnd; tx++){
+    for (let ty = tyStart; ty <= tyEnd; ty++){
+      if (ty < 0 || ty >= maxTile) continue;
+      const wrappedX = ((tx % maxTile) + maxTile) % maxTile;
+      const sub = SUBS[Math.abs(tx+ty) % SUBS.length];
+      const url = TILE_URL(zoom, wrappedX, ty, sub);
+      const px = (tx - originX) * tile - MAP_BOX.x;
+      const py = (ty - originY) * tile - MAP_BOX.y;
+      jobs.push(new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => { try{ octx.drawImage(img, px + MAP_BOX.x, py + MAP_BOX.y, tile, tile); }catch(e){} resolve(); };
+        img.onerror = () => resolve();
+        img.src = url;
+      }));
+    }
+  }
+  await Promise.all(jobs);
+  try{
+    const imgData = octx.getImageData(0,0,MAP_BOX.w,MAP_BOX.h);
+    const d = imgData.data;
+    for (let i=0;i<d.length;i+=4){
+      const v = d[i]*0.3 + d[i+1]*0.59 + d[i+2]*0.11;
+      const c = Math.min(255, (v-128)*1.08+128*1.03);
+      d[i]=d[i+1]=d[i+2]=c;
+    }
+    octx.putImageData(imgData,0,0);
+  } catch(e){
+    console.warn('Não foi possível aplicar o tom de cinza (possível restrição de CORS dos tiles):', e);
+  }
+  basemapCanvas = off;
+  basemapLoading = false;
+}
+
+/* ============================================================
+   caminho reto/curvo entre dois pontos, comprimento, sub-trechos
+   ============================================================ */
+function computeFitTransform(points, box, fillFraction){
+  const xs = points.map(p=>p.x), ys = points.map(p=>p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const w = (maxX-minX) || 1, h = (maxY-minY) || 1;
+  const scale = Math.min(box.w*fillFraction/w, box.h*fillFraction/h);
+  const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
+  const boxCx = box.x + box.w/2, boxCy = box.y + box.h/2;
+  return { scale, cx, cy, boxCx, boxCy };
+}
+function applyFitTransform(points, t){
+  return points.map(p => ({ x: t.boxCx + (p.x-t.cx)*t.scale, y: t.boxCy + (p.y-t.cy)*t.scale }));
+}
+function buildLegPath(a, b){
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  if (Math.random() < 0.35 || len < 90){
+    return [ { x:a.x, y:a.y }, { x:b.x, y:b.y } ];
+  }
+  const nx = -dy/len, ny = dx/len;
+  const side = Math.random() < 0.5 ? 1 : -1;
+  const offset = len * (0.08 + Math.random()*0.14) * side;
+  const mx = (a.x+b.x)/2 + nx*offset;
+  const my = (a.y+b.y)/2 + ny*offset;
+  const N = Math.max(18, Math.round(len/16));
+  const pts = [];
+  for (let i=0;i<=N;i++){
+    const t = i/N;
+    const it = 1-t;
+    pts.push({
+      x: it*it*a.x + 2*it*t*mx + t*t*b.x,
+      y: it*it*a.y + 2*it*t*my + t*t*b.y
+    });
+  }
+  return pts;
+}
+function pathLength(points){
+  let len = 0;
+  for (let i=1;i<points.length;i++) len += Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+  return len;
+}
+function pointAtDistance(points, dist){
+  let d = 0;
+  for (let i = 1; i < points.length; i++){
+    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+    if (d + seg >= dist){
+      const t = seg === 0 ? 0 : (dist-d)/seg;
+      return {
+        x: points[i-1].x + (points[i].x-points[i-1].x)*t,
+        y: points[i-1].y + (points[i].y-points[i-1].y)*t,
+        angle: Math.atan2(points[i].y-points[i-1].y, points[i].x-points[i-1].x)
+      };
+    }
+    d += seg;
+  }
+  const last = points[points.length-1];
+  return { x:last.x, y:last.y, angle:0 };
+}
+// sub-trecho do INÍCIO até `dist`
+function subPathUpTo(points, dist){
+  const out = [points[0]];
+  let d = 0;
+  for (let i = 1; i < points.length; i++){
+    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+    if (d + seg >= dist){
+      const t = seg === 0 ? 0 : (dist-d)/seg;
+      out.push({ x: points[i-1].x + (points[i].x-points[i-1].x)*t, y: points[i-1].y + (points[i].y-points[i-1].y)*t });
+      return out;
+    }
+    out.push(points[i]);
+    d += seg;
+  }
+  return out;
+}
+// sub-trecho de `dist` até o FIM — o espelho do de cima; é o que permite
+// "apagar" o traço a partir do ponto onde a cobrinha começou a desenhar
+function subPathFrom(points, dist){
+  if (dist <= 0) return points;
+  let d = 0;
+  for (let i = 1; i < points.length; i++){
+    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+    if (d + seg >= dist){
+      const t = seg === 0 ? 0 : (dist-d)/seg;
+      const cut = { x: points[i-1].x + (points[i].x-points[i-1].x)*t, y: points[i-1].y + (points[i].y-points[i-1].y)*t };
+      return [cut, ...points.slice(i)];
+    }
+    d += seg;
+  }
+  return [points[points.length-1]];
+}
+// trecho visível entre duas distâncias absolutas ao longo do caminho
+function extractRange(points, dStart, dEnd){
+  return subPathFrom(subPathUpTo(points, dEnd), dStart);
+}
+function shuffledIndices(n){
+  const arr = Array.from({length:n}, (_,i)=>i);
+  for (let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  return arr;
+}
+
+/* ============================================================
+   temas de cor (compartilhados com o gerador de post)
+   ============================================================ */
+const THEMES = {
+  branco: { bg:'#ffffff', ink:'#111111', sub:'#6b6b6b', mark:'#111111' },
+  cinza:  { bg:'#d8d8d6', ink:'#111111', sub:'#55524f', mark:'#111111' },
+  preto:  { bg:'#111111', ink:'#ffffff', sub:'#b5b5b3', mark:'#ffffff' }
+};
+let currentTheme = 'branco';
+let markFill = 'solido'; // solido | degrade
+
+/* ============================================================
+   estado geral
+   ============================================================ */
+let LOCATIONS = [];
+let PTS = []; // { x, y, id }
+let alphaNum = {};
+let numAddresses = 0;
+let numArtists = 0;
+let showMap = true;
+let showPins = true;
+let showText = true;
+let showTitle = true;
+let showStats = true;
+let videoTipo = 'marcas'; // marcas | circuito
+
+const canvas = document.getElementById('art');
+const ctx = canvas.getContext('2d');
+// grava/desenha numa resolução real maior que a lógica (LOGICAL=1000) —
+// todo o layout continua em coordenadas de 0 a 1000, o ctx.scale só faz
+// cada pixel lógico virar vários pixels reais, pro vídeo exportado sair nítido
+const RENDER_SCALE = 2;
+canvas.width = LOGICAL * RENDER_SCALE;
+canvas.height = LOGICAL * RENDER_SCALE;
+ctx.scale(RENDER_SCALE, RENDER_SCALE);
+const statusEl = document.getElementById('status');
+const recDot = document.getElementById('rec-dot');
+const btnGerarVideo = document.getElementById('btn-gerar-video');
+const btnRestart = document.getElementById('btn-restart');
+const tipoNote = document.getElementById('tipo-note');
+
+function setStatus(msg, isError){
+  statusEl.textContent = msg || '';
+  statusEl.classList.toggle('error', !!isError);
+}
+
+/* ---- toggles compartilhados ---- */
+function wireToggle(onId, offId, setter, extra){
+  const onBtn = document.getElementById(onId), offBtn = document.getElementById(offId);
+  onBtn.addEventListener('click', () => { setter(true); onBtn.classList.add('active'); offBtn.classList.remove('active'); if (extra) extra(true); redrawNow(); });
+  offBtn.addEventListener('click', () => { setter(false); offBtn.classList.add('active'); onBtn.classList.remove('active'); if (extra) extra(false); redrawNow(); });
+}
+wireToggle('pins-on','pins-off', v => showPins = v);
+wireToggle('text-on','text-off', v => showText = v);
+wireToggle('title-on','title-off', v => showTitle = v);
+wireToggle('stats-on','stats-off', v => showStats = v);
+wireToggle('map-on','map-off', v => showMap = v, async (v) => {
+  if (v && !basemapCanvas){
+    setStatus('carregando mapa…');
+    await fetchBasemapTiles();
+    setStatus('');
+  }
+});
+
+const fillSolidoBtn = document.getElementById('fill-solido');
+const fillDegradeBtn = document.getElementById('fill-degrade');
+fillSolidoBtn.addEventListener('click', () => { markFill='solido'; fillSolidoBtn.classList.add('active'); fillDegradeBtn.classList.remove('active'); redrawNow(); });
+fillDegradeBtn.addEventListener('click', () => { markFill='degrade'; fillDegradeBtn.classList.add('active'); fillSolidoBtn.classList.remove('active'); redrawNow(); });
+
+const bgBtns = { branco: document.getElementById('bg-branco'), cinza: document.getElementById('bg-cinza'), preto: document.getElementById('bg-preto') };
+Object.keys(bgBtns).forEach(key => {
+  bgBtns[key].addEventListener('click', () => {
+    currentTheme = key;
+    Object.keys(bgBtns).forEach(k => bgBtns[k].classList.toggle('active', k === key));
+    redrawNow();
+  });
+});
+
+/* ============================================================
+   camadas compartilhadas (base, título, infos, pontos)
+   ============================================================ */
+function drawBaseLayer(ctx2d){
+  const theme = THEMES[currentTheme];
+  ctx2d.clearRect(0, 0, LOGICAL, LOGICAL);
+  ctx2d.fillStyle = theme.bg;
+  ctx2d.fillRect(0, 0, LOGICAL, LOGICAL);
+  if (showMap && basemapCanvas) ctx2d.drawImage(basemapCanvas, 0, 0, LOGICAL, LOGICAL);
+}
+function drawTitleLayer(ctx2d){
+  if (!showTitle) return;
+  const theme = THEMES[currentTheme];
+  ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'alphabetic';
+  ctx2d.fillStyle = theme.ink;
+  ctx2d.font = `${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
+  ctx2d.fillText(EVT_TITLE_L1, MARGIN, EVT_TITLE_Y1);
+  ctx2d.fillText(EVT_TITLE_L2, MARGIN, EVT_TITLE_Y2);
+}
+function drawStatsLayer(ctx2d){
+  if (!showStats) return;
+  const theme = THEMES[currentTheme];
+  ctx2d.textAlign = 'left';
+  ctx2d.fillStyle = theme.ink;
+  ctx2d.font = `${STATS_SIZE}px 'Instrument Serif', Georgia, serif`;
+  ctx2d.fillText(`${numAddresses} Endereços`, MARGIN, STATS_Y1);
+  ctx2d.fillText(`${numArtists} Artistas`, MARGIN, STATS_Y2);
+  ctx2d.textAlign = 'right';
+  ctx2d.fillText(EVENT_DATES, LOGICAL - MARGIN, DATE_Y);
+  ctx2d.textAlign = 'left';
+}
+function drawPinsLayer(ctx2d){
+  if (!showPins) return;
+  const theme = THEMES[currentTheme];
+  PTS.forEach((p) => {
+    ctx2d.beginPath();
+    ctx2d.arc(p.x, p.y, 15, 0, Math.PI*2);
+    ctx2d.fillStyle = theme.mark;
+    ctx2d.fill();
+    ctx2d.lineWidth = 2.2;
+    ctx2d.strokeStyle = theme.bg;
+    ctx2d.stroke();
+    ctx2d.fillStyle = theme.bg;
+    ctx2d.font = "12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+    ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'middle';
+    ctx2d.fillText(String(alphaNum[p.id]).padStart(2,'0'), p.x, p.y+0.5);
+    ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'alphabetic';
+  });
+}
+// "negativo": onde a fita cruza o título, revela o título na cor do fundo —
+// como se a fita fosse uma máscara pra uma versão invertida do texto por baixo
+function applyTitleNegativeMask(ctx2d, visiblePoints){
+  if (!showTitle || !visiblePoints || visiblePoints.length < 2) return;
+  const theme = THEMES[currentTheme];
+  const off = document.createElement('canvas');
+  off.width = LOGICAL; off.height = LOGICAL;
+  const octx = off.getContext('2d');
+  octx.fillStyle = theme.bg;
+  octx.textAlign = 'left'; octx.textBaseline = 'alphabetic';
+  octx.font = `${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
+  octx.fillText(EVT_TITLE_L1, MARGIN, EVT_TITLE_Y1);
+  octx.fillText(EVT_TITLE_L2, MARGIN, EVT_TITLE_Y2);
+  octx.globalCompositeOperation = 'destination-in';
+  octx.lineWidth = MARK_WIDTH;
+  octx.lineCap = 'round';
+  octx.lineJoin = 'round';
+  octx.strokeStyle = '#000';
+  octx.beginPath();
+  visiblePoints.forEach((p, i) => { if (i === 0) octx.moveTo(p.x, p.y); else octx.lineTo(p.x, p.y); });
+  octx.stroke();
+  ctx2d.drawImage(off, 0, 0, LOGICAL, LOGICAL);
+}
+// texto seguindo o caminho, calculado sempre a partir da distância absoluta
+// 0..total — assim, ao "apagar" o começo (dStart > 0), os caracteres que
+// continuam visíveis não mudam de posição (sem reflow)
+function drawTextAlongRange(ctx2d, text, points, fontSize, dStart, dEnd, color){
+  const total = pathLength(points);
+  if (total < fontSize) return;
+  ctx2d.font = `${fontSize}px 'Instrument Serif', Georgia, serif`;
+  ctx2d.fillStyle = color;
+  const unit = text + '   ·   ';
+  let d = 0, safety = 0, uidx = 0;
+  while (d < total && safety < 4000){
+    const ch = unit[uidx % unit.length];
+    const w = ctx2d.measureText(ch).width;
+    if (d >= dStart && d <= dEnd){
+      const pt = pointAtDistance(points, d);
+      ctx2d.save();
+      ctx2d.translate(pt.x, pt.y);
+      ctx2d.rotate(pt.angle);
+      ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'middle';
+      ctx2d.fillText(ch, 0, 0);
+      ctx2d.restore();
+    }
+    d += w; uidx++; safety++;
+  }
+}
+// desenha as pernas (legs) de uma marca, cada uma só na faixa visível
+// [dStart,dEnd] — usado tanto na "troca de marcas" (dStart=0) quanto no
+// "circuito vivo" (dStart avança conforme a cobrinha se apaga)
+function strokeLegsInRange(ctx2d, legs, dStart, dEnd){
+  const theme = THEMES[currentTheme];
+  let offset = 0;
+  legs.forEach(leg => {
+    if (leg.length < 2) { return; }
+    const legLen = pathLength(leg);
+    const localStart = Math.max(0, dStart - offset);
+    const localEnd = Math.min(legLen, dEnd - offset);
+    if (localEnd > localStart){
+      const sub = extractRange(leg, localStart, localEnd);
+      if (sub.length >= 2){
+        ctx2d.lineWidth = MARK_WIDTH;
+        ctx2d.lineCap = 'round';
+        ctx2d.lineJoin = 'round';
+        if (markFill === 'degrade'){
+          const a = leg[0], b = leg[leg.length-1];
+          const grad = ctx2d.createLinearGradient(a.x, a.y, b.x, b.y);
+          grad.addColorStop(0, '#000000');
+          grad.addColorStop(1, '#ffffff');
+          ctx2d.strokeStyle = grad;
+        } else {
+          ctx2d.strokeStyle = theme.mark;
+        }
+        ctx2d.beginPath();
+        sub.forEach((p,i) => { if (i===0) ctx2d.moveTo(p.x,p.y); else ctx2d.lineTo(p.x,p.y); });
+        ctx2d.stroke();
+      }
+    }
+    offset += legLen;
+  });
+}
+function flattenLegs(legs){
+  const out = [];
+  legs.forEach(leg => { if (leg.length) out.push(...(out.length ? leg.slice(1) : leg)); });
+  return out;
+}
+function totalLegsLength(legs){ return legs.reduce((s,leg) => s + pathLength(leg), 0); }
+
+/* ============================================================
+   tipo 1 — "troca de marcas": mesma lógica de antes (marca
+   fechada aleatória, fit numa caixa, trocando a cada 500ms)
+   ============================================================ */
+const SLIDE_COUNT = 20;
+const SLIDE_MS = 500;
+
+function buildRandomMark(){
+  const order = [...PTS].sort(() => Math.random()-0.5);
+  const closed = [...order, order[0]];
+  const rawLegs = [];
+  for (let i = 1; i < closed.length; i++) rawLegs.push(buildLegPath(closed[i-1], closed[i]));
+  const pts = [ { x: closed[0].x, y: closed[0].y } ];
+  rawLegs.forEach(leg => leg.slice(1).forEach(p => pts.push(p)));
+  const t = computeFitTransform(pts, MAP_BOX, 0.94);
+  return rawLegs.map(leg => applyFitTransform(leg, t));
+}
+
+let currentMarcaLegs = null;
+function drawMarcasFrame(ctx2d, legs){
+  currentMarcaLegs = legs;
+  drawBaseLayer(ctx2d);
+  drawTitleLayer(ctx2d);
+  const total = totalLegsLength(legs);
+  strokeLegsInRange(ctx2d, legs, 0, total);
+  const flat = flattenLegs(legs);
+  if (showText) drawTextAlongRange(ctx2d, EVENT_TITLE, flat, 20, 0, total, THEMES[currentTheme].bg);
+  applyTitleNegativeMask(ctx2d, flat);
+  drawPinsLayer(ctx2d);
+  drawStatsLayer(ctx2d);
+}
+
+let marcasTimer = null;
+function startMarcasPreview(){
+  stopAllLoops();
+  const first = buildRandomMark();
+  drawMarcasFrame(ctx, first);
+  marcasTimer = setInterval(() => drawMarcasFrame(ctx, buildRandomMark()), SLIDE_MS);
+}
+
+/* ============================================================
+   tipo 2 — "circuito vivo": a cobrinha começa a se desenhar já
+   saindo de um dos pontos do mapa (sem entrar de fora da tela) e,
+   ao terminar, se apaga a partir do ponto onde começou — quando
+   some por completo, recomeça de outro ponto aleatório.
+   Desenhar continua trecho a trecho, cada um "estalando" no seu
+   próprio tempo (ease-out forte, tipo elástico sendo esticado aos
+   poucos). Apagar é o oposto: o circuito inteiro some de uma vez só,
+   num movimento único e rápido — como o elástico já tensionado
+   sendo solto de verdade, não vários pedacinhos soltando um a um.
+   ============================================================ */
+const LEG_DURATION = 0.32; // s — tempo de cada trecho ao desenhar (independe da distância real)
+const ERASE_DURATION = 3; // s — tempo do circuito INTEIRO ao apagar, num movimento só
+const CIRCUITO_RECORD_CYCLES = 5; // ao gravar vídeo, dura o equivalente a 5 circuitos completos (desenha+apaga)
+function easeOutSnap(t){ return t >= 1 ? 1 : 1 - Math.pow(2, -10*t); } // dispara rápido, desacelera forte no fim
+
+function buildTourLegs(){
+  const order = shuffledIndices(PTS.length);
+  const legs = [];
+  for (let i = 1; i < order.length; i++) legs.push(buildLegPath(PTS[order[i-1]], PTS[order[i]]));
+  return legs;
+}
+
+let circuitoLegs = [];
+let circuitoFlat = [];
+let circuitoTotal = 0;
+let circuitoLegOffsets = []; // distância acumulada até o início de cada trecho
+let circuitoLegIndex = 0;
+let circuitoLegElapsed = 0; // segundos decorridos no trecho atual (fase de desenho)
+let circuitoEraseElapsed = 0; // segundos decorridos apagando o circuito inteiro (fase de apagar)
+let circuitoProgress = 0; // distância absoluta revelada (fase de desenho)
+let circuitoErase = 0;    // distância absoluta consumida a partir do início (fase de apagar)
+let circuitoPhase = 'drawing'; // drawing | erasing
+let circuitoRafId = null;
+let circuitoLastTs = null;
+let circuitoRecording = false;
+let circuitoCyclesRemaining = 0; // quantos ciclos (desenha+apaga) ainda faltam gravar
+let circuitoOnCycleEnd = null; // callback chamado quando termina o ÚLTIMO ciclo gravado
+
+function startCircuitoCycle(){
+  circuitoLegs = buildTourLegs();
+  circuitoFlat = flattenLegs(circuitoLegs);
+  circuitoTotal = totalLegsLength(circuitoLegs);
+  circuitoLegOffsets = [];
+  let acc = 0;
+  circuitoLegs.forEach(leg => { circuitoLegOffsets.push(acc); acc += pathLength(leg); });
+  circuitoLegIndex = 0;
+  circuitoLegElapsed = 0;
+  circuitoEraseElapsed = 0;
+  circuitoProgress = 0;
+  circuitoErase = 0;
+  circuitoPhase = 'drawing';
+  circuitoLastTs = null;
+  if (!circuitoRafId) circuitoRafId = requestAnimationFrame(circuitoLoop);
+}
+
+// avança o trecho/tempo atual da fase de desenho e devolve a distância
+// absoluta já revelada até agora, mais um aviso de quando o último
+// trecho terminou seu estalo
+function advanceLegs(dt){
+  circuitoLegElapsed += dt;
+  let t = Math.min(1, circuitoLegElapsed / LEG_DURATION);
+  while (t >= 1 && circuitoLegIndex < circuitoLegs.length - 1){
+    circuitoLegIndex++;
+    circuitoLegElapsed -= LEG_DURATION;
+    t = Math.min(1, Math.max(0, circuitoLegElapsed) / LEG_DURATION);
+  }
+  const legLen = pathLength(circuitoLegs[circuitoLegIndex]);
+  const dist = circuitoLegOffsets[circuitoLegIndex] + easeOutSnap(t) * legLen;
+  const finished = t >= 1 && circuitoLegIndex === circuitoLegs.length - 1;
+  return { dist, finished };
+}
+
+function circuitoLoop(ts){
+  circuitoRafId = requestAnimationFrame(circuitoLoop);
+  if (circuitoLastTs == null) circuitoLastTs = ts;
+  const dt = Math.min(0.1, (ts - circuitoLastTs) / 1000);
+  circuitoLastTs = ts;
+
+  if (circuitoPhase === 'drawing'){
+    const { dist, finished } = advanceLegs(dt);
+    circuitoProgress = dist;
+    if (finished){
+      circuitoPhase = 'erasing';
+      circuitoEraseElapsed = 0;
+    }
+  } else {
+    circuitoEraseElapsed += dt;
+    const t = Math.min(1, circuitoEraseElapsed / ERASE_DURATION);
+    circuitoErase = easeOutSnap(t) * circuitoTotal;
+    if (t >= 1){
+      if (circuitoRecording){
+        circuitoCyclesRemaining--;
+        if (circuitoCyclesRemaining <= 0){
+          cancelAnimationFrame(circuitoRafId); circuitoRafId = null;
+          circuitoErase = circuitoTotal;
+          drawCircuitoFrame();
+          if (circuitoOnCycleEnd) circuitoOnCycleEnd();
+          return;
+        }
+      }
+      startCircuitoCycle();
+      return;
+    }
+  }
+  drawCircuitoFrame();
+}
+
+function drawCircuitoFrame(){
+  const dStart = circuitoPhase === 'erasing' ? circuitoErase : 0;
+  const dEnd = circuitoPhase === 'erasing' ? circuitoTotal : circuitoProgress;
+  drawBaseLayer(ctx);
+  drawTitleLayer(ctx);
+  strokeLegsInRange(ctx, circuitoLegs, dStart, dEnd);
+  if (showText) drawTextAlongRange(ctx, EVENT_TITLE, circuitoFlat, 20, dStart, dEnd, THEMES[currentTheme].bg);
+  const visible = extractRange(circuitoFlat, dStart, dEnd);
+  applyTitleNegativeMask(ctx, visible);
+  drawPinsLayer(ctx);
+  drawStatsLayer(ctx);
+
+  if (circuitoPhase === 'drawing' && circuitoProgress < circuitoTotal){
+    const head = pointAtDistance(circuitoFlat, circuitoProgress);
+    const pulse = 1 + Math.sin(performance.now()/260) * 0.18;
+    ctx.beginPath();
+    ctx.arc(head.x, head.y, 11*pulse, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(head.x, head.y, 5.5, 0, Math.PI*2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+  }
+}
+
+/* ============================================================
+   troca entre tipos + reinício da prévia
+   ============================================================ */
+function stopAllLoops(){
+  if (marcasTimer){ clearInterval(marcasTimer); marcasTimer = null; }
+  if (circuitoRafId){ cancelAnimationFrame(circuitoRafId); circuitoRafId = null; }
+}
+function redrawNow(){
+  if (videoTipo === 'marcas' && currentMarcaLegs) drawMarcasFrame(ctx, currentMarcaLegs);
+  // no modo circuito o próprio rAF já redesenha a cada quadro
+}
+function startPreview(){
+  stopAllLoops();
+  circuitoRecording = false;
+  if (videoTipo === 'marcas') startMarcasPreview();
+  else startCircuitoCycle();
+}
+
+const tipoMarcasBtn = document.getElementById('tipo-marcas');
+const tipoCircuitoBtn = document.getElementById('tipo-circuito');
+function setVideoTipo(t){
+  videoTipo = t;
+  tipoMarcasBtn.classList.toggle('active', t === 'marcas');
+  tipoCircuitoBtn.classList.toggle('active', t === 'circuito');
+  tipoNote.textContent = t === 'marcas'
+    ? 'marcas fechadas aleatórias, trocando a cada meio segundo — como um gif.'
+    : 'a cobrinha desenha o circuito real no mapa, do começo ao fim, depois se apaga a partir de onde começou e recomeça de outro ponto.';
+  startPreview();
+}
+document.getElementById('tipo-row').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-tipo]');
+  if (!btn) return;
+  setVideoTipo(btn.dataset.tipo);
+});
+btnRestart.addEventListener('click', () => startPreview());
+
+/* ============================================================
+   gravação (compartilhada pelos dois tipos)
+   ============================================================ */
+btnGerarVideo.addEventListener('click', () => {
+  if (!('MediaRecorder' in window)){
+    setStatus('Este navegador não suporta gravação de vídeo (tente no Chrome ou Firefox).', true);
+    return;
+  }
+  stopAllLoops();
+
+  let stream, recorder, isMp4 = false;
+  try{
+    stream = canvas.captureStream(30);
+    const mimeCandidates = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+    const mimeType = mimeCandidates.find(m => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || '';
+    isMp4 = mimeType.indexOf('mp4') === 0;
+    // bitrate alto de propósito — sem isso o MediaRecorder escolhe uma taxa
+    // baixa por padrão, que borra bastante o texto fino da fita no vídeo final
+    const recOptions = { videoBitsPerSecond: 16000000 };
+    if (mimeType) recOptions.mimeType = mimeType;
+    recorder = new MediaRecorder(stream, recOptions);
+  } catch(err){
+    setStatus('Não foi possível iniciar a gravação neste navegador.', true);
+    return;
+  }
+
+  const chunks = [];
+  recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+  recorder.onstop = () => {
+    recDot.classList.remove('on');
+    btnGerarVideo.disabled = false;
+    const ext = isMp4 ? 'mp4' : 'webm';
+    const blob = new Blob(chunks, { type: isMp4 ? 'video/mp4' : 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `circuito-video-${videoTipo}.${ext}`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    setStatus(isMp4
+      ? 'vídeo pronto (.mp4) — já dá pra postar direto no Instagram.'
+      : 'vídeo pronto (.webm) — esse navegador só grava nesse formato; talvez precise converter pra .mp4 antes de postar (o Safari grava .mp4 direto).');
+    startPreview();
+  };
+
+  btnGerarVideo.disabled = true;
+  recDot.classList.add('on');
+  setStatus('gravando o vídeo…');
+
+  if (videoTipo === 'marcas'){
+    const slides = [];
+    for (let i = 0; i < SLIDE_COUNT; i++) slides.push(buildRandomMark());
+    recorder.start();
+    let i = 0;
+    drawMarcasFrame(ctx, slides[0]);
+    const interval = setInterval(() => {
+      i++;
+      if (i >= SLIDE_COUNT){ clearInterval(interval); recorder.stop(); return; }
+      drawMarcasFrame(ctx, slides[i]);
+    }, SLIDE_MS);
+  } else {
+    circuitoRecording = true;
+    circuitoCyclesRemaining = CIRCUITO_RECORD_CYCLES;
+    circuitoOnCycleEnd = () => recorder.stop();
+    recorder.start();
+    startCircuitoCycle();
+  }
+});
+
+/* ============================================================
+   boot
+   ============================================================ */
+async function boot(){
+  try{
+    await Promise.all([
+      document.fonts.load(`${EVT_TITLE_SIZE}px 'Instrument Serif'`),
+      document.fonts.load(`${STATS_SIZE}px 'Instrument Serif'`),
+      document.fonts.load("20px 'Instrument Serif'")
+    ]);
+  } catch(e){}
+  try{
+    LOCATIONS = await loadLocationsFromSheet();
+  } catch(err){
+    console.error(err);
+    setStatus('Não foi possível carregar os dados da planilha agora. Recarregue a página em instantes.', true);
+    return;
+  }
+
+  const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
+  if (withCoords.length < 3){
+    setStatus('poucos ateliês com coordenadas preenchidas ainda — é preciso pelo menos 3 pra fechar um circuito.', true);
+    return;
+  }
+  const bounds = {
+    minLat: Math.min(...withCoords.map(l=>l.lat)),
+    maxLat: Math.max(...withCoords.map(l=>l.lat)),
+    minLng: Math.min(...withCoords.map(l=>l.lng)),
+    maxLng: Math.max(...withCoords.map(l=>l.lng)),
+  };
+  computeProjection(bounds);
+  PTS = withCoords.map(loc => ({ ...pixelOf(loc.lat, loc.lng), id: loc.id }));
+
+  const sortedForNum = [...withCoords].sort((a,b) =>
+    (a.local||a.endereco).localeCompare(b.local||b.endereco, 'pt-BR', {sensitivity:'base'}));
+  alphaNum = {};
+  sortedForNum.forEach((loc,i) => { alphaNum[loc.id] = i+1; });
+
+  numAddresses = LOCATIONS.length;
+  numArtists = LOCATIONS.reduce((sum, l) => sum + l.artistas.length, 0);
+
+  if (showMap){
+    setStatus('carregando mapa…');
+    await fetchBasemapTiles();
+    setStatus('');
+  }
+
+  setVideoTipo('marcas');
+}
+boot();
+</script>
+</body>
+</html>

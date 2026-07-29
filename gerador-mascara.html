@@ -70,6 +70,7 @@
       <a href="ferramentas.html">ferramentas</a>
       <a href="gerador-marca.html">marca</a>
       <a href="gerador-mascara.html" class="active">post</a>
+      <a href="gerador-video.html">vídeo</a>
     </div>
 
     <h1>Gerador de<br>Post</h1>
@@ -128,14 +129,7 @@
           <button class="btn" id="evt-text-off">sem texto</button>
         </div>
         <div class="row-btns" style="margin-top:0.5rem;">
-          <button class="btn active" id="evt-mark-static">imagem estática</button>
-          <button class="btn" id="evt-mark-video">vídeo</button>
-        </div>
-        <div class="row-btns" style="margin-top:0.5rem;" id="evt-static-row">
           <button class="btn" id="btn-evt-new-mark" style="flex:1;">gerar nova marca</button>
-        </div>
-        <div class="row-btns" style="margin-top:0.5rem; display:none;" id="evt-video-row">
-          <button class="btn primary" id="btn-evt-video" style="flex:1;">gerar vídeo</button>
         </div>
       </div>
 
@@ -537,7 +531,6 @@ let mode = 'artista'; // artista | evento
 let showMapEvt = true;
 let showPinsEvt = true;
 let showTextEvt = true;
-let markModeEvt = 'estatica'; // estatica | video
 
 const svgEl = document.getElementById('art');
 const eventCanvas = document.getElementById('event-canvas');
@@ -737,22 +730,6 @@ const evtPinsOffBtn = document.getElementById('evt-pins-off');
 evtPinsOnBtn.addEventListener('click', () => { showPinsEvt = true; evtPinsOnBtn.classList.add('active'); evtPinsOffBtn.classList.remove('active'); redrawEvent(); });
 evtPinsOffBtn.addEventListener('click', () => { showPinsEvt = false; evtPinsOffBtn.classList.add('active'); evtPinsOnBtn.classList.remove('active'); redrawEvent(); });
 
-const evtMarkStaticBtn = document.getElementById('evt-mark-static');
-const evtMarkVideoBtn = document.getElementById('evt-mark-video');
-const evtStaticRow = document.getElementById('evt-static-row');
-const evtVideoRow = document.getElementById('evt-video-row');
-evtMarkStaticBtn.addEventListener('click', () => {
-  markModeEvt = 'estatica';
-  evtMarkStaticBtn.classList.add('active'); evtMarkVideoBtn.classList.remove('active');
-  evtStaticRow.style.display = 'flex'; evtVideoRow.style.display = 'none';
-  redrawEvent();
-});
-evtMarkVideoBtn.addEventListener('click', () => {
-  markModeEvt = 'video';
-  evtMarkVideoBtn.classList.add('active'); evtMarkStaticBtn.classList.remove('active');
-  evtStaticRow.style.display = 'none'; evtVideoRow.style.display = 'flex';
-});
-
 function generateNewEventMark(){
   const order = [...PTS_EVT].sort(() => Math.random()-0.5);
   const closed = [...order, order[0]];
@@ -902,81 +879,6 @@ function redrawEvent(){
 function markPathForFrame(){
   return evtMarkLegs.length >= 1 ? evtMarkLegs : null;
 }
-
-/* ---- vídeo do post do evento: anda ponto a ponto, sem modais, uma
-   volta só, no ritmo real (sem duração fixa) ---- */
-const btnEvtVideo = document.getElementById('btn-evt-video');
-
-const EVT_SLIDE_COUNT = 20;
-const EVT_SLIDE_MS = 500;
-
-function buildRandomEventMark(){
-  const order = [...PTS_EVT].sort(() => Math.random()-0.5);
-  const closed = [...order, order[0]];
-  const rawLegs = [];
-  for (let i = 1; i < closed.length; i++) rawLegs.push(buildLegPath(closed[i-1], closed[i]));
-  const pts = [ { x: closed[0].x, y: closed[0].y } ];
-  rawLegs.forEach(leg => leg.slice(1).forEach(p => pts.push(p)));
-  const t = computeFitTransform(pts, EVT_MAP_BOX, 0.94);
-  return rawLegs.map(leg => applyFitTransform(leg, t));
-}
-
-btnEvtVideo.addEventListener('click', () => {
-  if (!('MediaRecorder' in window)){
-    setStatus('Este navegador não suporta gravação de vídeo (tente no Chrome ou Firefox).', true);
-    return;
-  }
-
-  // 20 marcas aleatórias prontas de antemão — cada uma some pra próxima
-  // de uma vez, sem transição, como 20 cliques em "gerar nova"
-  const slides = [];
-  for (let i = 0; i < EVT_SLIDE_COUNT; i++) slides.push(buildRandomEventMark());
-
-  let stream, recorder, isMp4 = false;
-  try{
-    stream = eventCanvas.captureStream(30);
-    // mp4 primeiro — já sai pronto pro Instagram; webm é o único formato
-    // que a maioria dos navegadores desktop consegue gravar nativamente
-    const mimeCandidates = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
-    const mimeType = mimeCandidates.find(m => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || '';
-    isMp4 = mimeType.indexOf('mp4') === 0 || mimeType.indexOf('video/mp4') === 0;
-    recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-  } catch(err){
-    setStatus('Não foi possível iniciar a gravação neste navegador.', true);
-    return;
-  }
-
-  const chunks = [];
-  recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
-  recorder.onstop = () => {
-    const ext = isMp4 ? 'mp4' : 'webm';
-    const blob = new Blob(chunks, { type: isMp4 ? 'video/mp4' : 'video/webm' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `circuito-post-evento.${ext}`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-    setStatus(isMp4
-      ? 'vídeo pronto (.mp4) — já dá pra postar direto no Instagram.'
-      : 'vídeo pronto (.webm) — esse navegador só grava nesse formato; talvez precise converter pra .mp4 antes de postar no Instagram (o Safari grava .mp4 direto).');
-    redrawEvent();
-  };
-
-  setStatus('gravando o vídeo do evento…');
-  recorder.start();
-
-  let i = 0;
-  drawEventFrame(ectx, totalLegsLength(slides[0]), slides[0]);
-  const interval = setInterval(() => {
-    i++;
-    if (i >= EVT_SLIDE_COUNT){
-      clearInterval(interval);
-      recorder.stop();
-      return;
-    }
-    drawEventFrame(ectx, totalLegsLength(slides[i]), slides[i]);
-  }, EVT_SLIDE_MS);
-});
 
 /* ============================================================
    exportação (compartilhada — ramifica por modo)
