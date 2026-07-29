@@ -303,6 +303,7 @@
   <canvas id="snake-overlay"></canvas>
   <div class="hero-title" id="hero-title">
     <h1><span id="htl-1">Circuito de</span><br><span id="htl-2">Ateliês do Centro</span></h1>
+    <div class="hero-date">Ateliês abertos</div>
     <div class="hero-date" id="hero-date">18 – 19 de Setembro</div>
   </div>
   <div class="hero-count" id="hero-count">— endereços · — artistas</div>
@@ -1212,7 +1213,7 @@ function drawSnakeFrame(){
 
   // [TESTE] escurece o quadro pra reduzir a "informação" do mapa por baixo
   // e destacar o traço branco por cima
-  snakeCtx.fillStyle = 'rgba(0,0,0,0.5)';
+  snakeCtx.fillStyle = 'rgba(0,0,0,0.7)';
   snakeCtx.fillRect(0, 0, snakeW, snakeH);
 
   snakeStrokeLegsInRange(snakeCtx, snakeLegs, dStart, dEnd, strokeWidth);

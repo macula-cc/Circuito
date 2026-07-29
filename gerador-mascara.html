@@ -182,6 +182,7 @@ const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXp
 const LOGICAL = 1000;
 const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap";
 const EVENT_TITLE = 'Circuito de Ateliês do Centro';
+const EVENT_EYEBROW = 'Ateliês abertos';
 const EVENT_DATES = '18 – 19 de Setembro';
 
 // layout — post do artista
@@ -659,7 +660,8 @@ function buildContentSVG(){
   }
   const textX = MARK_BOX.x + MARK_BOX.w + 26;
   s += `<text x="${textX}" y="${MARK_BOX.y+52}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE}" fill="${theme.ink}">${escapeXML(EVENT_TITLE)}</text>`;
-  s += `<text x="${textX}" y="${MARK_BOX.y+98}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE}" fill="${theme.sub}">${escapeXML(EVENT_DATES)}</text>`;
+  s += `<text x="${textX}" y="${MARK_BOX.y+98}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE}" fill="${theme.sub}">${escapeXML(EVENT_EYEBROW)}</text>`;
+  s += `<text x="${textX}" y="${MARK_BOX.y+144}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE}" fill="${theme.sub}">${escapeXML(EVENT_DATES)}</text>`;
 
   return s;
 }
@@ -868,6 +870,7 @@ function drawEventFrame(ctx2d, dMark, markPath){
 
   ctx2d.textAlign = 'right';
   ctx2d.fillStyle = theme.ink;
+  ctx2d.fillText(EVENT_EYEBROW, LOGICAL - MARGIN, EVT_STATS_Y1);
   ctx2d.fillText(EVENT_DATES, LOGICAL - MARGIN, EVT_DATE_Y);
   ctx2d.textAlign = 'left';
 }

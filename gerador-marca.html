@@ -168,6 +168,7 @@ const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXp
 const LOGICAL = 1000;
 const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap";
 const EVENT_TITLE = 'Circuito de Ateliês do Centro';
+const EVENT_EYEBROW = 'Ateliês abertos';
 const EVENT_DATES = '18 – 19 de Setembro';
 
 // estimativa de largura do texto (fontes serifadas ~0.52× o tamanho por
@@ -185,11 +186,12 @@ function estimateTextWidth(text, fontSize){
 const SYMBOL_V_SIZE = 640;
 const SYMBOL_V_STROKE = 35;
 const TITLE_SIZE_V = 64;
+const EYEBROW_SIZE_V = 64;
 const DATE_SIZE_V = 64;
 const GAP_V = 10; // distância real entre a ponta de baixo do símbolo e a tipografia
 const TITLE_LEAD_V = 62;
 const DATE_GAP_V = 66;
-const TEXT_BLOCK_H_V = (TITLE_SIZE_V*0.72) + TITLE_LEAD_V + DATE_GAP_V + (DATE_SIZE_V*0.25);
+const TEXT_BLOCK_H_V = (TITLE_SIZE_V*0.72) + TITLE_LEAD_V + DATE_GAP_V + DATE_GAP_V + (DATE_SIZE_V*0.25);
 const GROUP_H_V = SYMBOL_V_SIZE + GAP_V + TEXT_BLOCK_H_V;
 const GROUP_TOP_V = (LOGICAL - GROUP_H_V) / 2;
 const MARK_BOX_V = { x: (LOGICAL - SYMBOL_V_SIZE)/2, y: GROUP_TOP_V, w: SYMBOL_V_SIZE, h: SYMBOL_V_SIZE };
@@ -197,7 +199,8 @@ const TITLE_X_V = MARK_BOX_V.x;
 const TEXT_TOP_V = MARK_BOX_V.y + SYMBOL_V_SIZE + GAP_V;
 const TITLE_V_Y1 = TEXT_TOP_V + TITLE_SIZE_V*0.72;
 const TITLE_V_Y2 = TITLE_V_Y1 + TITLE_LEAD_V;
-const DATE_V_Y = TITLE_V_Y2 + DATE_GAP_V;
+const EYEBROW_V_Y = TITLE_V_Y2 + DATE_GAP_V;
+const DATE_V_Y = EYEBROW_V_Y + DATE_GAP_V;
 
 // marca completa — horizontal: exatamente a marca vertical (mesma
 // tipografia, mesmo espaçamento), só que com o símbolo 20% menor e o
@@ -209,15 +212,16 @@ const SYMBOL_H_STROKE = 18;
 const TITLE_SIZE_H = 56;
 const DATE_SIZE_H = 44;
 const GAP_H = 30;
-let TEXT_W_H, TOTAL_W_H, START_X_H, MARK_BOX_H, TITLE_X_H, TITLE_Y_H, DATE_Y_H;
+let TEXT_W_H, TOTAL_W_H, START_X_H, MARK_BOX_H, TITLE_X_H, TITLE_Y_H, EYEBROW_Y_H, DATE_Y_H;
 function computeHorizontalLayout(){
-  TEXT_W_H = Math.max(estimateTextWidth(EVENT_TITLE, TITLE_SIZE_H), estimateTextWidth(EVENT_DATES, DATE_SIZE_H));
+  TEXT_W_H = Math.max(estimateTextWidth(EVENT_TITLE, TITLE_SIZE_H), estimateTextWidth(EVENT_EYEBROW, DATE_SIZE_H), estimateTextWidth(EVENT_DATES, DATE_SIZE_H));
   TOTAL_W_H = SYMBOL_H_SIZE + GAP_H + TEXT_W_H;
   START_X_H = Math.max(15, (LOGICAL - TOTAL_W_H) / 2);
   MARK_BOX_H = { x: START_X_H, y: LOGICAL/2 - SYMBOL_H_SIZE/2, w: SYMBOL_H_SIZE, h: SYMBOL_H_SIZE };
   TITLE_X_H = START_X_H + SYMBOL_H_SIZE + GAP_H;
-  TITLE_Y_H = LOGICAL/2 - 8;
-  DATE_Y_H = TITLE_Y_H + 58;
+  TITLE_Y_H = LOGICAL/2 - 37;
+  EYEBROW_Y_H = TITLE_Y_H + 58;
+  DATE_Y_H = EYEBROW_Y_H + 58;
 }
 computeHorizontalLayout(); // primeira estimativa (fonte de fallback), recalculado depois que a web font carrega de verdade
 
@@ -633,11 +637,13 @@ function buildContentSVG(includeBg){
     if (orientMarca === 'vertical'){
       content += `<text x="${TITLE_X_V}" y="${TITLE_V_Y1}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Circuito de</text>`;
       content += `<text x="${TITLE_X_V}" y="${TITLE_V_Y2}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Ateliês do Centro</text>`;
+      content += `<text x="${TITLE_X_V}" y="${EYEBROW_V_Y}" font-family="'Instrument Serif', Georgia, serif" font-size="${EYEBROW_SIZE_V}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_EYEBROW)}</text>`;
       content += `<text x="${TITLE_X_V}" y="${DATE_V_Y}" font-family="'Instrument Serif', Georgia, serif" font-size="${DATE_SIZE_V}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
       if (showPinsCompleta) content += renderCompletaPins(completeMarkPins, SYMBOL_V_STROKE, theme);
       s += content;
     } else {
       content += `<text x="${TITLE_X_H}" y="${TITLE_Y_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_H}" fill="${theme.ribbon}">${escapeXML(EVENT_TITLE)}</text>`;
+      content += `<text x="${TITLE_X_H}" y="${EYEBROW_Y_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_H}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_EYEBROW)}</text>`;
       content += `<text x="${TITLE_X_H}" y="${DATE_Y_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_H}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
       if (showPinsCompleta) content += renderCompletaPins(completeMarkPins, SYMBOL_H_STROKE, theme);
       // só a apresentação muda aqui: a composição inteira é ampliada em

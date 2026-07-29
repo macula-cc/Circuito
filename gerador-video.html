@@ -175,6 +175,7 @@
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
 const LOGICAL = 1000;
 const EVENT_TITLE = 'Circuito de Ateliês do Centro';
+const EVENT_EYEBROW = 'Ateliês abertos';
 const EVENT_DATES = '18 – 19 de Setembro';
 const MARGIN = 60;
 const EVT_TITLE_L1 = 'Circuito de';
@@ -551,6 +552,7 @@ function drawStatsLayer(ctx2d){
   ctx2d.fillText(`${numAddresses} Endereços`, MARGIN, STATS_Y1);
   ctx2d.fillText(`${numArtists} Artistas`, MARGIN, STATS_Y2);
   ctx2d.textAlign = 'right';
+  ctx2d.fillText(EVENT_EYEBROW, LOGICAL - MARGIN, STATS_Y1);
   ctx2d.fillText(EVENT_DATES, LOGICAL - MARGIN, DATE_Y);
   ctx2d.textAlign = 'left';
 }
