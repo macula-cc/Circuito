@@ -235,7 +235,7 @@
   /* padding-top reservado só pro botão "fechar" — o título fica sempre
      abaixo dele, mesmo quando o nome do local é longo o bastante pra quebrar
      linha */
-  .drawer-head{ padding:3.6rem 1.6rem 1.1rem; border-bottom:1px solid var(--line); flex-shrink:0; position:relative; }
+  .drawer-head{ padding:40px 1.6rem 1.1rem; border-bottom:1px solid var(--line); flex-shrink:0; position:relative; }
   .drawer-title{ font-family:var(--serif); font-size:1.54rem; margin:0 0 0.15rem; line-height:1.2; }
   .drawer-addr{ font-family:var(--mono); font-size:0.83rem; color:var(--gray); }
   .drawer-directions{ display:inline-block; font-family:var(--mono); font-size:0.94rem; color:var(--ink);
@@ -243,9 +243,9 @@
   .drawer-directions:hover{ opacity:0.6; }
   .drawer-directions.hidden{ display:none; }
 
-  .drawer-close{ position:absolute; top:0.9rem; right:0.9rem; background:none; border:none; cursor:pointer;
-                 padding:0.7rem; min-height:44px;
-                 font-family:var(--mono); font-size:0.79rem; color:var(--ink); transition:opacity 0.15s ease; }
+  .drawer-close{ position:absolute; top:6px; right:0.9rem; background:none; border:none; cursor:pointer;
+                 padding:0.4rem 0.6rem; min-height:28px;
+                 font-family:var(--mono); font-size:0.75rem; color:var(--ink); transition:opacity 0.15s ease; }
   .drawer-close:hover{ opacity:0.5; }
 
   .drawer-list{ overflow-y:auto; -webkit-overflow-scrolling:touch; padding:1rem 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); }
@@ -307,7 +307,7 @@
      o conteúdo (imagem/legenda) fica num bloco separado que começa
      sempre abaixo dela, então nunca disputa o mesmo espaço — mesmo se a
      imagem+legenda for alta o bastante pra rolar */
-  .lightbox-head{ flex-shrink:0; height:4.4rem; position:relative; }
+  .lightbox-head{ flex-shrink:0; height:40px; position:relative; }
 
   .lightbox-body{ flex-grow:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
                    display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -322,9 +322,9 @@
   .lightbox-caption .lb-name{ font-family:var(--serif); font-size:1.32rem; color:var(--ink); margin:0 0 0.4rem; }
   .lightbox-caption .lb-room{ font-family:var(--mono); font-size:0.83rem; color:var(--gray); margin-bottom:0.5rem; }
   .lightbox-caption .lb-bio{ font-family:var(--sans); font-size:0.97rem; line-height:1.55; color:var(--gray); margin:0.8rem 0 0; }
-  .lightbox-close{ position:absolute; top:1rem; right:1rem;
-                    background:none; border:none; cursor:pointer; padding:0.6rem; min-height:36px;
-                    font-family:var(--mono); font-size:0.79rem; color:var(--ink); }
+  .lightbox-close{ position:absolute; top:6px; right:1rem;
+                    background:none; border:none; cursor:pointer; padding:0.4rem 0.6rem; min-height:28px;
+                    font-family:var(--mono); font-size:0.75rem; color:var(--ink); }
   .lightbox-close:hover{ opacity:0.6; }
 
   /* ---------------- About modal (same glass treatment as lightbox) ---------------- */
