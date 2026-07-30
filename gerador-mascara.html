@@ -184,6 +184,7 @@ const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Instrument+Serif:i
 const EVENT_TITLE = 'Circuito de Ateliês do Centro';
 const EVENT_EYEBROW = 'Ateliês abertos';
 const EVENT_DATES = '18 – 19 de Setembro';
+const EVENT_EYEBROW_DATE = `${EVENT_EYEBROW}: ${EVENT_DATES}`;
 
 // layout — post do artista
 const MARGIN = 60;
@@ -660,8 +661,7 @@ function buildContentSVG(){
   }
   const textX = MARK_BOX.x + MARK_BOX.w + 26;
   s += `<text x="${textX}" y="${MARK_BOX.y+52}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE}" fill="${theme.ink}">${escapeXML(EVENT_TITLE)}</text>`;
-  s += `<text x="${textX}" y="${MARK_BOX.y+98}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE}" fill="${theme.sub}">${escapeXML(EVENT_EYEBROW)}</text>`;
-  s += `<text x="${textX}" y="${MARK_BOX.y+144}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE}" fill="${theme.sub}">${escapeXML(EVENT_DATES)}</text>`;
+  s += `<text x="${textX}" y="${MARK_BOX.y+98}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE}" fill="${theme.sub}">${escapeXML(EVENT_EYEBROW_DATE)}</text>`;
 
   return s;
 }
@@ -870,8 +870,7 @@ function drawEventFrame(ctx2d, dMark, markPath){
 
   ctx2d.textAlign = 'right';
   ctx2d.fillStyle = theme.ink;
-  ctx2d.fillText(EVENT_EYEBROW, LOGICAL - MARGIN, EVT_STATS_Y1);
-  ctx2d.fillText(EVENT_DATES, LOGICAL - MARGIN, EVT_DATE_Y);
+  ctx2d.fillText(EVENT_EYEBROW_DATE, LOGICAL - MARGIN, EVT_DATE_Y);
   ctx2d.textAlign = 'left';
 }
 
