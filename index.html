@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no, address=no, email=no, date=no">
 <title>Circuito de Ateliês do Centro do Rio de Janeiro</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -206,6 +207,19 @@
   .row-title{ font-family:var(--serif); font-size:1.16rem; }
   .row-sub{ font-family:var(--mono); font-size:0.79rem; color:var(--gray); display:block; margin-top:0.15rem; }
   .row-count{ font-family:var(--mono); font-size:0.79rem; color:var(--gray); white-space:nowrap; }
+
+  /* lista "por artista": grid com áreas nomeadas — no desktop nome/endereço
+     ficam empilhados à esquerda com o instagram à direita (como antes); no
+     mobile vira uma coluna só, na ordem nome → instagram → endereço */
+  .row-artista{ display:grid; grid-template-columns:1fr auto; grid-template-areas:"title insta" "sub insta";
+                align-items:baseline; column-gap:1rem; row-gap:0.15rem; }
+  .row-artista .row-title{ grid-area:title; }
+  .row-artista .row-sub{ grid-area:sub; margin-top:0; }
+  .row-artista .row-instagram{ grid-area:insta; font-family:var(--mono); font-size:0.79rem; color:var(--gray);
+                                white-space:nowrap; align-self:center; }
+  @media (max-width:780px){
+    .row-artista{ grid-template-columns:1fr; grid-template-areas:"title" "insta" "sub"; }
+  }
 
   /* ---------------- Drawer ---------------- */
   .overlay{ position:fixed; inset:0; background:rgba(0,0,0,0.15); opacity:0; pointer-events:none;
@@ -1108,7 +1122,6 @@ function renderRowsByEndereco(){
         <span class="row-title">${loc.local || loc.endereco}</span>
         ${loc.local ? `<span class="row-sub">${loc.endereco}</span>` : ''}
       </span>
-      <span class="row-count">${loc.artistas.length}</span>
     `;
     btn.addEventListener('click', () => goToLocation(loc));
     rowsEl.appendChild(btn);
@@ -1127,13 +1140,11 @@ function renderRowsByArtista(){
 
   flat.forEach((entry) => {
     const btn = document.createElement('button');
-    btn.className = 'row' + (entry.loc.lat == null ? ' pending' : '');
+    btn.className = 'row row-artista' + (entry.loc.lat == null ? ' pending' : '');
     btn.innerHTML = `
-      <span class="row-main">
-        <span class="row-title">${entry.nome}</span>
-        <span class="row-sub">${entry.loc.local || entry.loc.endereco}</span>
-      </span>
-      <span class="row-count">${entry.instagram ? '@'+entry.instagram : ''}</span>
+      <span class="row-title">${entry.nome}</span>
+      <span class="row-instagram">${entry.instagram ? '@'+entry.instagram : ''}</span>
+      <span class="row-sub">${entry.loc.local || entry.loc.endereco}</span>
     `;
     btn.addEventListener('click', () => goToLocation(entry.loc));
     rowsEl.appendChild(btn);
