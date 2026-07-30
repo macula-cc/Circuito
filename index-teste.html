@@ -45,12 +45,12 @@
                font-size:clamp(3.8rem, 12vw, 9.5rem);
                transition:padding-top 0.75s cubic-bezier(.16,1,.3,1), font-size 0.75s cubic-bezier(.16,1,.3,1); }
 
-  /* núcleo tipográfico: label (nome do evento, sans) e o selo de edição são
-     relativos ao tamanho de "Ateliês abertos"/data (1em, no elemento pai)
-     via font-size em em — crescem e encolhem sempre na mesma proporção,
-     sem precisar repetir a lógica de breakpoint/shrink em cada um */
+  /* núcleo tipográfico: label (nome do evento, sans) é relativo ao tamanho
+     de "Ateliês abertos" (1em, no elemento pai) via font-size em em — cresce
+     e encolhe sempre na mesma proporção, calibrado pra ocupar ~90% da
+     largura de "Ateliês abertos" (medido via canvas.measureText) */
   .hero-label{ font-family:var(--sans-display); font-weight:500; color:var(--ink);
-               font-size:0.4em; line-height:1.2; margin:0 0 0.3em; }
+               font-size:0.33em; line-height:1.2; margin:0 0 0.3em; }
 
   .hero-title h1{ font-family:var(--serif); font-weight:400; color:var(--ink);
                   font-size:1em;
@@ -61,11 +61,14 @@
   .hero-date{ font-family:var(--serif); font-weight:400; color:var(--ink);
               font-size:1em;
               line-height:0.94; white-space:nowrap; }
-  .hero-edition{ font-family:var(--mono); font-size:0.3em; color:#fff; background:var(--gray);
+  /* selo de edição: tamanho fixo, não acompanha o "Ateliês abertos" gigante
+     no estado grande — só o estado encolhido tem um tamanho (menor) próprio */
+  .hero-edition{ font-family:var(--mono); font-size:0.85rem; color:#fff; background:var(--gray);
                  padding:0.35em 0.85em; border-radius:999px; white-space:nowrap; }
 
   .hero-title.shrunk{ font-size:clamp(1.43rem, 3.3vw, 2.09rem) !important; }
   .hero-title.shrunk h1{ line-height:1.25; max-width:14ch; white-space:normal; }
+  .hero-title.shrunk .hero-edition{ font-size:0.6rem; }
 
   /* Mobile: fixed sizes per breakpoint no elemento pai (label/data/selo
      seguem via em), calculadas conservadoramente contra a linha mais longa
