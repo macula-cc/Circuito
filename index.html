@@ -82,9 +82,10 @@
   .hero-count{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:calc(1.6rem + env(safe-area-inset-left)); z-index:200;
                font-family:var(--mono); font-size:0.79rem; color:var(--gray); pointer-events:none; }
 
-  /* ---------------- View switcher (glass pill toggle) ---------------- */
-  .switcher{ position:absolute; top:calc(1.1rem + env(safe-area-inset-top)); right:calc(0.9rem + env(safe-area-inset-right)); z-index:600;
-             display:flex; gap:2px; font-family:var(--mono); font-size:0.79rem;
+  /* ---------------- View switcher (glass pill toggle) + about button ---------------- */
+  .top-actions{ position:absolute; top:calc(1.1rem + env(safe-area-inset-top)); right:calc(0.9rem + env(safe-area-inset-right)); z-index:600;
+                display:flex; align-items:center; gap:0.5rem; }
+  .switcher{ display:flex; gap:2px; font-family:var(--mono); font-size:0.79rem;
              background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
              -webkit-backdrop-filter:blur(18px) saturate(180%);
              border:1px solid rgba(255,255,255,0.4); border-radius:999px; padding:3px;
@@ -94,6 +95,17 @@
                      transition:background 0.2s ease, color 0.2s ease; }
   .switcher button.active{ background:#111; color:#fff; }
   .switcher button:not(.active):hover{ background:rgba(255,255,255,0.35); }
+
+  /* botão "sobre": separado do toggle mapa/lista, mas segue o mesmo visual
+     da parte não-selecionada dele (vidro, sem fundo preto) */
+  .about-btn{ font-family:var(--mono); font-size:0.79rem; color:var(--ink); cursor:pointer;
+              background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
+              -webkit-backdrop-filter:blur(18px) saturate(180%);
+              border:1px solid rgba(255,255,255,0.4); border-radius:999px;
+              padding:0.55rem 0.9rem; min-height:38px;
+              box-shadow:0 2px 10px rgba(0,0,0,0.08);
+              transition:background 0.2s ease; }
+  .about-btn:hover{ background:rgba(255,255,255,0.35); }
 
   .sort-switch{ position:absolute; top:calc(4rem + env(safe-area-inset-top)); right:calc(0.9rem + env(safe-area-inset-right)); z-index:600;
                 display:flex; gap:2px; font-family:var(--mono); font-size:0.73rem;
@@ -299,6 +311,44 @@
                     background:none; border:none; cursor:pointer; padding:0.6rem; min-height:36px;
                     font-family:var(--mono); font-size:0.79rem; color:var(--ink); }
   .lightbox-close:hover{ opacity:0.6; }
+
+  /* ---------------- About modal (same glass treatment as lightbox) ---------------- */
+  .about-overlay{ position:fixed; inset:0; z-index:1000;
+             background:transparent;
+             display:flex; align-items:center; justify-content:center;
+             opacity:0; pointer-events:none; transition:opacity 0.25s ease;
+             padding:calc(1rem + env(safe-area-inset-top)) calc(1rem + env(safe-area-inset-right))
+                     calc(1rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left)); }
+  .about-overlay.open{ opacity:1; pointer-events:auto; }
+
+  .about-modal{ position:relative; width:100%; max-width:760px; max-height:100%;
+                    overflow-y:auto; -webkit-overflow-scrolling:touch;
+                    background:rgba(255,255,255,0.35);
+                    backdrop-filter:blur(32px) saturate(180%);
+                    -webkit-backdrop-filter:blur(32px) saturate(180%);
+                    border:1px solid rgba(255,255,255,0.6);
+                    border-radius:10px;
+                    padding:2.4rem 2rem;
+                    box-shadow:0 24px 70px rgba(0,0,0,0.25);
+                    transform:scale(0.97); transition:transform 0.25s ease; }
+  .about-overlay.open .about-modal{ transform:scale(1); }
+
+  .about-title{ font-family:var(--serif); font-weight:400; color:var(--ink);
+                font-size:clamp(1.9rem, 4vw, 2.6rem); line-height:1.05; margin:0 0 1.8rem; }
+
+  .about-grid{ display:grid; grid-template-columns:1fr 200px; gap:2.6rem; align-items:start; }
+  .about-main p{ font-family:var(--sans); font-size:0.97rem; line-height:1.6; color:var(--ink); margin:0 0 1em; }
+  .about-main p:last-child{ margin-bottom:0; }
+
+  .about-credits{ font-family:var(--mono); border-left:1px solid rgba(0,0,0,0.12); padding-left:1.6rem; }
+  .about-credits-label{ text-transform:uppercase; letter-spacing:0.06em; font-size:0.72rem; color:var(--gray); margin:0 0 0.7rem; }
+  .about-credits p{ font-size:0.83rem; line-height:1.5; color:var(--ink); margin:0 0 0.9rem; }
+  .about-credits a{ color:var(--ink); }
+
+  @media (max-width:640px){
+    .about-grid{ grid-template-columns:1fr; gap:1.8rem; }
+    .about-credits{ border-left:none; padding-left:0; border-top:1px solid rgba(0,0,0,0.12); padding-top:1.2rem; }
+  }
 </style>
 
 </head>
@@ -315,9 +365,12 @@
   <div class="hero-count" id="hero-count">— endereços · — artistas</div>
 </div>
 
-<div class="switcher">
-  <button id="switch-map" class="active">mapa</button>
-  <button id="switch-list">lista</button>
+<div class="top-actions">
+  <button class="about-btn" id="about-btn">sobre</button>
+  <div class="switcher">
+    <button id="switch-map" class="active">mapa</button>
+    <button id="switch-list">lista</button>
+  </div>
 </div>
 <div class="sort-switch" id="sort-switch">
   <button id="sort-endereco" class="active">por endereço</button>
@@ -352,6 +405,22 @@
       <div class="lb-room" id="lightbox-room"></div>
       <div class="day-badges" id="lightbox-days" style="justify-content:center;"></div>
       <p class="lb-bio" id="lightbox-bio"></p>
+    </div>
+  </div>
+</div>
+
+<div class="about-overlay" id="about-overlay">
+  <div class="about-modal">
+    <button class="lightbox-close" id="about-close" aria-label="Fechar">fechar ×</button>
+    <h2 class="about-title">Circuito de Ateliês do Centro</h2>
+    <div class="about-grid">
+      <div class="about-main">
+        <p>[Texto sobre o evento — a preencher.]</p>
+      </div>
+      <div class="about-credits">
+        <p class="about-credits-label">Créditos</p>
+        <p>Identidade visual e site: Eduardo Mattos<br><a href="https://instagram.com/macula.cc" target="_blank" rel="noopener">@macula.cc</a></p>
+      </div>
     </div>
   </div>
 </div>
@@ -926,7 +995,16 @@ function closeLightbox(){
 }
 document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
 lightbox.addEventListener('click', (e) => { if (e.target === lightbox) closeLightbox(); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLightbox(); });
+
+// ---------------- about modal ----------------
+const aboutOverlay = document.getElementById('about-overlay');
+function openAbout(){ aboutOverlay.classList.add('open'); }
+function closeAbout(){ aboutOverlay.classList.remove('open'); }
+document.getElementById('about-btn').addEventListener('click', openAbout);
+document.getElementById('about-close').addEventListener('click', closeAbout);
+aboutOverlay.addEventListener('click', (e) => { if (e.target === aboutOverlay) closeAbout(); });
+
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ closeLightbox(); closeAbout(); } });
 
 function goToLocation(loc){
   setView('map');
