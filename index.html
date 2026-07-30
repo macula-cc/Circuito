@@ -385,6 +385,18 @@ function parseCSV(text){
   return rows;
 }
 
+// artistas colando o link de "visualizar" do Google Drive (drive.google.com/
+// file/d/ID/view) em vez de um link de imagem direto — isso não é uma
+// imagem, é uma página HTML, então <img>/background-image nunca carrega.
+// Convertemos pro endpoint de thumbnail do próprio Drive, que serve a
+// imagem de verdade (o arquivo ainda precisa estar compartilhado como
+// "qualquer pessoa com o link"). Link de pasta do Drive não dá pra
+// converter — não há como saber qual arquivo dentro dela é a foto.
+function resolveDrivePhotoURL(url){
+  const m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1000` : url;
+}
+
 async function loadLocationsFromSheet(){
   const res = await fetch(SHEET_CSV_URL);
   if (!res.ok) throw new Error('Falha ao buscar a planilha: HTTP ' + res.status);
@@ -410,7 +422,7 @@ async function loadLocationsFromSheet(){
     if (!endereco && !nome) return; // linha em branco
 
     const instagram = get(row, 'Instagram').replace(/^@/, '');
-    const foto = get(row, 'Foto do trabalho (URL)');
+    const foto = resolveDrivePhotoURL(get(row, 'Foto do trabalho (URL)'));
     const bio = get(row, 'Mini bio (1 parágrafo curto)');
     const obs = get(row, 'Observações');
     const latRaw = get(row, 'Latitude');
