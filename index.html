@@ -118,14 +118,6 @@
   .sort-switch button.active{ background:#111; color:#fff; }
   .sort-switch button:not(.active):hover{ background:rgba(255,255,255,0.35); }
 
-  /* celulares pequenos (iPhone, SE e afins): o botão "sobre" desce pra uma
-     segunda linha, alinhado à direita, deixando mais espaço horizontal pro
-     título grande — o sort-switch (só visível na lista) desce junto */
-  @media (max-width:480px){
-    .top-actions{ flex-direction:column; align-items:flex-end; }
-    .sort-switch{ top:calc(8rem + env(safe-area-inset-top)); }
-  }
-
   /* pins: 40px invisible tap target, badge circle with initials centered inside */
   .pin-hit{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
   .pin{ width:24px; height:24px; border-radius:50%; background:#111; border:1.5px solid #fff;
