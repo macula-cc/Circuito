@@ -102,7 +102,7 @@
               background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
               -webkit-backdrop-filter:blur(18px) saturate(180%);
               border:1px solid rgba(255,255,255,0.4); border-radius:999px;
-              padding:0.55rem 0.9rem; min-height:38px;
+              padding:0.55rem 0.9rem; min-height:46px;
               box-shadow:0 2px 10px rgba(0,0,0,0.08);
               transition:background 0.2s ease; }
   .about-btn:hover{ background:rgba(255,255,255,0.35); }
@@ -321,20 +321,23 @@
                      calc(1rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left)); }
   .about-overlay.open{ opacity:1; pointer-events:auto; }
 
-  .about-modal{ position:relative; width:100%; max-width:760px; max-height:100%;
-                    overflow-y:auto; -webkit-overflow-scrolling:touch;
+  .about-modal{ position:relative; width:100%; height:100%;
                     background:rgba(255,255,255,0.35);
                     backdrop-filter:blur(32px) saturate(180%);
                     -webkit-backdrop-filter:blur(32px) saturate(180%);
                     border:1px solid rgba(255,255,255,0.6);
                     border-radius:10px;
-                    padding:2.4rem 2rem;
                     box-shadow:0 24px 70px rgba(0,0,0,0.25);
+                    display:flex; flex-direction:column; overflow:hidden;
                     transform:scale(0.97); transition:transform 0.25s ease; }
   .about-overlay.open .about-modal{ transform:scale(1); }
 
-  .about-title{ font-family:var(--serif); font-weight:400; color:var(--ink);
-                font-size:clamp(1.9rem, 4vw, 2.6rem); line-height:1.05; margin:0 0 1.8rem; }
+  .about-head{ padding:1.6rem 1.6rem 1rem; border-bottom:1px solid rgba(0,0,0,0.12); flex-shrink:0; }
+  .about-title{ font-family:var(--serif); font-weight:400; color:var(--ink); font-size:1.32rem; margin:0; }
+
+  .about-body{ overflow-y:auto; -webkit-overflow-scrolling:touch; flex-grow:1;
+               max-width:920px; width:100%; margin:0 auto;
+               padding:1.6rem 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); }
 
   .about-grid{ display:grid; grid-template-columns:1fr 200px; gap:2.6rem; align-items:start; }
   .about-main p{ font-family:var(--sans); font-size:0.97rem; line-height:1.6; color:var(--ink); margin:0 0 1em; }
@@ -366,11 +369,11 @@
 </div>
 
 <div class="top-actions">
-  <button class="about-btn" id="about-btn">sobre</button>
   <div class="switcher">
     <button id="switch-map" class="active">mapa</button>
     <button id="switch-list">lista</button>
   </div>
+  <button class="about-btn" id="about-btn">sobre</button>
 </div>
 <div class="sort-switch" id="sort-switch">
   <button id="sort-endereco" class="active">por endereço</button>
@@ -412,14 +415,16 @@
 <div class="about-overlay" id="about-overlay">
   <div class="about-modal">
     <button class="lightbox-close" id="about-close" aria-label="Fechar">fechar ×</button>
-    <h2 class="about-title">Circuito de Ateliês do Centro</h2>
-    <div class="about-grid">
-      <div class="about-main">
-        <p>[Texto sobre o evento — a preencher.]</p>
-      </div>
-      <div class="about-credits">
-        <p class="about-credits-label">Créditos</p>
-        <p>Identidade visual e site: Eduardo Mattos<br><a href="https://instagram.com/macula.cc" target="_blank" rel="noopener">@macula.cc</a></p>
+    <div class="about-head"><h2 class="about-title">Circuito de Ateliês do Centro</h2></div>
+    <div class="about-body">
+      <div class="about-grid">
+        <div class="about-main">
+          <p>[Texto sobre o evento — a preencher.]</p>
+        </div>
+        <div class="about-credits">
+          <p class="about-credits-label">Créditos</p>
+          <p>Identidade visual e site: Eduardo Mattos<br><a href="https://instagram.com/macula.cc" target="_blank" rel="noopener">@macula.cc</a></p>
+        </div>
       </div>
     </div>
   </div>
