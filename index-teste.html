@@ -7,12 +7,13 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 
 <style>
   :root{
     --serif: 'Instrument Serif', Georgia, 'Iowan Old Style', 'Times New Roman', ui-serif, serif;
     --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --sans-display: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --ink:#111;
     --line: rgba(0,0,0,0.15);
@@ -42,17 +43,28 @@
                padding:calc(1.6rem + env(safe-area-inset-top)) calc(1.6rem + env(safe-area-inset-right)) 0 calc(1.6rem + env(safe-area-inset-left));
                z-index:260; pointer-events:none;
                transition:padding-top 0.75s cubic-bezier(.16,1,.3,1); }
+  /* núcleo tipográfico: nome do evento vira uma linha pequena em sans
+     (Instrument Sans) acima de "Ateliês abertos" + data, que agora são o
+     destaque grande em serif */
+  .hero-label{ font-family:var(--sans-display); font-weight:500; color:var(--ink);
+               font-size:clamp(1rem, 2.1vw, 1.5rem); line-height:1.2; margin:0 0 0.4em; }
+
   .hero-title h1{ font-family:var(--serif); font-weight:400; color:var(--ink);
                   font-size:clamp(3.8rem, 12vw, 9.5rem);
                   line-height:0.94; margin:0; white-space:nowrap; letter-spacing:-0.01em;
                   transition:font-size 0.75s cubic-bezier(.16,1,.3,1), line-height 0.75s cubic-bezier(.16,1,.3,1); }
-  .hero-date{ font-family:var(--serif); font-weight:400; color:#cfcfcf;
+
+  .hero-date-row{ display:flex; align-items:baseline; flex-wrap:wrap; gap:0.5em; margin-top:0.05em; }
+  .hero-date{ font-family:var(--serif); font-weight:400; color:var(--ink);
               font-size:clamp(3.8rem, 12vw, 9.5rem);
-              line-height:0.94; margin-top:0.05em; white-space:nowrap;
-              transition:font-size 0.75s cubic-bezier(.16,1,.3,1), margin-top 0.75s cubic-bezier(.16,1,.3,1), color 0.4s ease; }
+              line-height:0.94; white-space:nowrap;
+              transition:font-size 0.75s cubic-bezier(.16,1,.3,1); }
+  .hero-edition{ font-family:var(--mono); font-size:0.85rem; color:#fff; background:var(--gray);
+                 padding:0.3em 0.75em; border-radius:999px; white-space:nowrap; }
 
   .hero-title.shrunk h1{ font-size:clamp(1.43rem, 3.3vw, 2.09rem) !important; line-height:1.25; max-width:14ch; white-space:normal; }
-  .hero-title.shrunk .hero-date{ font-size:clamp(1.43rem, 3.3vw, 2.09rem) !important; margin-top:0.2rem; color:var(--gray); }
+  .hero-title.shrunk .hero-date{ font-size:clamp(1.43rem, 3.3vw, 2.09rem) !important; }
+  .hero-title.shrunk .hero-label{ font-size:0.85rem; margin-bottom:0.2rem; }
 
   /* Mobile: fixed sizes per breakpoint, calculated conservatively against the
      longest line ("18 – 19 de Setembro") so it never wraps or overflows, even
@@ -62,7 +74,7 @@
     .hero-title{ padding-top:calc(4.8rem + env(safe-area-inset-top)); }
     .hero-title.shrunk{ padding-top:calc(1.6rem + env(safe-area-inset-top)); }
     .hero-title h1{ font-size:2rem; white-space:normal; }
-    .hero-date{ font-size:2rem; }
+    .hero-date{ font-size:2rem; white-space:normal; }
   }
   @media (max-width:430px){
     .hero-title h1{ font-size:1.7rem; }
@@ -302,9 +314,12 @@
   <div id="map"></div>
   <canvas id="snake-overlay"></canvas>
   <div class="hero-title" id="hero-title">
-    <h1><span id="htl-1">Circuito de</span><br><span id="htl-2">Ateliês do Centro</span></h1>
-    <div class="hero-date">Ateliês abertos</div>
-    <div class="hero-date" id="hero-date">18 – 19 de Setembro</div>
+    <div class="hero-label">Circuito de Ateliês do Centro</div>
+    <h1>Ateliês abertos</h1>
+    <div class="hero-date-row">
+      <span class="hero-date" id="hero-date">18 – 19 de Setembro</span>
+      <span class="hero-edition">Edição 01</span>
+    </div>
   </div>
   <div class="hero-count" id="hero-count">— endereços · — artistas</div>
 </div>
