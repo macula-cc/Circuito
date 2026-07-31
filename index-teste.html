@@ -37,8 +37,13 @@
      "replaced" e, mesmo com inset:0, um replaced element position:fixed
      sem width/height definido usa o tamanho intrínseco (os atributos
      width/height em pixels físicos setados via JS) em vez de esticar pro
-     viewport — sem isso o canvas renderiza gigante e tudo sai "pixelado" */
-  #cursor-canvas{ position:fixed; inset:0; width:100%; height:100%; z-index:5000; pointer-events:none; }
+     viewport — sem isso o canvas renderiza gigante e tudo sai "pixelado".
+     mix-blend-mode:difference faz o cursor funcionar como máscara de
+     negativo: onde o círculo branco se sobrepõe a algo (o pin preto, por
+     exemplo), o resultado vira a cor invertida — só na área de
+     interseção, não no elemento inteiro. */
+  #cursor-canvas{ position:fixed; inset:0; width:100%; height:100%; z-index:5000; pointer-events:none;
+                  mix-blend-mode:difference; }
 
   /* ---------------- Hero: full-bleed map (always mounted) ---------------- */
   .hero{ position:fixed; inset:0; }
@@ -161,13 +166,12 @@
         box-shadow:0 2px 10px rgba(0,0,0,0.08);
         display:flex; align-items:center; justify-content:center;
         font-family:var(--mono); font-size:0.6rem; font-weight:500; color:#fff; letter-spacing:0.01em;
-        transition:transform 0.18s cubic-bezier(.4,0,.2,1), background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+        transition:transform 0.18s cubic-bezier(.4,0,.2,1), box-shadow 0.18s ease;
         transform:scale(1); }
-  /* hover em negativo: em vez da mãozinha padrão (o cursor customizado já
-     substitui isso), o próprio ponto inverte pra branco+preto e cresce um
-     pouco — sem outline, só uma sombra mais forte pra destacar do mapa */
-  .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.18); background:#fff; color:#111;
-                                               box-shadow:0 4px 16px rgba(0,0,0,0.35); }
+  /* o "negativo" no hover não é mais uma troca de cor daqui — é o próprio
+     cursor customizado (mix-blend-mode:difference) que inverte só onde
+     realmente se sobrepõe ao pin; aqui só o crescimento leve + sombra */
+  .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.18); box-shadow:0 4px 16px rgba(0,0,0,0.35); }
   .pin.active{ transform:scale(1.18); box-shadow:0 0 0 3px rgba(0,0,0,0.18); }
 
   /* transit stations (metrô/VLT): blue circular badge with letter — click
@@ -1226,12 +1230,21 @@ if (window.matchMedia('(hover:hover) and (pointer:fine)').matches){
     cursorCtx.restore();
 
     if (cursorTargetX != null){
+      const prevX = cursorDrawX, prevY = cursorDrawY;
       cursorDrawX += (cursorTargetX - cursorDrawX) * CURSOR_EASE;
       cursorDrawY += (cursorTargetY - cursorDrawY) * CURSOR_EASE;
+      // traço grosso de ponta arredondada ligando a posição do quadro
+      // anterior à atual — em vez de um círculo solto por quadro, garante
+      // um rastro contínuo e "sólido", sem buracos entre quadros mesmo em
+      // movimentos rápidos (branco porque quem cria o negativo é o
+      // mix-blend-mode:difference do canvas, não a cor em si)
       cursorCtx.beginPath();
-      cursorCtx.arc(cursorDrawX, cursorDrawY, 12, 0, Math.PI*2);
-      cursorCtx.fillStyle = '#111';
-      cursorCtx.fill();
+      cursorCtx.moveTo(prevX, prevY);
+      cursorCtx.lineTo(cursorDrawX, cursorDrawY);
+      cursorCtx.lineWidth = 24;
+      cursorCtx.lineCap = 'round';
+      cursorCtx.strokeStyle = '#fff';
+      cursorCtx.stroke();
     }
     requestAnimationFrame(cursorLoop);
   })();
