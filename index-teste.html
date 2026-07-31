@@ -83,13 +83,15 @@
                   transition:line-height 0.75s cubic-bezier(.16,1,.3,1), color 0.4s ease; }
 
   .hero-date{ font-family:var(--serif); font-weight:400; color:#cfcfcf;
-              font-size:1em; margin-top:0.05em;
+              font-size:1em; margin-top:0.05em; margin-bottom:-0.4em;
               line-height:0.94; white-space:nowrap;
               transition:color 0.4s ease; }
-  /* selo de edição: linha própria, centralizada, abaixo da data — tamanho
+  /* selo de edição: linha própria, centralizada, colada na data — tamanho
      fixo, não acompanha o "Ateliês abertos" gigante no estado grande; só o
-     estado encolhido tem um tamanho (menor) próprio */
-  .hero-edition{ display:inline-block; margin-top:0.8em;
+     estado encolhido tem um tamanho (menor) próprio. O margin-bottom
+     negativo acima (no tamanho da PRÓPRIA data, que é gigante) compensa o
+     espaço de entrelinha que sobrava abaixo dela antes do selo começar */
+  .hero-edition{ display:inline-block; margin-top:0.3em;
                  font-family:var(--mono); font-size:0.85rem; color:#fff; background:var(--gray);
                  padding:0.35em 0.85em; border-radius:999px; white-space:nowrap; }
 
@@ -1219,33 +1221,47 @@ if (window.matchMedia('(hover:hover) and (pointer:fine)').matches){
   });
   document.addEventListener('mouseleave', () => { cursorTargetX = null; cursorTargetY = null; });
 
+  // histórico curto de posições (com timestamp) em vez de "apagar aos
+  // poucos" — cada quadro limpa o canvas inteiro (clearRect, sem resíduo
+  // possível) e redesenha só os pontos ainda dentro da janela de tempo,
+  // com opacidade calculada pela idade de cada um. Mais robusto que o
+  // destination-out acumulado: não tem como sobrar marca permanente,
+  // porque nada persiste de um quadro pro outro além desse histórico.
+  const CURSOR_TRAIL_MS = 260;
+  let cursorHistory = [];
+
   (function cursorLoop(){
-    // apaga uma fatia do frame anterior (destination-out) — o que já foi
-    // desenhado decai suavemente até sumir, criando o rastro em degradê
-    // de 100% a 0% de opacidade sem precisar guardar histórico de pontos
-    cursorCtx.save();
-    cursorCtx.globalCompositeOperation = 'destination-out';
-    cursorCtx.fillStyle = 'rgba(0,0,0,0.14)';
-    cursorCtx.fillRect(0, 0, window.innerWidth, window.innerHeight);
-    cursorCtx.restore();
+    const now = performance.now();
+    cursorCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
     if (cursorTargetX != null){
-      const prevX = cursorDrawX, prevY = cursorDrawY;
+      const prevDrawX = cursorDrawX, prevDrawY = cursorDrawY;
       cursorDrawX += (cursorTargetX - cursorDrawX) * CURSOR_EASE;
       cursorDrawY += (cursorTargetY - cursorDrawY) * CURSOR_EASE;
-      // traço grosso de ponta arredondada ligando a posição do quadro
-      // anterior à atual — em vez de um círculo solto por quadro, garante
-      // um rastro contínuo e "sólido", sem buracos entre quadros mesmo em
-      // movimentos rápidos (branco porque quem cria o negativo é o
-      // mix-blend-mode:difference do canvas, não a cor em si)
+      // só registra no histórico se a posição realmente mudou — com o
+      // mouse parado (mesmo dentro da janela) a posição suavizada converge
+      // e para de se mover; sem essa checagem um ponto "novo" era
+      // empilhado a cada quadro pra sempre, e o rastro nunca esvaziava de
+      // verdade (a marca "eterna" que ficava grudada na tela)
+      if (Math.abs(cursorDrawX - prevDrawX) > 0.02 || Math.abs(cursorDrawY - prevDrawY) > 0.02){
+        cursorHistory.push({ x:cursorDrawX, y:cursorDrawY, t:now });
+      }
+    }
+    cursorHistory = cursorHistory.filter(p => now - p.t < CURSOR_TRAIL_MS);
+
+    cursorCtx.lineCap = 'round';
+    cursorCtx.lineWidth = 24;
+    cursorCtx.strokeStyle = '#fff';
+    for (let i = 1; i < cursorHistory.length; i++){
+      const p0 = cursorHistory[i-1], p1 = cursorHistory[i];
+      cursorCtx.globalAlpha = Math.max(0, 1 - (now - p1.t) / CURSOR_TRAIL_MS);
       cursorCtx.beginPath();
-      cursorCtx.moveTo(prevX, prevY);
-      cursorCtx.lineTo(cursorDrawX, cursorDrawY);
-      cursorCtx.lineWidth = 24;
-      cursorCtx.lineCap = 'round';
-      cursorCtx.strokeStyle = '#fff';
+      cursorCtx.moveTo(p0.x, p0.y);
+      cursorCtx.lineTo(p1.x, p1.y);
       cursorCtx.stroke();
     }
+    cursorCtx.globalAlpha = 1;
+
     requestAnimationFrame(cursorLoop);
   })();
 }
