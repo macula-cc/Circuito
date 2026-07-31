@@ -28,13 +28,21 @@
   button{ font:inherit; touch-action:manipulation; }
   .row, .drawer-close, .switcher button, .sort-switch button{ -webkit-tap-highlight-color:transparent; }
 
+  /* cursor customizado: só em desktop de verdade (mouse fino, com hover) —
+     não mexe com touch. #cursor-canvas desenha o ponto + rastro (ver JS). */
+  @media (hover:hover) and (pointer:fine){
+    *{ cursor:none !important; }
+  }
+  #cursor-canvas{ position:fixed; inset:0; z-index:5000; pointer-events:none; }
+
   /* ---------------- Hero: full-bleed map (always mounted) ---------------- */
   .hero{ position:fixed; inset:0; }
   #map{ position:absolute; inset:0; width:100%; height:100%; background:#e9e9e9; z-index:1; isolation:isolate; }
   /* escurece o mapa (pontos incluídos, ficam por baixo) enquanto o hero title
      está grande, só pra dar destaque ao título/data — some no primeiro toque,
      junto com o encolhimento do título */
-  .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(0,0,0,0.7);
+  .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(0,0,0,0.6);
+            backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
             pointer-events:none; transition:opacity 0.6s ease; }
   .map-dim.hidden{ opacity:0; }
   /* filtro aplicado por tile individual (não na pane inteira) — cada tile é só
@@ -64,9 +72,10 @@
                   line-height:0.94; margin:0; white-space:nowrap; letter-spacing:-0.01em;
                   transition:line-height 0.75s cubic-bezier(.16,1,.3,1), color 0.4s ease; }
 
-  .hero-date{ font-family:var(--serif); font-weight:400; color:var(--ink);
+  .hero-date{ font-family:var(--serif); font-weight:400; color:#cfcfcf;
               font-size:1em; margin-top:0.05em;
-              line-height:0.94; white-space:nowrap; }
+              line-height:0.94; white-space:nowrap;
+              transition:color 0.4s ease; }
   /* selo de edição: linha própria, centralizada, abaixo da data — tamanho
      fixo, não acompanha o "Ateliês abertos" gigante no estado grande; só o
      estado encolhido tem um tamanho (menor) próprio */
@@ -76,6 +85,7 @@
 
   .hero-title.shrunk{ font-size:clamp(1.43rem, 3.3vw, 2.09rem) !important; }
   .hero-title.shrunk h1{ line-height:1.25; white-space:normal; color:var(--gray); }
+  .hero-title.shrunk .hero-date{ color:var(--gray); }
   .hero-title.shrunk .hero-edition{ font-size:0.6rem; }
 
   /* Mobile: fixed sizes per breakpoint no elemento pai (label/data/selo
@@ -142,8 +152,8 @@
 
   /* pins: 40px invisible tap target, badge circle with initials centered inside */
   .pin-hit{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
-  .pin{ width:24px; height:24px; border-radius:50%; background:#111; border:1.5px solid #fff;
-        box-shadow:0 0 0 1px rgba(0,0,0,0.4);
+  .pin{ width:24px; height:24px; border-radius:50%; background:#111;
+        box-shadow:0 2px 10px rgba(0,0,0,0.08);
         display:flex; align-items:center; justify-content:center;
         font-family:var(--mono); font-size:0.6rem; font-weight:500; color:#fff; letter-spacing:0.01em;
         transition:transform 0.18s cubic-bezier(.4,0,.2,1); transform:scale(1); }
@@ -449,6 +459,8 @@
     </div>
   </div>
 </div>
+
+<canvas id="cursor-canvas"></canvas>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -1166,6 +1178,44 @@ async function boot(){
   renderRows();
 }
 boot();
+
+// ---------------- cursor customizado (desktop): ponto preto + rastro em
+// degradê, mesmo espírito visual da cobrinha que foi removida ----------------
+if (window.matchMedia('(hover:hover) and (pointer:fine)').matches){
+  const cursorCanvas = document.getElementById('cursor-canvas');
+  const cursorCtx = cursorCanvas.getContext('2d');
+  function resizeCursorCanvas(){
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cursorCanvas.width = window.innerWidth * dpr;
+    cursorCanvas.height = window.innerHeight * dpr;
+    cursorCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resizeCursorCanvas();
+  window.addEventListener('resize', resizeCursorCanvas);
+
+  let cursorX = null, cursorY = null;
+  document.addEventListener('mousemove', (e) => { cursorX = e.clientX; cursorY = e.clientY; });
+  document.addEventListener('mouseleave', () => { cursorX = null; cursorY = null; });
+
+  (function cursorLoop(){
+    // apaga uma fatia do frame anterior (destination-out) — o que já foi
+    // desenhado decai suavemente até sumir, criando o rastro em degradê
+    // de 100% a 0% de opacidade sem precisar guardar histórico de pontos
+    cursorCtx.save();
+    cursorCtx.globalCompositeOperation = 'destination-out';
+    cursorCtx.fillStyle = 'rgba(0,0,0,0.14)';
+    cursorCtx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+    cursorCtx.restore();
+
+    if (cursorX != null){
+      cursorCtx.beginPath();
+      cursorCtx.arc(cursorX, cursorY, 5, 0, Math.PI*2);
+      cursorCtx.fillStyle = '#111';
+      cursorCtx.fill();
+    }
+    requestAnimationFrame(cursorLoop);
+  })();
+}
 </script>
 </body>
 </html>
