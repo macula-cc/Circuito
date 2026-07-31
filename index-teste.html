@@ -7,13 +7,13 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 
 <style>
   :root{
     --serif: 'Instrument Serif', Georgia, 'Iowan Old Style', 'Times New Roman', ui-serif, serif;
     --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --sans-display: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --sans-display: 'Inter Tight', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --ink:#111;
     --line: rgba(0,0,0,0.15);
@@ -46,15 +46,17 @@
 
   .hero-title{ position:absolute; top:0; left:0; right:0;
                padding:calc(1.6rem + env(safe-area-inset-top)) calc(1.6rem + env(safe-area-inset-right)) 0 calc(1.6rem + env(safe-area-inset-left));
-               z-index:260; pointer-events:none;
+               z-index:260; pointer-events:none; text-align:center;
                font-size:clamp(3.8rem, 12vw, 9.5rem);
                transition:padding-top 0.75s cubic-bezier(.16,1,.3,1), font-size 0.75s cubic-bezier(.16,1,.3,1); }
 
-  /* núcleo tipográfico: label (nome do evento, sans) é relativo ao tamanho
-     de "Ateliês abertos" (1em, no elemento pai) via font-size em em — cresce
-     e encolhe sempre na mesma proporção, calibrado pra ocupar ~90% da
-     largura de "Ateliês abertos" (medido via canvas.measureText) */
-  .hero-label{ font-family:var(--sans-display); font-weight:500; color:var(--ink);
+  /* núcleo tipográfico: label (nome do evento, sans caixa alta, Inter Tight)
+     é relativo ao tamanho de "Ateliês abertos" (1em, no elemento pai) via
+     font-size em em — cresce e encolhe sempre na mesma proporção, calibrado
+     pra ocupar ~90% da largura de "Ateliês abertos" (medido via
+     canvas.measureText) */
+  .hero-label{ font-family:var(--sans-display); font-weight:600; color:var(--ink);
+               text-transform:uppercase; letter-spacing:0.04em;
                font-size:0.33em; line-height:1.2; margin:0 0 0.3em; }
 
   .hero-title h1{ font-family:var(--serif); font-weight:400; color:#cfcfcf;
@@ -62,17 +64,18 @@
                   line-height:0.94; margin:0; white-space:nowrap; letter-spacing:-0.01em;
                   transition:line-height 0.75s cubic-bezier(.16,1,.3,1), color 0.4s ease; }
 
-  .hero-date-row{ display:flex; align-items:center; flex-wrap:wrap; gap:0.25em; margin-top:0.05em; }
   .hero-date{ font-family:var(--serif); font-weight:400; color:var(--ink);
-              font-size:1em;
+              font-size:1em; margin-top:0.05em;
               line-height:0.94; white-space:nowrap; }
-  /* selo de edição: tamanho fixo, não acompanha o "Ateliês abertos" gigante
-     no estado grande — só o estado encolhido tem um tamanho (menor) próprio */
-  .hero-edition{ font-family:var(--mono); font-size:0.85rem; color:#fff; background:var(--gray);
+  /* selo de edição: linha própria, centralizada, abaixo da data — tamanho
+     fixo, não acompanha o "Ateliês abertos" gigante no estado grande; só o
+     estado encolhido tem um tamanho (menor) próprio */
+  .hero-edition{ display:inline-block; margin-top:0.8em;
+                 font-family:var(--mono); font-size:0.85rem; color:#fff; background:var(--gray);
                  padding:0.35em 0.85em; border-radius:999px; white-space:nowrap; }
 
   .hero-title.shrunk{ font-size:clamp(1.43rem, 3.3vw, 2.09rem) !important; }
-  .hero-title.shrunk h1{ line-height:1.25; max-width:14ch; white-space:normal; color:var(--gray); }
+  .hero-title.shrunk h1{ line-height:1.25; white-space:normal; color:var(--gray); }
   .hero-title.shrunk .hero-edition{ font-size:0.6rem; }
 
   /* Mobile: fixed sizes per breakpoint no elemento pai (label/data/selo
@@ -96,9 +99,12 @@
   .hero-count{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:calc(1.6rem + env(safe-area-inset-left)); z-index:200;
                font-family:var(--mono); font-size:0.79rem; color:var(--gray); pointer-events:none; }
 
-  /* ---------------- View switcher (glass pill toggle) ---------------- */
-  .switcher{ position:absolute; top:calc(1.1rem + env(safe-area-inset-top)); right:calc(0.9rem + env(safe-area-inset-right)); z-index:600;
-             display:flex; gap:2px; font-family:var(--mono); font-size:0.79rem;
+  /* ---------------- View switcher (glass pill toggle) + about button ----------------
+     centralizados na parte inferior da tela — o sort-switch (por endereço/
+     por artista) fica numa linha própria acima deles, mesmo esquema */
+  .top-actions{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:600;
+                display:flex; align-items:center; gap:0.5rem; }
+  .switcher{ display:flex; gap:2px; font-family:var(--mono); font-size:0.79rem;
              background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
              -webkit-backdrop-filter:blur(18px) saturate(180%);
              border:1px solid rgba(255,255,255,0.4); border-radius:999px; padding:3px;
@@ -109,7 +115,18 @@
   .switcher button.active{ background:#111; color:#fff; }
   .switcher button:not(.active):hover{ background:rgba(255,255,255,0.35); }
 
-  .sort-switch{ position:absolute; top:calc(4rem + env(safe-area-inset-top)); right:calc(0.9rem + env(safe-area-inset-right)); z-index:600;
+  /* botão "sobre": separado do toggle mapa/lista, mesmo visual da parte
+     não-selecionada dele (vidro, sem fundo preto) */
+  .about-btn{ font-family:var(--mono); font-size:0.79rem; color:var(--ink); cursor:pointer;
+              background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
+              -webkit-backdrop-filter:blur(18px) saturate(180%);
+              border:1px solid rgba(255,255,255,0.4); border-radius:999px;
+              padding:0.55rem 0.9rem; min-height:46px;
+              box-shadow:0 2px 10px rgba(0,0,0,0.08);
+              transition:background 0.2s ease; }
+  .about-btn:hover{ background:rgba(255,255,255,0.35); }
+
+  .sort-switch{ position:absolute; bottom:calc(5rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:600;
                 display:flex; gap:2px; font-family:var(--mono); font-size:0.73rem;
                 background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
                 -webkit-backdrop-filter:blur(18px) saturate(180%);
@@ -313,6 +330,47 @@
                     background:none; border:none; cursor:pointer; padding:0.6rem; min-height:36px;
                     font-family:var(--mono); font-size:0.79rem; color:var(--ink); }
   .lightbox-close:hover{ opacity:0.6; }
+
+  /* ---------------- About modal (same glass treatment as lightbox) ---------------- */
+  .about-overlay{ position:fixed; inset:0; z-index:1000;
+             background:transparent;
+             display:flex; align-items:center; justify-content:center;
+             opacity:0; pointer-events:none; transition:opacity 0.25s ease;
+             padding:calc(1rem + env(safe-area-inset-top)) calc(1rem + env(safe-area-inset-right))
+                     calc(1rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left)); }
+  .about-overlay.open{ opacity:1; pointer-events:auto; }
+
+  .about-modal{ position:relative; width:100%; height:100%;
+                    background:rgba(255,255,255,0.35);
+                    backdrop-filter:blur(32px) saturate(180%);
+                    -webkit-backdrop-filter:blur(32px) saturate(180%);
+                    border:1px solid rgba(255,255,255,0.6);
+                    border-radius:10px;
+                    box-shadow:0 24px 70px rgba(0,0,0,0.25);
+                    display:flex; flex-direction:column; overflow:hidden;
+                    transform:scale(0.97); transition:transform 0.25s ease; }
+  .about-overlay.open .about-modal{ transform:scale(1); }
+
+  .about-head{ padding:1.6rem 1.6rem 1rem; border-bottom:1px solid rgba(0,0,0,0.12); flex-shrink:0; }
+  .about-title{ font-family:var(--serif); font-weight:400; color:var(--ink); font-size:1.32rem; margin:0; }
+
+  .about-body{ overflow-y:auto; -webkit-overflow-scrolling:touch; flex-grow:1;
+               max-width:920px; width:100%; margin:0 auto;
+               padding:1.6rem 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); }
+
+  .about-grid{ display:grid; grid-template-columns:1fr 200px; gap:2.6rem; align-items:start; }
+  .about-main p{ font-family:var(--sans); font-size:0.97rem; line-height:1.6; color:var(--ink); margin:0 0 1em; }
+  .about-main p:last-child{ margin-bottom:0; }
+
+  .about-credits{ font-family:var(--mono); border-left:1px solid rgba(0,0,0,0.12); padding-left:1.6rem; }
+  .about-credits-label{ text-transform:uppercase; letter-spacing:0.06em; font-size:0.72rem; color:var(--gray); margin:0 0 0.7rem; }
+  .about-credits p{ font-size:0.83rem; line-height:1.5; color:var(--ink); margin:0 0 0.9rem; }
+  .about-credits a{ color:var(--ink); }
+
+  @media (max-width:640px){
+    .about-grid{ grid-template-columns:1fr; gap:1.8rem; }
+    .about-credits{ border-left:none; padding-left:0; border-top:1px solid rgba(0,0,0,0.12); padding-top:1.2rem; }
+  }
 </style>
 
 </head>
@@ -324,17 +382,18 @@
   <div class="hero-title" id="hero-title">
     <div class="hero-label">Circuito de Ateliês do Centro</div>
     <h1>Ateliês abertos</h1>
-    <div class="hero-date-row">
-      <span class="hero-date" id="hero-date">18 – 19 de Setembro</span>
-      <span class="hero-edition">Edição 01</span>
-    </div>
+    <div class="hero-date" id="hero-date">18 – 19 de Setembro</div>
+    <span class="hero-edition">Edição 01</span>
   </div>
   <div class="hero-count" id="hero-count">— endereços · — artistas</div>
 </div>
 
-<div class="switcher">
-  <button id="switch-map" class="active">mapa</button>
-  <button id="switch-list">lista</button>
+<div class="top-actions">
+  <div class="switcher">
+    <button id="switch-map" class="active">mapa</button>
+    <button id="switch-list">lista</button>
+  </div>
+  <button class="about-btn" id="about-btn">sobre</button>
 </div>
 <div class="sort-switch" id="sort-switch">
   <button id="sort-endereco" class="active">por endereço</button>
@@ -369,6 +428,24 @@
       <div class="lb-room" id="lightbox-room"></div>
       <div class="day-badges" id="lightbox-days" style="justify-content:center;"></div>
       <p class="lb-bio" id="lightbox-bio"></p>
+    </div>
+  </div>
+</div>
+
+<div class="about-overlay" id="about-overlay">
+  <div class="about-modal">
+    <button class="lightbox-close" id="about-close" aria-label="Fechar">fechar ×</button>
+    <div class="about-head"><h2 class="about-title">Circuito de Ateliês do Centro</h2></div>
+    <div class="about-body">
+      <div class="about-grid">
+        <div class="about-main">
+          <p>[Texto sobre o evento — a preencher.]</p>
+        </div>
+        <div class="about-credits">
+          <p class="about-credits-label">Créditos</p>
+          <p>Identidade visual e site: Eduardo Mattos<br><a href="https://instagram.com/macula.cc" target="_blank" rel="noopener">@macula.cc</a></p>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -932,7 +1009,16 @@ function closeLightbox(){
 }
 document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
 lightbox.addEventListener('click', (e) => { if (e.target === lightbox) closeLightbox(); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLightbox(); });
+
+// ---------------- about modal ----------------
+const aboutOverlay = document.getElementById('about-overlay');
+function openAbout(){ aboutOverlay.classList.add('open'); }
+function closeAbout(){ aboutOverlay.classList.remove('open'); }
+document.getElementById('about-btn').addEventListener('click', openAbout);
+document.getElementById('about-close').addEventListener('click', closeAbout);
+aboutOverlay.addEventListener('click', (e) => { if (e.target === aboutOverlay) closeAbout(); });
+
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ closeLightbox(); closeAbout(); } });
 
 function goToLocation(loc){
   setView('map');
