@@ -31,7 +31,12 @@
   /* ---------------- Hero: full-bleed map (always mounted) ---------------- */
   .hero{ position:fixed; inset:0; }
   #map{ position:absolute; inset:0; width:100%; height:100%; background:#e9e9e9; z-index:1; isolation:isolate; }
-  #snake-overlay{ position:absolute; inset:0; width:100%; height:100%; z-index:250; pointer-events:none; }
+  /* escurece o mapa (pontos incluídos, ficam por baixo) enquanto o hero title
+     está grande, só pra dar destaque ao título/data — some no primeiro toque,
+     junto com o encolhimento do título */
+  .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(0,0,0,0.7);
+            pointer-events:none; transition:opacity 0.6s ease; }
+  .map-dim.hidden{ opacity:0; }
   /* filtro aplicado por tile individual (não na pane inteira) — cada tile é só
      256x256px, então cada rasterização do filtro é barata; aplicar na pane
      inteira forçava recalcular o filtro da área visível toda a cada tile novo
@@ -52,12 +57,12 @@
   .hero-label{ font-family:var(--sans-display); font-weight:500; color:var(--ink);
                font-size:0.33em; line-height:1.2; margin:0 0 0.3em; }
 
-  .hero-title h1{ font-family:var(--serif); font-weight:400; color:var(--ink);
+  .hero-title h1{ font-family:var(--serif); font-weight:400; color:#cfcfcf;
                   font-size:1em;
                   line-height:0.94; margin:0; white-space:nowrap; letter-spacing:-0.01em;
-                  transition:line-height 0.75s cubic-bezier(.16,1,.3,1); }
+                  transition:line-height 0.75s cubic-bezier(.16,1,.3,1), color 0.4s ease; }
 
-  .hero-date-row{ display:flex; align-items:baseline; flex-wrap:wrap; gap:0.4em; margin-top:0.05em; }
+  .hero-date-row{ display:flex; align-items:center; flex-wrap:wrap; gap:0.25em; margin-top:0.05em; }
   .hero-date{ font-family:var(--serif); font-weight:400; color:var(--ink);
               font-size:1em;
               line-height:0.94; white-space:nowrap; }
@@ -67,7 +72,7 @@
                  padding:0.35em 0.85em; border-radius:999px; white-space:nowrap; }
 
   .hero-title.shrunk{ font-size:clamp(1.43rem, 3.3vw, 2.09rem) !important; }
-  .hero-title.shrunk h1{ line-height:1.25; max-width:14ch; white-space:normal; }
+  .hero-title.shrunk h1{ line-height:1.25; max-width:14ch; white-space:normal; color:var(--gray); }
   .hero-title.shrunk .hero-edition{ font-size:0.6rem; }
 
   /* Mobile: fixed sizes per breakpoint no elemento pai (label/data/selo
@@ -315,7 +320,7 @@
 
 <div class="hero">
   <div id="map"></div>
-  <canvas id="snake-overlay"></canvas>
+  <div class="map-dim" id="map-dim"></div>
   <div class="hero-title" id="hero-title">
     <div class="hero-label">Circuito de Ateliês do Centro</div>
     <h1>Ateliês abertos</h1>
@@ -552,10 +557,7 @@ function initMap(){
     // wheelPxPerZoomLevel mais baixo que o padrão (60) compensa: cada incremento
     // fracionário passa a valer mais zoom, pra não sentir "fraquinho" no pinch.
     map = L.map('map', { scrollWheelZoom:true, doubleClickZoom:true, zoomControl:false, zoomSnap:0.25, wheelPxPerZoomLevel:20 });
-    // enquadramento inicial: em vez de um centro/zoom fixos, calcula a partir
-    // dos pontos reais, com padding maior em cima — reserva "campo livre" pro
-    // hero title grande sem os pins ficarem embaixo dele
-    frameForSnake(false);
+    frameMapToPoints();
     L.control.zoom({ position:'bottomright' }).addTo(map);
 
     const LocateControl = L.Control.extend({
@@ -630,7 +632,6 @@ function initMap(){
     LOCATIONS.forEach((loc) => addMarkerForLocation(loc));
     addStationMarkers();
     locateUserAutomatically();
-    beginSnakeIntro();
   } catch(err){
     console.error('Mapa indisponível:', err);
     const mapEl = document.getElementById('map');
@@ -941,397 +942,39 @@ function goToLocation(loc){
   openDrawer(loc.id);
 }
 
-/* ============================================================
-   [TESTE] "cobrinha" ambiente — desenha o circuito real sobre o mapa,
-   partindo de um ponto aleatório, e some num movimento único de elástico
-   solto antes de recomeçar de outro ponto. Aparece na carga inicial
-   (mapa congelado, título grande) e some na primeira interação real;
-   volta como "screensaver" depois de 5min de inatividade (ver bloco de
-   interação mais abaixo). Reaproveita a mesma técnica de fita+texto+
-   "negativo" no título do gerador-video.html, só que projetando os
-   pontos com o próprio Leaflet (map.latLngToContainerPoint) em vez de
-   reimplementar a projeção — assim fica sempre alinhada ao mapa real.
-   ============================================================ */
-const SNAKE_LEG_DURATION = 0.32; // s — tempo de cada trecho ao desenhar
-const SNAKE_ERASE_DURATION = 3;  // s — tempo do circuito INTEIRO ao apagar, num movimento só
-function snakeEaseOutSnap(t){ return t >= 1 ? 1 : 1 - Math.pow(2, -10*t); }
-
-function snakeShuffledIndices(n){
-  const arr = Array.from({length:n}, (_,i)=>i);
-  for (let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
-  return arr;
-}
-function snakeBuildLegPath(a, b){
-  const dx = b.x - a.x, dy = b.y - a.y;
-  const len = Math.hypot(dx, dy) || 1;
-  if (Math.random() < 0.35 || len < 90){
-    return [ { x:a.x, y:a.y }, { x:b.x, y:b.y } ];
-  }
-  const nx = -dy/len, ny = dx/len;
-  const side = Math.random() < 0.5 ? 1 : -1;
-  const offset = len * (0.08 + Math.random()*0.14) * side;
-  const mx = (a.x+b.x)/2 + nx*offset;
-  const my = (a.y+b.y)/2 + ny*offset;
-  const N = Math.max(18, Math.round(len/16));
-  const pts = [];
-  for (let i=0;i<=N;i++){
-    const t = i/N;
-    const it = 1-t;
-    pts.push({ x: it*it*a.x + 2*it*t*mx + t*t*b.x, y: it*it*a.y + 2*it*t*my + t*t*b.y });
-  }
-  return pts;
-}
-function snakePathLength(points){
-  let len = 0;
-  for (let i=1;i<points.length;i++) len += Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
-  return len;
-}
-function snakePointAtDistance(points, dist){
-  let d = 0;
-  for (let i = 1; i < points.length; i++){
-    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
-    if (d + seg >= dist){
-      const t = seg === 0 ? 0 : (dist-d)/seg;
-      return {
-        x: points[i-1].x + (points[i].x-points[i-1].x)*t,
-        y: points[i-1].y + (points[i].y-points[i-1].y)*t,
-        angle: Math.atan2(points[i].y-points[i-1].y, points[i].x-points[i-1].x)
-      };
-    }
-    d += seg;
-  }
-  const last = points[points.length-1];
-  return { x:last.x, y:last.y, angle:0 };
-}
-function snakeSubPathUpTo(points, dist){
-  const out = [points[0]];
-  let d = 0;
-  for (let i = 1; i < points.length; i++){
-    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
-    if (d + seg >= dist){
-      const t = seg === 0 ? 0 : (dist-d)/seg;
-      out.push({ x: points[i-1].x + (points[i].x-points[i-1].x)*t, y: points[i-1].y + (points[i].y-points[i-1].y)*t });
-      return out;
-    }
-    out.push(points[i]);
-    d += seg;
-  }
-  return out;
-}
-function snakeSubPathFrom(points, dist){
-  if (dist <= 0) return points;
-  let d = 0;
-  for (let i = 1; i < points.length; i++){
-    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
-    if (d + seg >= dist){
-      const t = seg === 0 ? 0 : (dist-d)/seg;
-      const cut = { x: points[i-1].x + (points[i].x-points[i-1].x)*t, y: points[i-1].y + (points[i].y-points[i-1].y)*t };
-      return [cut, ...points.slice(i)];
-    }
-    d += seg;
-  }
-  return [points[points.length-1]];
-}
-function snakeExtractRange(points, dStart, dEnd){
-  return snakeSubPathFrom(snakeSubPathUpTo(points, dEnd), dStart);
-}
-function snakeFlattenLegs(legs){
-  const out = [];
-  legs.forEach(leg => { if (leg.length) out.push(...(out.length ? leg.slice(1) : leg)); });
-  return out;
-}
-function snakeTotalLegsLength(legs){ return legs.reduce((s,leg) => s + snakePathLength(leg), 0); }
-
-// enquadra o mapa a partir dos pontos reais, com padding maior em cima —
-// deixa "campo livre" pro hero title grande sem os pins ficarem por baixo
-// dele. animate:true é usado quando o screensaver reenquadra depois da
-// pessoa ter navegado o mapa livremente.
-function frameForSnake(animate){
+// enquadramento inicial do mapa: calcula a partir dos pontos reais, com
+// padding maior em cima — reserva "campo livre" pro hero title grande sem
+// os pins ficarem embaixo dele
+function frameMapToPoints(){
   const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
   if (withCoords.length < 2){
-    map.setView([-22.9065, -43.1795], 15, { animate: !!animate });
+    map.setView([-22.9065, -43.1795], 15);
     return;
   }
   const bounds = L.latLngBounds(withCoords.map(l => [l.lat, l.lng]));
-  map.fitBounds(bounds, {
-    paddingTopLeft: [30, 220],
-    paddingBottomRight: [30, 50],
-    animate: !!animate,
-    duration: 1.1
-  });
+  map.fitBounds(bounds, { paddingTopLeft: [30, 220], paddingBottomRight: [30, 50] });
 }
 
-function freezeMapForSnake(){
-  map.dragging.disable();
-  map.scrollWheelZoom.disable();
-  map.doubleClickZoom.disable();
-  if (map.touchZoom) map.touchZoom.disable();
-}
-function unfreezeMap(){
-  map.dragging.enable();
-  map.scrollWheelZoom.enable();
-  map.doubleClickZoom.enable();
-  if (map.touchZoom) map.touchZoom.enable();
-}
-
-const snakeCanvas = document.getElementById('snake-overlay');
-const snakeCtx = snakeCanvas.getContext('2d');
-let snakeDPR = 1, snakeW = 0, snakeH = 0;
-function resizeSnakeCanvas(){
-  snakeDPR = Math.min(window.devicePixelRatio || 1, 3);
-  snakeW = window.innerWidth;
-  snakeH = window.innerHeight;
-  snakeCanvas.width = snakeW * snakeDPR;
-  snakeCanvas.height = snakeH * snakeDPR;
-  snakeCtx.setTransform(snakeDPR, 0, 0, snakeDPR, 0, 0);
-}
-window.addEventListener('resize', () => { resizeSnakeCanvas(); if (snakeActive) drawSnakeFrame(); });
-
-function snakeStrokeWidth(){
-  return Math.max(8, Math.min(24, Math.min(window.innerWidth, window.innerHeight) * 0.026));
-}
-function collectSnakeScreenPoints(){
-  return LOCATIONS
-    .filter(l => l.lat != null && l.lng != null)
-    .map(l => map.latLngToContainerPoint([l.lat, l.lng]));
-}
-function buildSnakeLegs(){
-  const pts = collectSnakeScreenPoints();
-  if (pts.length < 2) return [];
-  const order = snakeShuffledIndices(pts.length);
-  const legs = [];
-  for (let i = 1; i < order.length; i++) legs.push(snakeBuildLegPath(pts[order[i-1]], pts[order[i]]));
-  return legs;
-}
-
-let snakeActive = false;
-let snakeLegs = [], snakeFlat = [], snakeLegOffsets = [];
-let snakeTotal = 0, snakeLegIndex = 0, snakeLegElapsed = 0, snakeEraseElapsed = 0;
-let snakeProgress = 0, snakeErase = 0;
-let snakePhase = 'drawing'; // drawing | erasing
-let snakeRafId = null, snakeLastTs = null;
-
-function startSnakeCycle(){
-  snakeLegs = buildSnakeLegs();
-  if (snakeLegs.length < 1) return; // ainda sem pontos suficientes com coordenada
-  snakeFlat = snakeFlattenLegs(snakeLegs);
-  snakeTotal = snakeTotalLegsLength(snakeLegs);
-  snakeLegOffsets = [];
-  let acc = 0;
-  snakeLegs.forEach(leg => { snakeLegOffsets.push(acc); acc += snakePathLength(leg); });
-  snakeLegIndex = 0; snakeLegElapsed = 0; snakeEraseElapsed = 0;
-  snakeProgress = 0; snakeErase = 0;
-  snakePhase = 'drawing';
-  snakeLastTs = null;
-  if (!snakeRafId) snakeRafId = requestAnimationFrame(snakeLoop);
-}
-
-function advanceSnakeLegs(dt){
-  snakeLegElapsed += dt;
-  let t = Math.min(1, snakeLegElapsed / SNAKE_LEG_DURATION);
-  while (t >= 1 && snakeLegIndex < snakeLegs.length - 1){
-    snakeLegIndex++;
-    snakeLegElapsed -= SNAKE_LEG_DURATION;
-    t = Math.min(1, Math.max(0, snakeLegElapsed) / SNAKE_LEG_DURATION);
-  }
-  const legLen = snakePathLength(snakeLegs[snakeLegIndex]);
-  const dist = snakeLegOffsets[snakeLegIndex] + snakeEaseOutSnap(t) * legLen;
-  const finished = t >= 1 && snakeLegIndex === snakeLegs.length - 1;
-  return { dist, finished };
-}
-
-function snakeLoop(ts){
-  if (!snakeActive){ snakeRafId = null; return; }
-  snakeRafId = requestAnimationFrame(snakeLoop);
-  if (snakeLastTs == null) snakeLastTs = ts;
-  const dt = Math.min(0.1, (ts - snakeLastTs) / 1000);
-  snakeLastTs = ts;
-
-  if (snakePhase === 'drawing'){
-    const { dist, finished } = advanceSnakeLegs(dt);
-    snakeProgress = dist;
-    if (finished){ snakePhase = 'erasing'; snakeEraseElapsed = 0; }
-  } else {
-    snakeEraseElapsed += dt;
-    const t = Math.min(1, snakeEraseElapsed / SNAKE_ERASE_DURATION);
-    snakeErase = snakeEaseOutSnap(t) * snakeTotal;
-    if (t >= 1){ startSnakeCycle(); return; }
-  }
-  drawSnakeFrame();
-}
-
-function snakeStrokeLegsInRange(ctx2d, legs, dStart, dEnd, strokeWidth){
-  let offset = 0;
-  legs.forEach(leg => {
-    if (leg.length < 2) return;
-    const legLen = snakePathLength(leg);
-    const localStart = Math.max(0, dStart - offset);
-    const localEnd = Math.min(legLen, dEnd - offset);
-    if (localEnd > localStart){
-      const sub = snakeExtractRange(leg, localStart, localEnd);
-      if (sub.length >= 2){
-        ctx2d.lineWidth = strokeWidth;
-        ctx2d.lineCap = 'round'; ctx2d.lineJoin = 'round';
-        ctx2d.strokeStyle = '#111';
-        ctx2d.beginPath();
-        sub.forEach((p,i) => { if (i===0) ctx2d.moveTo(p.x,p.y); else ctx2d.lineTo(p.x,p.y); });
-        ctx2d.stroke();
-      }
-    }
-    offset += legLen;
-  });
-}
-// o #map tem isolation:isolate (corrige um bug antigo de z-index durante
-// zoom — ver CLAUDE.md) e isso faz o mapa inteiro (tiles + pins) virar uma
-// única camada vista de fora. Como o canvas da cobrinha fica por cima dessa
-// camada inteira, os pins reais do Leaflet ficariam escondidos atrás do
-// traço. Solução: redesenhar réplicas dos pins (mesmo visual, mesmas
-// coordenadas) por cima do traço neste mesmo canvas — os pins de verdade
-// continuam lá, intocados, só temporariamente "cobertos" por uma cópia sua.
-function snakeDrawPins(ctx2d){
-  LOCATIONS.forEach(loc => {
-    if (loc.lat == null || loc.lng == null) return;
-    const p = map.latLngToContainerPoint([loc.lat, loc.lng]);
-    const label = String(locationNumberMap[loc.id] || '?').padStart(2, '0');
-    ctx2d.beginPath();
-    ctx2d.arc(p.x, p.y, 12, 0, Math.PI*2);
-    ctx2d.fillStyle = '#111';
-    ctx2d.fill();
-    ctx2d.lineWidth = 1.5;
-    ctx2d.strokeStyle = '#fff';
-    ctx2d.stroke();
-    ctx2d.fillStyle = '#fff';
-    ctx2d.font = "10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-    ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'middle';
-    ctx2d.fillText(label, p.x, p.y + 0.5);
-  });
-  STATIONS.forEach(st => {
-    const p = map.latLngToContainerPoint([st.lat, st.lng]);
-    ctx2d.beginPath();
-    ctx2d.arc(p.x, p.y, 10, 0, Math.PI*2);
-    ctx2d.fillStyle = st.tipo === 'metro' ? '#1565C0' : '#0F3D7A';
-    ctx2d.fill();
-    ctx2d.lineWidth = 2;
-    ctx2d.strokeStyle = '#fff';
-    ctx2d.stroke();
-    ctx2d.fillStyle = '#fff';
-    ctx2d.font = "bold 9px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-    ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'middle';
-    ctx2d.fillText(st.tipo === 'metro' ? 'M' : 'V', p.x, p.y + 0.5);
-  });
-  ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'alphabetic';
-}
-
-function drawSnakeFrame(){
-  snakeCtx.clearRect(0, 0, snakeW, snakeH);
-  if (!snakeActive || !snakeLegs.length) return;
-  const strokeWidth = snakeStrokeWidth();
-  const dStart = snakePhase === 'erasing' ? snakeErase : 0;
-  const dEnd = snakePhase === 'erasing' ? snakeTotal : snakeProgress;
-
-  // [TESTE] escurece o quadro pra reduzir a "informação" do mapa por baixo
-  // e destacar o traço branco por cima
-  snakeCtx.fillStyle = 'rgba(0,0,0,0.7)';
-  snakeCtx.fillRect(0, 0, snakeW, snakeH);
-
-  snakeStrokeLegsInRange(snakeCtx, snakeLegs, dStart, dEnd, strokeWidth);
-
-  if (snakePhase === 'drawing' && snakeProgress < snakeTotal){
-    const head = snakePointAtDistance(snakeFlat, snakeProgress);
-    const pulse = 1 + Math.sin(performance.now()/260) * 0.18;
-    snakeCtx.beginPath();
-    snakeCtx.arc(head.x, head.y, strokeWidth*0.45*pulse, 0, Math.PI*2);
-    snakeCtx.fillStyle = 'rgba(255,255,255,0.3)';
-    snakeCtx.fill();
-    snakeCtx.beginPath();
-    snakeCtx.arc(head.x, head.y, strokeWidth*0.2, 0, Math.PI*2);
-    snakeCtx.fillStyle = '#fff';
-    snakeCtx.fill();
-  }
-
-  snakeDrawPins(snakeCtx);
-}
-
-function stopSnake(){
-  snakeActive = false;
-  if (snakeRafId){ cancelAnimationFrame(snakeRafId); snakeRafId = null; }
-  snakeCtx.clearRect(0, 0, snakeW, snakeH);
-}
-// chamado uma vez no boot, logo depois do mapa/marcadores existirem — a
-// view já foi enquadrada dentro do próprio initMap() via frameForSnake(false)
-function beginSnakeIntro(){
-  resizeSnakeCanvas();
-  snakeActive = true;
-  freezeMapForSnake();
-  startSnakeCycle();
-}
-// screensaver: reaparece depois de 5min parado — reenquadra (a pessoa pode
-// ter navegado o mapa livremente) e faz o título grande "voltar"
-function beginScreensaver(){
-  heroShrunk = false;
-  heroTitle.classList.remove('shrunk');
-  armInteractionListeners();
-  frameForSnake(true);
-  snakeActive = true;
-  freezeMapForSnake();
-  startSnakeCycle();
-}
-
-// ---------------- hero title: starts large (fixed CSS breakpoint sizes), shrinks to the corner on first interaction ----------------
+// ---------------- hero title: starts large, shrinks to the corner on first interaction ----------------
 const heroTitle = document.getElementById('hero-title');
 let heroShrunk = false;
 
-// primeira interação real (mapa+título grande / screensaver): encolhe o
-// título, some com a cobrinha e libera o mapa pra navegação normal — tudo
-// no mesmo gatilho, porque semanticamente é o mesmo evento ("a pessoa
-// começou a usar o site de verdade"). Reatachável, porque o screensaver
-// precisa rearmar esse mesmo comportamento depois de cada vez que aparece.
-function onFirstInteraction(e){
+function shrinkHero(e){
+  if (heroShrunk) return;
   // ignora eventos sintéticos (disparados por script, não por uma ação real
   // da pessoa) — algumas extensões de navegador injetam eventos de teclado
   // na página, e isso não deve contar como "o usuário interagiu".
   if (e && e.isTrusted === false) return;
-  if (!heroShrunk){
-    heroShrunk = true;
-    heroTitle.classList.add('shrunk');
-  }
-  if (snakeActive){
-    stopSnake();
-    unfreezeMap();
-  }
-  document.removeEventListener('pointerdown', onFirstInteraction);
-  document.removeEventListener('wheel', onFirstInteraction);
-  document.removeEventListener('keydown', onFirstInteraction);
-  resetInactivityTimer();
+  heroShrunk = true;
+  heroTitle.classList.add('shrunk');
+  document.getElementById('map-dim').classList.add('hidden');
+  document.removeEventListener('pointerdown', shrinkHero);
+  document.removeEventListener('wheel', shrinkHero);
+  document.removeEventListener('keydown', shrinkHero);
 }
-function armInteractionListeners(){
-  document.addEventListener('pointerdown', onFirstInteraction, { passive:true });
-  document.addEventListener('wheel', onFirstInteraction, { passive:true });
-  document.addEventListener('keydown', onFirstInteraction);
-}
-armInteractionListeners();
-
-// ---------------- inatividade (5 min) → cobrinha volta como "screensaver" ----------------
-// qualquer interação real reseta a contagem; se algo estiver aberto (drawer,
-// lightbox, lista) quando os 5 min completarem, não conta como inatividade —
-// só tenta de novo mais adiante.
-const INACTIVITY_MS = 5 * 60 * 1000;
-let inactivityTimer = null;
-function anythingOpen(){
-  return overlay.classList.contains('open') || listOverlay.classList.contains('open') || lightbox.classList.contains('open');
-}
-function resetInactivityTimer(){
-  clearTimeout(inactivityTimer);
-  inactivityTimer = setTimeout(tryStartScreensaver, INACTIVITY_MS);
-}
-function tryStartScreensaver(){
-  if (anythingOpen()){ resetInactivityTimer(); return; }
-  beginScreensaver();
-}
-['pointerdown','wheel','keydown','touchstart'].forEach(evt => {
-  document.addEventListener(evt, (e) => { if (e && e.isTrusted === false) return; resetInactivityTimer(); }, { passive:true });
-});
-resetInactivityTimer();
+document.addEventListener('pointerdown', shrinkHero, { passive:true });
+document.addEventListener('wheel', shrinkHero, { passive:true });
+document.addEventListener('keydown', shrinkHero);
 
 // ---------------- view switch (mapa / lista) ----------------
 const listOverlay = document.getElementById('list-overlay');
