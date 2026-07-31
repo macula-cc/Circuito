@@ -70,12 +70,12 @@
 
   /* núcleo tipográfico: label (nome do evento, sans caixa alta, Inter Tight)
      é relativo ao tamanho de "Ateliês abertos" (1em, no elemento pai) via
-     font-size em em — cresce e encolhe sempre na mesma proporção, calibrado
-     pra ocupar ~90% da largura de "Ateliês abertos" (medido via
-     canvas.measureText) */
+     font-size em em — cresce e encolhe sempre na mesma proporção. Razão
+     calibrada pelos valores de referência do design original (Circuito
+     41pt / Ateliês abertos 137pt = 41/137 ≈ 0,2993) */
   .hero-label{ font-family:var(--sans-display); font-weight:600; color:var(--ink);
                text-transform:uppercase; letter-spacing:0.04em;
-               font-size:0.33em; line-height:1.2; margin:0 0 0.3em; }
+               font-size:0.2993em; line-height:1.2; margin:0 0 0.3em; }
 
   .hero-title h1{ font-family:var(--serif); font-weight:400; color:#cfcfcf;
                   font-size:1em;
