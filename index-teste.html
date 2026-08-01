@@ -1197,8 +1197,7 @@ async function boot(){
 }
 boot();
 
-// ---------------- cursor customizado (desktop): ponto preto + rastro em
-// degradê, mesmo espírito visual da cobrinha que foi removida ----------------
+// ---------------- cursor customizado (desktop): só o ponto, sem rastro ----------------
 if (window.matchMedia('(hover:hover) and (pointer:fine)').matches){
   const cursorCanvas = document.getElementById('cursor-canvas');
   const cursorCtx = cursorCanvas.getContext('2d');
@@ -1223,47 +1222,16 @@ if (window.matchMedia('(hover:hover) and (pointer:fine)').matches){
   });
   document.addEventListener('mouseleave', () => { cursorTargetX = null; cursorTargetY = null; });
 
-  // histórico curto de posições (com timestamp) em vez de "apagar aos
-  // poucos" — cada quadro limpa o canvas inteiro (clearRect, sem resíduo
-  // possível) e redesenha só os pontos ainda dentro da janela de tempo,
-  // com opacidade calculada pela idade de cada um. Mais robusto que o
-  // destination-out acumulado: não tem como sobrar marca permanente,
-  // porque nada persiste de um quadro pro outro além desse histórico.
-  const CURSOR_TRAIL_MS = 260;
-  let cursorHistory = [];
-
   (function cursorLoop(){
-    const now = performance.now();
     cursorCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-
     if (cursorTargetX != null){
-      const prevDrawX = cursorDrawX, prevDrawY = cursorDrawY;
       cursorDrawX += (cursorTargetX - cursorDrawX) * CURSOR_EASE;
       cursorDrawY += (cursorTargetY - cursorDrawY) * CURSOR_EASE;
-      // só registra no histórico se a posição realmente mudou — com o
-      // mouse parado (mesmo dentro da janela) a posição suavizada converge
-      // e para de se mover; sem essa checagem um ponto "novo" era
-      // empilhado a cada quadro pra sempre, e o rastro nunca esvaziava de
-      // verdade (a marca "eterna" que ficava grudada na tela)
-      if (Math.abs(cursorDrawX - prevDrawX) > 0.02 || Math.abs(cursorDrawY - prevDrawY) > 0.02){
-        cursorHistory.push({ x:cursorDrawX, y:cursorDrawY, t:now });
-      }
-    }
-    cursorHistory = cursorHistory.filter(p => now - p.t < CURSOR_TRAIL_MS);
-
-    cursorCtx.lineCap = 'round';
-    cursorCtx.lineWidth = 24;
-    cursorCtx.strokeStyle = '#fff';
-    for (let i = 1; i < cursorHistory.length; i++){
-      const p0 = cursorHistory[i-1], p1 = cursorHistory[i];
-      cursorCtx.globalAlpha = Math.max(0, 1 - (now - p1.t) / CURSOR_TRAIL_MS);
       cursorCtx.beginPath();
-      cursorCtx.moveTo(p0.x, p0.y);
-      cursorCtx.lineTo(p1.x, p1.y);
-      cursorCtx.stroke();
+      cursorCtx.arc(cursorDrawX, cursorDrawY, 12, 0, Math.PI*2);
+      cursorCtx.fillStyle = '#fff';
+      cursorCtx.fill();
     }
-    cursorCtx.globalAlpha = 1;
-
     requestAnimationFrame(cursorLoop);
   })();
 }
