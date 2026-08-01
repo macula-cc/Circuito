@@ -32,6 +32,23 @@
   button{ font:inherit; touch-action:manipulation; }
   .row, .drawer-close, .switcher button, .sort-switch button{ -webkit-tap-highlight-color:transparent; }
 
+  /* cursor customizado: só em desktop de verdade (mouse fino, com hover) —
+     não mexe com touch. #cursor-canvas desenha o ponto + rastro (ver JS). */
+  @media (hover:hover) and (pointer:fine){
+    *{ cursor:none !important; }
+  }
+  /* width/height:100% explícitos são necessários aqui: canvas é elemento
+     "replaced" e, mesmo com inset:0, um replaced element position:fixed
+     sem width/height definido usa o tamanho intrínseco (os atributos
+     width/height em pixels físicos setados via JS) em vez de esticar pro
+     viewport — sem isso o canvas renderiza gigante e tudo sai "pixelado".
+     mix-blend-mode:difference faz o cursor funcionar como máscara de
+     negativo: onde o círculo branco se sobrepõe a algo (o pin preto, por
+     exemplo), o resultado vira a cor invertida — só na área de
+     interseção, não no elemento inteiro. */
+  #cursor-canvas{ position:fixed; inset:0; width:100%; height:100%; z-index:5000; pointer-events:none;
+                  mix-blend-mode:difference; }
+
   /* ---------------- Hero: full-bleed map (always mounted) ---------------- */
   .hero{ position:fixed; inset:0; }
   #map{ position:absolute; inset:0; width:100%; height:100%; background:#e9e9e9; z-index:1; isolation:isolate; }
@@ -45,7 +62,8 @@
   /* escurece o mapa (pontos incluídos, ficam por baixo) enquanto o hero title
      está grande, só pra dar destaque ao título/data — some no primeiro toque,
      junto com o encolhimento do título */
-  .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(0,0,0,0.7);
+  .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(0,0,0,0.6);
+            backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
             pointer-events:none; transition:opacity 0.6s ease; }
   .map-dim.hidden{ opacity:0; }
 
@@ -79,8 +97,10 @@
   .hero-count{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:calc(1.6rem + env(safe-area-inset-left)); z-index:200;
                font-family:var(--mono); font-size:0.79rem; color:var(--gray); pointer-events:none; }
 
-  /* ---------------- View switcher (glass pill toggle) + about button ---------------- */
-  .top-actions{ position:absolute; top:calc(1.1rem + env(safe-area-inset-top)); right:calc(0.9rem + env(safe-area-inset-right)); z-index:600;
+  /* ---------------- View switcher (glass pill toggle) + about button ----------------
+     centralizados na parte inferior da tela — o sort-switch (por endereço/
+     por artista) fica numa linha própria acima deles, mesmo esquema */
+  .top-actions{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:600;
                 display:flex; align-items:center; gap:0.5rem; }
   .switcher{ display:flex; gap:2px; font-family:var(--mono); font-size:0.79rem;
              background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
@@ -104,7 +124,7 @@
               transition:background 0.2s ease; }
   .about-btn:hover{ background:rgba(255,255,255,0.35); }
 
-  .sort-switch{ position:absolute; top:calc(4rem + env(safe-area-inset-top)); right:calc(0.9rem + env(safe-area-inset-right)); z-index:600;
+  .sort-switch{ position:absolute; bottom:calc(5rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:600;
                 display:flex; gap:2px; font-family:var(--mono); font-size:0.73rem;
                 background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
                 -webkit-backdrop-filter:blur(18px) saturate(180%);
@@ -120,12 +140,16 @@
 
   /* pins: 40px invisible tap target, badge circle with initials centered inside */
   .pin-hit{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
-  .pin{ width:24px; height:24px; border-radius:50%; background:#111; border:1.5px solid #fff;
-        box-shadow:0 0 0 1px rgba(0,0,0,0.4);
+  .pin{ width:24px; height:24px; border-radius:50%; background:#111;
+        box-shadow:0 2px 10px rgba(0,0,0,0.08);
         display:flex; align-items:center; justify-content:center;
         font-family:var(--mono); font-size:0.6rem; font-weight:500; color:#fff; letter-spacing:0.01em;
-        transition:transform 0.18s cubic-bezier(.4,0,.2,1); transform:scale(1); }
-  .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.18); }
+        transition:transform 0.18s cubic-bezier(.4,0,.2,1), box-shadow 0.18s ease;
+        transform:scale(1); }
+  /* o "negativo" no hover não é uma troca de cor daqui — é o próprio
+     cursor customizado (mix-blend-mode:difference) que inverte só onde
+     realmente se sobrepõe ao pin; aqui só o crescimento leve + sombra */
+  .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.18); box-shadow:0 4px 16px rgba(0,0,0,0.35); }
   .pin.active{ transform:scale(1.18); box-shadow:0 0 0 3px rgba(0,0,0,0.18); }
 
   /* transit stations (metrô/VLT): blue circular badge with letter — click
@@ -150,7 +174,12 @@
   .leaflet-control-zoom{ border:none !important; }
   .leaflet-control-zoom a{ background:#fff !important; color:#111 !important; border:1px solid var(--line) !important;
                             border-radius:0 !important; font-family:var(--mono) !important; }
-  .leaflet-control-attribution{ font-family:var(--mono); font-size:0.68rem !important; background:rgba(255,255,255,0.75) !important; }
+  /* crédito de OSM/CARTO discreto (mas sempre visível — é exigência de
+     licença, não só estética) — texto/fundo mais fracos que o padrão do
+     Leaflet, e a versão completa também aparece no "Sobre" */
+  .leaflet-control-attribution{ font-family:var(--mono); font-size:0.6rem !important;
+                                 background:rgba(255,255,255,0.45) !important; color:rgba(0,0,0,0.55) !important; }
+  .leaflet-control-attribution a{ color:rgba(0,0,0,0.55) !important; }
 
   .locate-control a{ background:#fff !important; color:#111 !important; border:1px solid var(--line) !important;
                       border-radius:0 !important; font-size:1rem !important; line-height:26px !important;
@@ -453,11 +482,14 @@
         <div class="about-credits">
           <p class="about-credits-label">Créditos</p>
           <p>Identidade visual e site: Eduardo Mattos<br><a href="https://instagram.com/macula.cc" target="_blank" rel="noopener">@macula.cc</a></p>
+          <p>Mapa: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a> contributors, tiles por <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>, biblioteca <a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>.</p>
         </div>
       </div>
     </div>
   </div>
 </div>
+
+<canvas id="cursor-canvas"></canvas>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -655,6 +687,10 @@ function initMap(){
     // wheelPxPerZoomLevel mais baixo que o padrão (60) compensa: cada incremento
     // fracionário passa a valer mais zoom, pra não sentir "fraquinho" no pinch.
     map = L.map('map', { scrollWheelZoom:true, doubleClickZoom:true, zoomControl:false, zoomSnap:0.25, wheelPxPerZoomLevel:20 }).setView([-22.9065, -43.1795], 15);
+    // tira só o "Leaflet |" do crédito — isso é cortesia de marca, não
+    // exigência de licença. O crédito de OpenStreetMap/CARTO continua
+    // (esse sim é exigido pela ODbL e pelos termos do serviço de tiles).
+    map.attributionControl.setPrefix(false);
     L.control.zoom({ position:'bottomright' }).addTo(map);
 
     const LocateControl = L.Control.extend({
@@ -1194,6 +1230,74 @@ async function boot(){
   renderRows();
 }
 boot();
+
+// ---------------- cursor customizado (desktop): ponto preto + rastro em
+// degradê ----------------
+if (window.matchMedia('(hover:hover) and (pointer:fine)').matches){
+  const cursorCanvas = document.getElementById('cursor-canvas');
+  const cursorCtx = cursorCanvas.getContext('2d');
+  function resizeCursorCanvas(){
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cursorCanvas.width = window.innerWidth * dpr;
+    cursorCanvas.height = window.innerHeight * dpr;
+    cursorCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resizeCursorCanvas();
+  window.addEventListener('resize', resizeCursorCanvas);
+
+  // posição "alvo" (mouse de verdade) e posição "desenhada" (a que
+  // realmente vai pro canvas) são separadas — a desenhada persegue o alvo
+  // suavizada (lerp) em vez de saltar direto pra ele, tirando a brusquidão
+  let cursorTargetX = null, cursorTargetY = null;
+  let cursorDrawX = null, cursorDrawY = null;
+  const CURSOR_EASE = 0.22; // menor = movimento mais suave/com mais atraso
+  document.addEventListener('mousemove', (e) => {
+    cursorTargetX = e.clientX; cursorTargetY = e.clientY;
+    if (cursorDrawX == null){ cursorDrawX = cursorTargetX; cursorDrawY = cursorTargetY; }
+  });
+  document.addEventListener('mouseleave', () => { cursorTargetX = null; cursorTargetY = null; });
+
+  // histórico curto de posições (com timestamp) — cada quadro limpa o
+  // canvas inteiro (clearRect, sem resíduo possível) e redesenha só os
+  // pontos ainda dentro da janela de tempo, com opacidade pela idade de
+  // cada um.
+  const CURSOR_TRAIL_MS = 260;
+  let cursorHistory = [];
+
+  (function cursorLoop(){
+    const now = performance.now();
+    cursorCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+    if (cursorTargetX != null){
+      const prevDrawX = cursorDrawX, prevDrawY = cursorDrawY;
+      cursorDrawX += (cursorTargetX - cursorDrawX) * CURSOR_EASE;
+      cursorDrawY += (cursorTargetY - cursorDrawY) * CURSOR_EASE;
+      // só registra no histórico se a posição realmente mudou — com o
+      // mouse parado a posição suavizada converge e para; sem essa
+      // checagem um ponto "novo" era empilhado a cada quadro pra sempre,
+      // e o rastro nunca esvaziava de verdade
+      if (Math.abs(cursorDrawX - prevDrawX) > 0.02 || Math.abs(cursorDrawY - prevDrawY) > 0.02){
+        cursorHistory.push({ x:cursorDrawX, y:cursorDrawY, t:now });
+      }
+    }
+    cursorHistory = cursorHistory.filter(p => now - p.t < CURSOR_TRAIL_MS);
+
+    cursorCtx.lineCap = 'round';
+    cursorCtx.lineWidth = 24;
+    cursorCtx.strokeStyle = '#fff';
+    for (let i = 1; i < cursorHistory.length; i++){
+      const p0 = cursorHistory[i-1], p1 = cursorHistory[i];
+      cursorCtx.globalAlpha = Math.max(0, 1 - (now - p1.t) / CURSOR_TRAIL_MS);
+      cursorCtx.beginPath();
+      cursorCtx.moveTo(p0.x, p0.y);
+      cursorCtx.lineTo(p1.x, p1.y);
+      cursorCtx.stroke();
+    }
+    cursorCtx.globalAlpha = 1;
+
+    requestAnimationFrame(cursorLoop);
+  })();
+}
 </script>
 </body>
 </html>
