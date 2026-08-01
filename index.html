@@ -8,12 +8,13 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@350&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 
 <style>
   :root{
     --serif: 'Instrument Serif', Georgia, 'Iowan Old Style', 'Times New Roman', ui-serif, serif;
     --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --sans-display: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --ink:#111;
     --line: rgba(0,0,0,0.15);
@@ -69,19 +70,43 @@
 
   .hero-title{ position:absolute; top:0; left:0; right:0;
                padding:calc(1.6rem + env(safe-area-inset-top)) calc(1.6rem + env(safe-area-inset-right)) 0 calc(1.6rem + env(safe-area-inset-left));
-               z-index:200; pointer-events:none;
-               transition:padding-top 0.75s cubic-bezier(.16,1,.3,1); }
-  .hero-title h1{ font-family:var(--serif); font-weight:400; color:var(--ink);
-                  font-size:var(--hero-font-size, clamp(3.8rem, 12vw, 9.5rem));
-                  line-height:0.94; margin:0; white-space:nowrap; letter-spacing:-0.01em;
-                  transition:font-size 0.75s cubic-bezier(.16,1,.3,1), line-height 0.75s cubic-bezier(.16,1,.3,1); }
-  .hero-date{ font-family:var(--serif); font-weight:400; color:#cfcfcf;
-              font-size:var(--hero-font-size, clamp(3.8rem, 12vw, 9.5rem));
-              line-height:0.94; margin-top:0.05em; white-space:nowrap;
-              transition:font-size 0.75s cubic-bezier(.16,1,.3,1), margin-top 0.75s cubic-bezier(.16,1,.3,1), color 0.4s ease; }
+               z-index:200; pointer-events:none; text-align:center;
+               font-size:var(--hero-font-size, clamp(3.8rem, 12vw, 9.5rem));
+               transition:padding-top 0.75s cubic-bezier(.16,1,.3,1), font-size 0.75s cubic-bezier(.16,1,.3,1); }
 
-  .hero-title.shrunk h1{ font-size:clamp(1.43rem, 3.3vw, 2.09rem) !important; line-height:1.25; max-width:14ch; white-space:normal; }
-  .hero-title.shrunk .hero-date{ font-size:clamp(1.43rem, 3.3vw, 2.09rem) !important; margin-top:0.2rem; color:var(--gray); }
+  /* núcleo tipográfico: label (nome do evento, sans caixa alta, Geist) e o
+     selo de edição são relativos ao tamanho de "Ateliês abertos" (1em, no
+     elemento pai) via font-size em em — crescem e encolhem sempre na mesma
+     proporção. Razões calibradas pelos valores de referência do design:
+     sans 57pt / serifado 212pt ≈ 0,2689; "Edição 01" 24pt / 212pt ≈ 0,1132;
+     entrelinha do título 100% (line-height:1); entrelinha da data
+     195pt / 212pt ≈ 0,9198 */
+  .hero-label{ font-family:var(--sans-display); font-weight:350; color:#cfcfcf;
+               text-transform:uppercase; letter-spacing:-0.025em;
+               font-size:0.2689em; line-height:1.2; margin:0 0 0.3em;
+               transition:color 0.4s ease; }
+
+  .hero-title h1{ font-family:var(--serif); font-weight:400; color:#cfcfcf;
+                  font-size:1em;
+                  line-height:1; margin:0; white-space:nowrap; letter-spacing:-0.01em;
+                  transition:line-height 0.75s cubic-bezier(.16,1,.3,1), color 0.4s ease; }
+
+  .hero-date{ font-family:var(--serif); font-weight:400; font-style:italic; color:#cfcfcf;
+              font-size:1em; margin-top:0.05em; margin-bottom:-0.4em;
+              line-height:0.9198; white-space:nowrap;
+              transition:color 0.4s ease; }
+  /* selo de edição: linha própria, centralizada, colada na data — proporcional
+     ao "Ateliês abertos" gigante (24/212), mas com tamanho fixo e legível no
+     estado encolhido (proporcional ficaria ilegível de tão pequeno) */
+  .hero-edition{ display:inline-block; margin-top:0.3em;
+                 font-family:var(--mono); font-size:0.1132em; color:#fff; background:var(--gray);
+                 padding:0.35em 0.85em; border-radius:999px; white-space:nowrap; }
+
+  .hero-title.shrunk{ font-size:clamp(1.43rem, 3.3vw, 2.09rem) !important; }
+  .hero-title.shrunk h1{ line-height:1.25; white-space:normal; color:var(--ink); }
+  .hero-title.shrunk .hero-date{ line-height:0.94; color:var(--ink); }
+  .hero-title.shrunk .hero-label{ color:var(--ink); }
+  .hero-title.shrunk .hero-edition{ font-size:0.6rem; }
 
   /* Mobile: --hero-font-size é calculado via JS (fitHeroText) pra ocupar
      100% da largura disponível no estado grande — sem isso (JS
@@ -92,6 +117,7 @@
     .hero-title{ padding-top:calc(4.8rem + env(safe-area-inset-top)); }
     .hero-title.shrunk{ padding-top:calc(1.6rem + env(safe-area-inset-top)); }
     .hero-title h1{ white-space:normal; }
+    .hero-date{ white-space:normal; }
   }
 
   .hero-count{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:calc(1.6rem + env(safe-area-inset-left)); z-index:200;
@@ -415,9 +441,10 @@
   <div id="map"></div>
   <div class="map-dim" id="map-dim"></div>
   <div class="hero-title" id="hero-title">
-    <h1>Circuito de<br>Ateliês do Centro</h1>
-    <div class="hero-date">Ateliês abertos</div>
-    <div class="hero-date">18 – 19 de Setembro</div>
+    <div class="hero-label">Circuito de Ateliês do Centro</div>
+    <h1>Ateliês abertos</h1>
+    <div class="hero-date" id="hero-date">18 – 19 de Setembro</div>
+    <span class="hero-edition">Edição 01</span>
   </div>
   <div class="hero-count" id="hero-count">— endereços · — artistas</div>
 </div>
@@ -1093,7 +1120,7 @@ let heroShrunk = false;
 // no desktop o clamp(...) fluido do CSS já dá conta sozinho.
 const heroFitCanvas = document.createElement('canvas');
 const heroFitCtx = heroFitCanvas.getContext('2d');
-const HERO_FIT_LINES = ['Circuito de', 'Ateliês do Centro', 'Ateliês abertos', '18 – 19 de Setembro'];
+const HERO_FIT_LINES = ['Ateliês abertos', '18 – 19 de Setembro'];
 function fitHeroText(){
   if (window.innerWidth > 780){
     document.documentElement.style.removeProperty('--hero-font-size');

@@ -73,7 +73,8 @@
      elemento pai) via font-size em em — crescem e encolhem sempre na mesma
      proporção. Razões calibradas pelos valores de referência do design:
      sans 57pt / serifado 212pt ≈ 0,2689; "Edição 01" 24pt / 212pt ≈ 0,1132;
-     entrelinha do serifado 100% (line-height:1) */
+     entrelinha do título 100% (line-height:1); entrelinha da data
+     195pt / 212pt ≈ 0,9198 */
   .hero-label{ font-family:var(--sans-display); font-weight:350; color:#cfcfcf;
                text-transform:uppercase; letter-spacing:-0.025em;
                font-size:0.2689em; line-height:1.2; margin:0 0 0.3em;
@@ -86,7 +87,7 @@
 
   .hero-date{ font-family:var(--serif); font-weight:400; font-style:italic; color:#cfcfcf;
               font-size:1em; margin-top:0.05em; margin-bottom:-0.4em;
-              line-height:1; white-space:nowrap;
+              line-height:0.9198; white-space:nowrap;
               transition:color 0.4s ease; }
   /* selo de edição: linha própria, centralizada, colada na data — proporcional
      ao "Ateliês abertos" gigante (24/212), mas com tamanho fixo e legível no
