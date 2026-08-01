@@ -73,9 +73,10 @@
      font-size em em — cresce e encolhe sempre na mesma proporção. Razão
      calibrada pelos valores de referência do design original (Circuito
      41pt / Ateliês abertos 137pt = 41/137 ≈ 0,2993) */
-  .hero-label{ font-family:var(--sans-display); font-weight:350; color:var(--ink);
+  .hero-label{ font-family:var(--sans-display); font-weight:350; color:#cfcfcf;
                text-transform:uppercase; letter-spacing:-0.025em;
-               font-size:0.2993em; line-height:1.2; margin:0 0 0.3em; }
+               font-size:0.2993em; line-height:1.2; margin:0 0 0.3em;
+               transition:color 0.4s ease; }
 
   .hero-title h1{ font-family:var(--serif); font-weight:400; color:#cfcfcf;
                   font-size:1em;
@@ -96,8 +97,9 @@
                  padding:0.35em 0.85em; border-radius:999px; white-space:nowrap; }
 
   .hero-title.shrunk{ font-size:clamp(1.43rem, 3.3vw, 2.09rem) !important; }
-  .hero-title.shrunk h1{ line-height:1.25; white-space:normal; color:var(--gray); }
-  .hero-title.shrunk .hero-date{ color:var(--gray); }
+  .hero-title.shrunk h1{ line-height:1.25; white-space:normal; color:var(--ink); }
+  .hero-title.shrunk .hero-date{ color:var(--ink); }
+  .hero-title.shrunk .hero-label{ color:var(--ink); }
   .hero-title.shrunk .hero-edition{ font-size:0.6rem; }
 
   /* Mobile: fixed sizes per breakpoint no elemento pai (label/data/selo
