@@ -728,9 +728,11 @@ function buildRandomMark(){
   const closed = [...order, order[0]];
   const rawLegs = [];
   for (let i = 1; i < closed.length; i++) rawLegs.push(buildLegPath(closed[i-1], closed[i]));
-  const pts = [ { x: closed[0].x, y: closed[0].y } ];
-  rawLegs.forEach(leg => leg.slice(1).forEach(p => pts.push(p)));
-  const t = computeFitTransform(pts, MAP_BOX, 0.82);
+  // o enquadramento usa só os pontos reais (order), não as curvas dos
+  // trechos — essas variam a cada troca (reta ou curva, sorteado em
+  // buildLegPath), e enquadrar por elas faria os pinos "balançarem" de
+  // quadro em quadro mesmo representando os mesmos endereços
+  const t = computeFitTransform(order, MAP_BOX, 0.82);
   const legs = rawLegs.map(leg => applyFitTransform(leg, t));
   const pins = applyFitTransform(order, t);
   return { legs, pins };
