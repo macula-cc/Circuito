@@ -201,8 +201,8 @@ const LABEL_SIZE = TITLE_SIZE * (25/33.5); // ≈ 47.76 — label sans-serif em 
 const LABEL_GAP_BASE = 58 * 1.1; // espaço entre as duas linhas, +10% (comum às duas orientações)
 
 // vertical: bloco de texto inteiro 20% menor que o núcleo "cheio" (label,
-// linha principal e o espaço entre elas) — o tamanho muda, mas a posição x
-// agora é alinhada pela borda direita do símbolo (ver computeVerticalLayout)
+// linha principal e o espaço entre elas), alinhado à esquerda pela borda
+// do símbolo — só o tamanho muda, a posição x é sempre MARK_BOX_V.x
 const V_TEXT_SCALE = 0.8;
 const LABEL_SIZE_V = LABEL_SIZE * V_TEXT_SCALE;
 const TITLE_SIZE_V = TITLE_SIZE * V_TEXT_SCALE;
@@ -225,19 +225,8 @@ const LABEL1_V_Y = TEXT_TOP_V + LABEL_SIZE_V*0.72;
 const LABEL2_V_Y = LABEL1_V_Y + LABEL_LINE_GAP_V;
 const TITLE1_V_Y = LABEL2_V_Y + LABEL_GAP_V;
 const TITLE2_V_Y = TITLE1_V_Y + TITLE_LINE_GAP_V;
-// largura do bloco (maior linha) só é conhecida depois que a fonte real
-// carrega — ver computeVerticalLayout, chamada no boot()
-let BLOCK_W_V, TITLE_X_V;
-function computeVerticalLayout(){
-  BLOCK_W_V = Math.max(
-    estimateSansWidth(LABEL_LINE1_V, LABEL_SIZE_V),
-    estimateSansWidth(LABEL_LINE2_V, LABEL_SIZE_V),
-    estimateTextWidth(EVENT_TAGLINE, TITLE_SIZE_V),
-    estimateTextWidth(EVENT_DATES, TITLE_SIZE_V)
-  );
-  TITLE_X_V = (MARK_BOX_V.x + SYMBOL_V_SIZE) - BLOCK_W_V;
-}
-computeVerticalLayout(); // primeira estimativa (fonte de fallback), recalculado depois que a web font carrega de verdade
+// alinhado à esquerda pela borda do símbolo (mesma posição x pras 4 linhas)
+const TITLE_X_V = MARK_BOX_V.x;
 
 // horizontal: símbolo menor ao lado, mesmo núcleo tipográfico "cheio" (só a
 // vertical fica menor); composição inteira ampliada/centralizada no
@@ -852,9 +841,8 @@ async function boot(){
     ]);
   } catch(e){}
   // agora que a fonte de verdade carregou, recalcula a largura do texto
-  // horizontal e vertical com a métrica real (antes disso, usava a fonte de fallback)
+  // horizontal com a métrica real (antes disso, usava a fonte de fallback)
   computeHorizontalLayout();
-  computeVerticalLayout();
   try{
     LOCATIONS = await loadLocationsFromSheet();
   } catch(err){
