@@ -195,24 +195,33 @@ function estimateSansWidth(text, fontSize){
 // sans 25pt / serifado 33.5pt ≈ 0,7463
 const TITLE_SIZE = 64; // linha serifada "Ateliês abertos ... data"
 const LABEL_SIZE = TITLE_SIZE * (25/33.5); // ≈ 47.76 — label sans-serif em caixa alta
+const LABEL_GAP_BASE = 58 * 1.1; // espaço entre as duas linhas, +10% (comum às duas orientações)
+
+// vertical: bloco de texto inteiro 20% menor que o núcleo "cheio" (label,
+// linha principal e o espaço entre elas), mantendo alinhado à esquerda —
+// só o tamanho muda, a posição x continua a mesma (borda do símbolo)
+const V_TEXT_SCALE = 0.8;
+const LABEL_SIZE_V = LABEL_SIZE * V_TEXT_SCALE;
+const TITLE_SIZE_V = TITLE_SIZE * V_TEXT_SCALE;
+const LABEL_GAP_V = LABEL_GAP_BASE * V_TEXT_SCALE;
 
 // vertical: símbolo grande acima, texto embaixo (2 linhas: label + linha
 // principal), grupo inteiro centralizado no artboard
 const SYMBOL_V_SIZE = 720;
 const SYMBOL_V_STROKE = 38;
 const GAP_V = 10; // distância real entre a ponta de baixo do símbolo e a tipografia
-const LABEL_GAP_V = 58; // da baseline do label até a baseline da linha principal
-const TEXT_BLOCK_H_V = (LABEL_SIZE*0.72) + LABEL_GAP_V + (TITLE_SIZE*0.25);
+const TEXT_BLOCK_H_V = (LABEL_SIZE_V*0.72) + LABEL_GAP_V + (TITLE_SIZE_V*0.25);
 const GROUP_H_V = SYMBOL_V_SIZE + GAP_V + TEXT_BLOCK_H_V;
 const GROUP_TOP_V = (LOGICAL - GROUP_H_V) / 2;
 const MARK_BOX_V = { x: (LOGICAL - SYMBOL_V_SIZE)/2, y: GROUP_TOP_V, w: SYMBOL_V_SIZE, h: SYMBOL_V_SIZE };
 const TITLE_X_V = MARK_BOX_V.x;
 const TEXT_TOP_V = MARK_BOX_V.y + SYMBOL_V_SIZE + GAP_V;
-const LABEL_V_Y = TEXT_TOP_V + LABEL_SIZE*0.72;
+const LABEL_V_Y = TEXT_TOP_V + LABEL_SIZE_V*0.72;
 const TITLE_V_Y = LABEL_V_Y + LABEL_GAP_V;
 
-// horizontal: símbolo menor ao lado, mesmo núcleo tipográfico da vertical;
-// composição inteira ampliada/centralizada no artboard no fim (scaleUp)
+// horizontal: símbolo menor ao lado, mesmo núcleo tipográfico "cheio" (só a
+// vertical fica menor); composição inteira ampliada/centralizada no
+// artboard no fim (scaleUp)
 const SYMBOL_H_SIZE = 420;
 const SYMBOL_H_STROKE = 20;
 const GAP_H = 30;
@@ -224,7 +233,7 @@ function computeHorizontalLayout(){
   MARK_BOX_H = { x: START_X_H, y: LOGICAL/2 - SYMBOL_H_SIZE/2, w: SYMBOL_H_SIZE, h: SYMBOL_H_SIZE };
   TITLE_X_H = START_X_H + SYMBOL_H_SIZE + GAP_H;
   LABEL_Y_H = LOGICAL/2 - 8;
-  TITLE_Y_H = LABEL_Y_H + 58;
+  TITLE_Y_H = LABEL_Y_H + LABEL_GAP_BASE;
 }
 computeHorizontalLayout(); // primeira estimativa (fonte de fallback), recalculado depois que a web font carrega de verdade
 
@@ -677,12 +686,12 @@ function buildContentSVG(includeBg){
     content += pathsOut;
 
     if (orientMarca === 'vertical'){
-      content += `<text x="${TITLE_X_V}" y="${LABEL_V_Y}" font-family="${SANS_DISPLAY}" font-weight="350" letter-spacing="-1.2" font-size="${LABEL_SIZE.toFixed(2)}" fill="${theme.ribbon}">${escapeXML(EVENT_LABEL)}</text>`;
-      content += `<text x="${TITLE_X_V}" y="${TITLE_V_Y}" font-size="${TITLE_SIZE}" fill="${theme.ribbon}"><tspan font-family="'Instrument Serif', Georgia, serif">${escapeXML(EVENT_TAGLINE)} </tspan><tspan font-family="'Instrument Serif', Georgia, serif" font-style="italic">${escapeXML(EVENT_DATES)}</tspan></text>`;
+      content += `<text x="${TITLE_X_V}" y="${LABEL_V_Y}" font-family="${SANS_DISPLAY}" font-weight="350" letter-spacing="${(LABEL_SIZE_V*-0.025).toFixed(2)}" font-size="${LABEL_SIZE_V.toFixed(2)}" fill="${theme.ribbon}">${escapeXML(EVENT_LABEL)}</text>`;
+      content += `<text x="${TITLE_X_V}" y="${TITLE_V_Y}" font-size="${TITLE_SIZE_V.toFixed(2)}" fill="${theme.ribbon}"><tspan font-family="'Instrument Serif', Georgia, serif">${escapeXML(EVENT_TAGLINE)} </tspan><tspan font-family="'Instrument Serif', Georgia, serif" font-style="italic">${escapeXML(EVENT_DATES)}</tspan></text>`;
       if (showPinsCompleta) content += renderCompletaPins(completeMarkPins, SYMBOL_V_STROKE, theme);
       s += content;
     } else {
-      content += `<text x="${TITLE_X_H}" y="${LABEL_Y_H}" font-family="${SANS_DISPLAY}" font-weight="350" letter-spacing="-1.2" font-size="${LABEL_SIZE.toFixed(2)}" fill="${theme.ribbon}">${escapeXML(EVENT_LABEL)}</text>`;
+      content += `<text x="${TITLE_X_H}" y="${LABEL_Y_H}" font-family="${SANS_DISPLAY}" font-weight="350" letter-spacing="${(LABEL_SIZE*-0.025).toFixed(2)}" font-size="${LABEL_SIZE.toFixed(2)}" fill="${theme.ribbon}">${escapeXML(EVENT_LABEL)}</text>`;
       content += `<text x="${TITLE_X_H}" y="${TITLE_Y_H}" font-size="${TITLE_SIZE}" fill="${theme.ribbon}"><tspan font-family="'Instrument Serif', Georgia, serif">${escapeXML(EVENT_TAGLINE)} </tspan><tspan font-family="'Instrument Serif', Georgia, serif" font-style="italic">${escapeXML(EVENT_DATES)}</tspan></text>`;
       if (showPinsCompleta) content += renderCompletaPins(completeMarkPins, SYMBOL_H_STROKE, theme);
       // só a apresentação muda aqui: a composição inteira é ampliada em
