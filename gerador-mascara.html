@@ -484,29 +484,51 @@ function pointAtDistance(points, dist){
   const last = points[points.length-1];
   return { x:last.x, y:last.y, angle:0 };
 }
-// texto seguindo o caminho da marca — mesma lógica do gerador de marca,
-// só que em canvas em vez de SVG
-function drawTextAlongPath(ctx2d, text, points, fontSize, color){
+// texto seguindo o caminho da marca — mesmo estilo alternado (sans em caixa
+// alta / serifado com a data em itálico) da fita do gerador de marca, só
+// que em canvas em vez de SVG
+const RIBBON_SEP = '   ·   ';
+function buildRibbonRuns(serifFontSize){
+  function xAscent(fontSize, fontFamily, weight){
+    ectx.font = `${weight ? weight+' ' : ''}${fontSize}px ${fontFamily}`;
+    return ectx.measureText('x').actualBoundingBoxAscent;
+  }
+  const serifFamily = "'Instrument Serif', Georgia, serif";
+  const serifAscent = xAscent(serifFontSize, serifFamily, '400');
+  const sansAscentAtSerifSize = xAscent(serifFontSize, SANS_DISPLAY, '350');
+  const sansFontSize = serifFontSize * (serifAscent / sansAscentAtSerifSize) * 0.85;
+  const sansLabel = `${EVT_LABEL_L1} ${EVT_LABEL_L2}`;
+  return [
+    { text: sansLabel, fontFamily: SANS_DISPLAY, weight:'350', fontSize: sansFontSize },
+    { text: RIBBON_SEP, fontFamily: SANS_DISPLAY, weight:'350', fontSize: sansFontSize },
+    { text: `${EVENT_EYEBROW} `, fontFamily: serifFamily, weight:'400', fontSize: serifFontSize },
+    { text: EVENT_DATES, fontFamily: serifFamily, weight:'400', fontSize: serifFontSize, italic:true },
+    { text: RIBBON_SEP, fontFamily: serifFamily, weight:'400', fontSize: serifFontSize }
+  ];
+}
+function drawRibbonAlongPath(ctx2d, points, serifFontSize, color){
   const total = pathLength(points);
-  if (total < fontSize) return;
-  ctx2d.font = `${fontSize}px 'Instrument Serif', Georgia, serif`;
+  if (total < serifFontSize) return;
+  const runs = buildRibbonRuns(serifFontSize);
+  const chars = [];
+  runs.forEach(run => { for (const ch of run.text) chars.push({ ch, run }); });
   ctx2d.fillStyle = color;
-  const unit = text + '   ·   ';
-  let d = 0, safety = 0;
+  ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'middle';
+  let d = 0, charPos = 0, safety = 0;
   while (d < total && safety < 4000){
-    for (const ch of unit){
-      if (d >= total) break;
-      const w = ctx2d.measureText(ch).width;
-      const pt = pointAtDistance(points, d);
-      ctx2d.save();
-      ctx2d.translate(pt.x, pt.y);
-      ctx2d.rotate(pt.angle);
-      ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'middle';
-      ctx2d.fillText(ch, 0, 0);
-      ctx2d.restore();
-      d += w;
-      safety++;
-    }
+    const item = chars[charPos % chars.length];
+    const run = item.run;
+    ctx2d.font = `${run.italic ? 'italic ' : ''}${run.weight ? run.weight+' ' : ''}${run.fontSize}px ${run.fontFamily}`;
+    const w = ctx2d.measureText(item.ch).width;
+    const pt = pointAtDistance(points, d);
+    ctx2d.save();
+    ctx2d.translate(pt.x, pt.y);
+    ctx2d.rotate(pt.angle);
+    ctx2d.fillText(item.ch, 0, 0);
+    ctx2d.restore();
+    d += w;
+    charPos++;
+    safety++;
   }
 }
 function subPathUpTo(points, dist){
@@ -846,7 +868,7 @@ function drawEventFrame(ctx2d, dMark, markPath){
     const flatRevealed = revealedFlatPoints(markPath, dMark);
 
     if (showTextEvt && flatRevealed.length >= 2){
-      drawTextAlongPath(ctx2d, EVENT_TITLE, flatRevealed, 20, theme.bg);
+      drawRibbonAlongPath(ctx2d, flatRevealed, 20, theme.bg);
     }
 
     // "negativo": onde a linha cruza o título, revela o título na cor
@@ -1005,7 +1027,8 @@ async function boot(){
       document.fonts.load(`${EVT_TITLE_SIZE}px 'Instrument Serif'`),
       document.fonts.load(`italic ${EVT_TITLE_SIZE}px 'Instrument Serif'`),
       document.fonts.load(`${EVT_STATS_SIZE}px 'Instrument Serif'`),
-      document.fonts.load(`${EVT_LABEL_WEIGHT} 100px 'Geist'`)
+      document.fonts.load(`${EVT_LABEL_WEIGHT} 100px 'Geist'`),
+      document.fonts.load(`350 20px 'Geist'`)
     ]);
   } catch(e){}
   computeEvtLabelSize();
