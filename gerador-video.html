@@ -210,7 +210,7 @@ function parseCSV(text){
 }
 
 async function loadLocationsFromSheet(){
-  const res = await fetch(SHEET_CSV_URL);
+  const res = await fetch(`${SHEET_CSV_URL}&_=${Date.now()}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const text = await res.text();
   const table = parseCSV(text).filter(r => r.some(c => c !== undefined && c.trim() !== ''));
@@ -944,6 +944,69 @@ btnGerarVideo.addEventListener('click', () => {
 /* ============================================================
    boot
    ============================================================ */
+// ---------------- geocodificação automática (fallback) ----------------
+// mesma lógica do index.html: endereços sem lat/lng na planilha são
+// resolvidos via Nominatim (gratuito) em segundo plano, sem travar o
+// carregamento inicial com o que já está disponível
+async function geocodeAddress(query){
+  try{
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('geocode http error ' + res.status);
+    const results = await res.json();
+    if (results && results.length){
+      return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
+    }
+  } catch(err){
+    console.warn('Falha ao geocodificar endereço:', query, err);
+  }
+  return null;
+}
+async function resolveMissingCoordinates(){
+  const pending = LOCATIONS.filter(l => (l.lat == null || l.lng == null) && !/confirmar/i.test(l.endereco));
+  for (const loc of pending){
+    const query = `${loc.endereco}, Centro, Rio de Janeiro, Brasil`;
+    const coords = await geocodeAddress(query);
+    if (coords){
+      loc.lat = coords.lat;
+      loc.lng = coords.lng;
+      await setupFromLocations();
+    }
+    await new Promise(r => setTimeout(r, 1100));
+  }
+}
+
+async function setupFromLocations(){
+  const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
+  if (withCoords.length < 3){
+    setStatus('poucos ateliês com coordenadas preenchidas ainda — é preciso pelo menos 3 pra fechar um circuito.', true);
+    return;
+  }
+  setStatus('');
+  const bounds = {
+    minLat: Math.min(...withCoords.map(l=>l.lat)),
+    maxLat: Math.max(...withCoords.map(l=>l.lat)),
+    minLng: Math.min(...withCoords.map(l=>l.lng)),
+    maxLng: Math.max(...withCoords.map(l=>l.lng)),
+  };
+  computeProjection(bounds);
+  PTS = withCoords.map(loc => ({ ...pixelOf(loc.lat, loc.lng), id: loc.id }));
+
+  const sortedForNum = [...withCoords].sort((a,b) =>
+    (a.local||a.endereco).localeCompare(b.local||b.endereco, 'pt-BR', {sensitivity:'base'}));
+  alphaNum = {};
+  sortedForNum.forEach((loc,i) => { alphaNum[loc.id] = i+1; });
+
+  basemapCanvas = null; // bounds podem ter mudado — o recorte antigo do mapa não serve mais
+  if (showMap){
+    setStatus('carregando mapa…');
+    await fetchBasemapTiles();
+    setStatus('');
+  }
+
+  setVideoTipo('marcas');
+}
+
 async function boot(){
   try{
     await Promise.all([
@@ -960,35 +1023,11 @@ async function boot(){
     return;
   }
 
-  const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
-  if (withCoords.length < 3){
-    setStatus('poucos ateliês com coordenadas preenchidas ainda — é preciso pelo menos 3 pra fechar um circuito.', true);
-    return;
-  }
-  const bounds = {
-    minLat: Math.min(...withCoords.map(l=>l.lat)),
-    maxLat: Math.max(...withCoords.map(l=>l.lat)),
-    minLng: Math.min(...withCoords.map(l=>l.lng)),
-    maxLng: Math.max(...withCoords.map(l=>l.lng)),
-  };
-  computeProjection(bounds);
-  PTS = withCoords.map(loc => ({ ...pixelOf(loc.lat, loc.lng), id: loc.id }));
-
-  const sortedForNum = [...withCoords].sort((a,b) =>
-    (a.local||a.endereco).localeCompare(b.local||b.endereco, 'pt-BR', {sensitivity:'base'}));
-  alphaNum = {};
-  sortedForNum.forEach((loc,i) => { alphaNum[loc.id] = i+1; });
-
   numAddresses = LOCATIONS.length;
   numArtists = LOCATIONS.reduce((sum, l) => sum + l.artistas.length, 0);
 
-  if (showMap){
-    setStatus('carregando mapa…');
-    await fetchBasemapTiles();
-    setStatus('');
-  }
-
-  setVideoTipo('marcas');
+  await setupFromLocations();
+  resolveMissingCoordinates();
 }
 boot();
 </script>

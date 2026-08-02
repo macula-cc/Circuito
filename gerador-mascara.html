@@ -254,7 +254,7 @@ function parseCSV(text){
 }
 
 async function loadLocationsFromSheet(){
-  const res = await fetch(SHEET_CSV_URL);
+  const res = await fetch(`${SHEET_CSV_URL}&_=${Date.now()}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const text = await res.text();
   const table = parseCSV(text).filter(r => r.some(c => c !== undefined && c.trim() !== ''));
@@ -1016,9 +1016,76 @@ document.getElementById('btn-download-pdf').addEventListener('click', async () =
   }
 });
 
+// ---------------- geocodificação automática (fallback) ----------------
+// mesma lógica do index.html: endereços sem lat/lng na planilha são
+// resolvidos via Nominatim (gratuito) em segundo plano, sem travar o
+// carregamento inicial com o que já está disponível
+async function geocodeAddress(query){
+  try{
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('geocode http error ' + res.status);
+    const results = await res.json();
+    if (results && results.length){
+      return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
+    }
+  } catch(err){
+    console.warn('Falha ao geocodificar endereço:', query, err);
+  }
+  return null;
+}
+async function resolveMissingCoordinates(){
+  const pending = LOCATIONS.filter(l => (l.lat == null || l.lng == null) && !/confirmar/i.test(l.endereco));
+  for (const loc of pending){
+    const query = `${loc.endereco}, Centro, Rio de Janeiro, Brasil`;
+    const coords = await geocodeAddress(query);
+    if (coords){
+      loc.lat = coords.lat;
+      loc.lng = coords.lng;
+      setupFromLocations();
+    }
+    await new Promise(r => setTimeout(r, 1100));
+  }
+}
+
 /* ============================================================
    boot
    ============================================================ */
+function setupFromLocations(){
+  const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
+  if (withCoords.length < 3){
+    setStatus('poucos ateliês com coordenadas preenchidas ainda — é preciso pelo menos 3 pra fechar uma forma.', true);
+    return;
+  }
+  setStatus('');
+  const bounds = {
+    minLat: Math.min(...withCoords.map(l=>l.lat)),
+    maxLat: Math.max(...withCoords.map(l=>l.lat)),
+    minLng: Math.min(...withCoords.map(l=>l.lng)),
+    maxLng: Math.max(...withCoords.map(l=>l.lng)),
+  };
+
+  // post do artista
+  proj = computeProjection(bounds, LOGICAL, LOGICAL, 1.0);
+  PTS = withCoords.map(loc => pixelOf(loc.lat, loc.lng));
+
+  // post do evento
+  computeEvtProjection(bounds);
+  PTS_EVT = withCoords.map(loc => ({ ...pixelOfEvt(loc.lat, loc.lng), id: loc.id }));
+  evtBasemapCanvas = null; // bounds podem ter mudado — o recorte antigo do mapa não serve mais
+  if (showMapEvt){
+    setStatus('carregando mapa…');
+    fetchEvtBasemapTiles().then(() => { setStatus(''); redrawEvent(); });
+  }
+  const sortedForNum = [...withCoords].sort((a,b) =>
+    (a.local||a.endereco).localeCompare(b.local||b.endereco, 'pt-BR', {sensitivity:'base'}));
+  alphaNumEvt = {};
+  sortedForNum.forEach((loc,i) => { alphaNumEvt[loc.id] = i+1; });
+
+  generateNewMark();
+  generateNewEventMark();
+}
+
 async function boot(){
   try{
     await Promise.all([
@@ -1040,34 +1107,6 @@ async function boot(){
     return;
   }
 
-  const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
-  if (withCoords.length < 3){
-    setStatus('poucos ateliês com coordenadas preenchidas ainda — é preciso pelo menos 3 pra fechar uma forma.', true);
-    return;
-  }
-  const bounds = {
-    minLat: Math.min(...withCoords.map(l=>l.lat)),
-    maxLat: Math.max(...withCoords.map(l=>l.lat)),
-    minLng: Math.min(...withCoords.map(l=>l.lng)),
-    maxLng: Math.max(...withCoords.map(l=>l.lng)),
-  };
-
-  // post do artista
-  proj = computeProjection(bounds, LOGICAL, LOGICAL, 1.0);
-  PTS = withCoords.map(loc => pixelOf(loc.lat, loc.lng));
-
-  // post do evento
-  computeEvtProjection(bounds);
-  PTS_EVT = withCoords.map(loc => ({ ...pixelOfEvt(loc.lat, loc.lng), id: loc.id }));
-  if (showMapEvt){
-    setStatus('carregando mapa…');
-    fetchEvtBasemapTiles().then(() => { setStatus(''); redrawEvent(); });
-  }
-  const sortedForNum = [...withCoords].sort((a,b) =>
-    (a.local||a.endereco).localeCompare(b.local||b.endereco, 'pt-BR', {sensitivity:'base'}));
-  alphaNumEvt = {};
-  sortedForNum.forEach((loc,i) => { alphaNumEvt[loc.id] = i+1; });
-
   numAddresses = LOCATIONS.length;
   numArtists = LOCATIONS.reduce((sum, l) => sum + l.artistas.filter(a => a.nome).length, 0);
   document.getElementById('evt-stats-note').textContent = `${numAddresses} endereços · ${numArtists} artistas (direto da planilha)`;
@@ -1076,10 +1115,10 @@ async function boot(){
     if (art.nome) FLAT_ARTISTS.push({ ...art, loc });
   }));
   FLAT_ARTISTS.sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR',{sensitivity:'base'}));
-
   renderArtistSelect();
-  generateNewMark();
-  generateNewEventMark();
+
+  setupFromLocations();
+  resolveMissingCoordinates();
 }
 boot();
 </script>

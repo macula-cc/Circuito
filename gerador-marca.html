@@ -266,7 +266,7 @@ function parseCSV(text){
 }
 
 async function loadLocationsFromSheet(){
-  const res = await fetch(SHEET_CSV_URL);
+  const res = await fetch(`${SHEET_CSV_URL}&_=${Date.now()}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const text = await res.text();
   const table = parseCSV(text).filter(r => r.some(c => c !== undefined && c.trim() !== ''));
@@ -828,34 +828,48 @@ document.getElementById('btn-download-pdf').addEventListener('click', async () =
   }
 });
 
+// ---------------- geocodificação automática (fallback) ----------------
+// mesma lógica do index.html: endereços sem lat/lng na planilha são
+// resolvidos via Nominatim (gratuito) em segundo plano, sem travar o
+// carregamento inicial com o que já está disponível
+async function geocodeAddress(query){
+  try{
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('geocode http error ' + res.status);
+    const results = await res.json();
+    if (results && results.length){
+      return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
+    }
+  } catch(err){
+    console.warn('Falha ao geocodificar endereço:', query, err);
+  }
+  return null;
+}
+async function resolveMissingCoordinates(){
+  const pending = LOCATIONS.filter(l => (l.lat == null || l.lng == null) && !/confirmar/i.test(l.endereco));
+  for (const loc of pending){
+    const query = `${loc.endereco}, Centro, Rio de Janeiro, Brasil`;
+    const coords = await geocodeAddress(query);
+    if (coords){
+      loc.lat = coords.lat;
+      loc.lng = coords.lng;
+      setupFromLocations();
+    }
+    await new Promise(r => setTimeout(r, 1100));
+  }
+}
+
 /* ============================================================
    boot
    ============================================================ */
-async function boot(){
-  try{
-    await Promise.all([
-      document.fonts.load("24px 'Instrument Serif'"),
-      document.fonts.load(`${TITLE_SIZE}px 'Instrument Serif'`),
-      document.fonts.load(`italic ${TITLE_SIZE}px 'Instrument Serif'`),
-      document.fonts.load(`350 ${LABEL_SIZE}px 'Geist'`)
-    ]);
-  } catch(e){}
-  // agora que a fonte de verdade carregou, recalcula a largura do texto
-  // horizontal com a métrica real (antes disso, usava a fonte de fallback)
-  computeHorizontalLayout();
-  try{
-    LOCATIONS = await loadLocationsFromSheet();
-  } catch(err){
-    console.error(err);
-    setStatus('Não foi possível carregar os dados da planilha agora. Recarregue a página em instantes.', true);
-    return;
-  }
-
+function setupFromLocations(){
   const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
   if (withCoords.length < 2){
     setStatus('poucos ateliês com coordenadas preenchidas ainda.', true);
     return;
   }
+  setStatus('');
   const bounds = {
     minLat: Math.min(...withCoords.map(l=>l.lat)),
     maxLat: Math.max(...withCoords.map(l=>l.lat)),
@@ -876,6 +890,30 @@ async function boot(){
 
   generateNewRoute();
   generateCompleteMark();
+}
+
+async function boot(){
+  try{
+    await Promise.all([
+      document.fonts.load("24px 'Instrument Serif'"),
+      document.fonts.load(`${TITLE_SIZE}px 'Instrument Serif'`),
+      document.fonts.load(`italic ${TITLE_SIZE}px 'Instrument Serif'`),
+      document.fonts.load(`350 ${LABEL_SIZE}px 'Geist'`)
+    ]);
+  } catch(e){}
+  // agora que a fonte de verdade carregou, recalcula a largura do texto
+  // horizontal com a métrica real (antes disso, usava a fonte de fallback)
+  computeHorizontalLayout();
+  try{
+    LOCATIONS = await loadLocationsFromSheet();
+  } catch(err){
+    console.error(err);
+    setStatus('Não foi possível carregar os dados da planilha agora. Recarregue a página em instantes.', true);
+    return;
+  }
+
+  setupFromLocations();
+  resolveMissingCoordinates();
 }
 boot();
 </script>
