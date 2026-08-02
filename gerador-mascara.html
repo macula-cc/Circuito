@@ -6,7 +6,7 @@
 <title>Gerador de Post — Circuito de Ateliês do Centro</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@350&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
@@ -180,11 +180,12 @@
    ============================================================ */
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
 const LOGICAL = 1000;
-const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap";
+const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Geist:wght@350&family=Instrument+Serif:ital@0;1&display=swap";
+const SANS_DISPLAY = "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const EVENT_TITLE = 'Circuito de Ateliês do Centro';
 const EVENT_EYEBROW = 'Ateliês abertos';
 const EVENT_DATES = '18 – 19 de Setembro';
-const EVENT_EYEBROW_DATE = `${EVENT_EYEBROW}: ${EVENT_DATES}`;
+const EVENT_EYEBROW_DATE = `${EVENT_EYEBROW}: ${EVENT_DATES}`; // post do artista (subtítulo abaixo da marca)
 
 // layout — post do artista
 const MARGIN = 60;
@@ -196,9 +197,11 @@ const NAME_SIZE = 64;
 const ADDR_SIZE = 24;
 const TITLE_SIZE = 36;
 
-// layout — post do evento
-const EVT_TITLE_L1 = 'Circuito de';
-const EVT_TITLE_L2 = 'Ateliês do Centro';
+// layout — post do evento: título grande é o par tagline/data (serifado,
+// 2ª linha em itálico); o nome do evento vira o label pequeno em caixa
+// alta (sans) embaixo à direita — mesma hierarquia da marca completa
+const EVT_TITLE_L1 = EVENT_EYEBROW; // 'Ateliês abertos'
+const EVT_TITLE_L2 = EVENT_DATES;   // '18 – 19 de Setembro' (itálico)
 const EVT_TITLE_SIZE = 92;
 const EVT_TITLE_Y1 = 126;
 const EVT_TITLE_Y2 = 213;
@@ -207,7 +210,12 @@ const EVT_MARK_WIDTH = 30;
 const EVT_STATS_SIZE = 40;
 const EVT_STATS_Y1 = 884;
 const EVT_STATS_Y2 = 930;
-const EVT_DATE_Y = EVT_STATS_Y2;
+const EVT_LABEL_L1 = 'CIRCUITO DE';
+const EVT_LABEL_L2 = 'ATELIÊS DO CENTRO';
+const EVT_LABEL_SIZE = 26; // valor de referência: 26 sobre 28 (tamanho/entrelinha)
+const EVT_LABEL_LINE_GAP = 28;
+const EVT_LABEL_Y2 = EVT_STATS_Y2; // última linha alinhada com a última linha das estatísticas
+const EVT_LABEL_Y1 = EVT_LABEL_Y2 - EVT_LABEL_LINE_GAP;
 
 function parseCSV(text){
   const rows = []; let row = []; let field = ''; let inQuotes = false;
@@ -786,6 +794,7 @@ function drawEventFrame(ctx2d, dMark, markPath){
   ctx2d.fillStyle = theme.ink;
   ctx2d.font = `${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
   ctx2d.fillText(EVT_TITLE_L1, MARGIN, EVT_TITLE_Y1);
+  ctx2d.font = `italic ${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
   ctx2d.fillText(EVT_TITLE_L2, MARGIN, EVT_TITLE_Y2);
 
   if (markPath && markPath.length){
@@ -832,6 +841,7 @@ function drawEventFrame(ctx2d, dMark, markPath){
       octx.textAlign = 'left'; octx.textBaseline = 'alphabetic';
       octx.font = `${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
       octx.fillText(EVT_TITLE_L1, MARGIN, EVT_TITLE_Y1);
+      octx.font = `italic ${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
       octx.fillText(EVT_TITLE_L2, MARGIN, EVT_TITLE_Y2);
       octx.globalCompositeOperation = 'destination-in';
       octx.lineWidth = EVT_MARK_WIDTH;
@@ -868,10 +878,13 @@ function drawEventFrame(ctx2d, dMark, markPath){
   ctx2d.fillText(`${numAddresses} Endereços`, MARGIN, EVT_STATS_Y1);
   ctx2d.fillText(`${numArtists} Artistas`, MARGIN, EVT_STATS_Y2);
 
-  ctx2d.textAlign = 'right';
   ctx2d.fillStyle = theme.ink;
-  ctx2d.fillText(EVENT_EYEBROW_DATE, LOGICAL - MARGIN, EVT_DATE_Y);
+  ctx2d.font = `350 ${EVT_LABEL_SIZE}px ${SANS_DISPLAY}`;
+  const labelBlockW = Math.max(ctx2d.measureText(EVT_LABEL_L1).width, ctx2d.measureText(EVT_LABEL_L2).width);
+  const labelX = (LOGICAL - MARGIN) - labelBlockW;
   ctx2d.textAlign = 'left';
+  ctx2d.fillText(EVT_LABEL_L1, labelX, EVT_LABEL_Y1);
+  ctx2d.fillText(EVT_LABEL_L2, labelX, EVT_LABEL_Y2);
 }
 
 function redrawEvent(){
@@ -971,7 +984,9 @@ async function boot(){
       document.fonts.load(`${NAME_SIZE}px 'Instrument Serif'`),
       document.fonts.load(`${TITLE_SIZE}px 'Instrument Serif'`),
       document.fonts.load(`${EVT_TITLE_SIZE}px 'Instrument Serif'`),
-      document.fonts.load(`${EVT_STATS_SIZE}px 'Instrument Serif'`)
+      document.fonts.load(`italic ${EVT_TITLE_SIZE}px 'Instrument Serif'`),
+      document.fonts.load(`${EVT_STATS_SIZE}px 'Instrument Serif'`),
+      document.fonts.load(`350 ${EVT_LABEL_SIZE}px 'Geist'`)
     ]);
   } catch(e){}
   try{
