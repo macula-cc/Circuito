@@ -6,7 +6,7 @@
 <title>Gerador de Vídeo — Circuito de Ateliês do Centro</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 
 <style>
   :root{
@@ -174,12 +174,15 @@
    ============================================================ */
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
 const LOGICAL = 1000;
-const EVENT_TITLE = 'Circuito de Ateliês do Centro';
+const SANS_DISPLAY = "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const EVENT_EYEBROW = 'Ateliês abertos';
 const EVENT_DATES = '18 – 19 de Setembro';
 const MARGIN = 36;
-const EVT_TITLE_L1 = 'Circuito de';
-const EVT_TITLE_L2 = 'Ateliês do Centro';
+// título grande é o par tagline/data (serifado, 2ª linha em itálico); o
+// nome do evento vira o label pequeno em caixa alta (sans) embaixo à
+// direita — mesma hierarquia do gerador de post
+const EVT_TITLE_L1 = EVENT_EYEBROW; // 'Ateliês abertos'
+const EVT_TITLE_L2 = EVENT_DATES;   // '18 – 19 de Setembro' (itálico)
 const EVT_TITLE_SIZE = 92;
 const EVT_TITLE_Y1 = 126;
 const EVT_TITLE_Y2 = 213;
@@ -188,7 +191,27 @@ const MARK_WIDTH = 30;
 const STATS_SIZE = 40;
 const STATS_Y1 = 884;
 const STATS_Y2 = 930;
-const DATE_Y = STATS_Y2;
+const LABEL_L1 = 'CIRCUITO DE';
+const LABEL_L2 = 'ATELIÊS DO CENTRO';
+const LABEL_WEIGHT = 400;
+// tamanho calculado a partir da altura de caixa alta do serifado das
+// estatísticas (ver computeLabelSize, chamada no boot() depois que a fonte
+// de verdade carrega) — 0.85x o match exato, igual no gerador de post
+const LABEL_SIZE_FACTOR = 0.85;
+let LABEL_SIZE = 26;
+let LABEL_LINE_GAP = 28;
+let LABEL_Y2 = STATS_Y2;
+let LABEL_Y1 = LABEL_Y2 - LABEL_LINE_GAP;
+function computeLabelSize(){
+  ctx.font = `${STATS_SIZE}px 'Instrument Serif', Georgia, serif`;
+  const serifCap = ctx.measureText('E').actualBoundingBoxAscent;
+  ctx.font = `${LABEL_WEIGHT} 100px ${SANS_DISPLAY}`;
+  const sansCapPer100 = ctx.measureText('E').actualBoundingBoxAscent / 100;
+  LABEL_SIZE = (serifCap / sansCapPer100) * LABEL_SIZE_FACTOR;
+  LABEL_LINE_GAP = LABEL_SIZE * (28/26);
+  LABEL_Y2 = STATS_Y2;
+  LABEL_Y1 = LABEL_Y2 - LABEL_LINE_GAP;
+}
 
 function parseCSV(text){
   const rows = []; let row = []; let field = ''; let inQuotes = false;
@@ -357,7 +380,7 @@ function computeFitTransform(points, box, fillFraction){
   return { scale, cx, cy, boxCx, boxCy };
 }
 function applyFitTransform(points, t){
-  return points.map(p => ({ x: t.boxCx + (p.x-t.cx)*t.scale, y: t.boxCy + (p.y-t.cy)*t.scale }));
+  return points.map(p => ({ ...p, x: t.boxCx + (p.x-t.cx)*t.scale, y: t.boxCy + (p.y-t.cy)*t.scale }));
 }
 function buildLegPath(a, b){
   const dx = b.x - a.x, dy = b.y - a.y;
@@ -541,6 +564,7 @@ function drawTitleLayer(ctx2d){
   ctx2d.fillStyle = theme.ink;
   ctx2d.font = `${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
   ctx2d.fillText(EVT_TITLE_L1, MARGIN, EVT_TITLE_Y1);
+  ctx2d.font = `italic ${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
   ctx2d.fillText(EVT_TITLE_L2, MARGIN, EVT_TITLE_Y2);
 }
 function drawStatsLayer(ctx2d){
@@ -551,15 +575,17 @@ function drawStatsLayer(ctx2d){
   ctx2d.font = `${STATS_SIZE}px 'Instrument Serif', Georgia, serif`;
   ctx2d.fillText(`${numAddresses} Endereços`, MARGIN, STATS_Y1);
   ctx2d.fillText(`${numArtists} Artistas`, MARGIN, STATS_Y2);
-  ctx2d.textAlign = 'right';
-  ctx2d.fillText(EVENT_EYEBROW, LOGICAL - MARGIN, STATS_Y1);
-  ctx2d.fillText(EVENT_DATES, LOGICAL - MARGIN, DATE_Y);
-  ctx2d.textAlign = 'left';
+
+  ctx2d.font = `${LABEL_WEIGHT} ${LABEL_SIZE}px ${SANS_DISPLAY}`;
+  const labelBlockW = Math.max(ctx2d.measureText(LABEL_L1).width, ctx2d.measureText(LABEL_L2).width);
+  const labelX = (LOGICAL - MARGIN) - labelBlockW;
+  ctx2d.fillText(LABEL_L1, labelX, LABEL_Y1);
+  ctx2d.fillText(LABEL_L2, labelX, LABEL_Y2);
 }
-function drawPinsLayer(ctx2d){
+function drawPinsLayer(ctx2d, pins){
   if (!showPins) return;
   const theme = THEMES[currentTheme];
-  PTS.forEach((p) => {
+  (pins || PTS).forEach((p) => {
     ctx2d.beginPath();
     ctx2d.arc(p.x, p.y, 15, 0, Math.PI*2);
     ctx2d.fillStyle = theme.mark;
@@ -586,6 +612,7 @@ function applyTitleNegativeMask(ctx2d, visiblePoints){
   octx.textAlign = 'left'; octx.textBaseline = 'alphabetic';
   octx.font = `${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
   octx.fillText(EVT_TITLE_L1, MARGIN, EVT_TITLE_Y1);
+  octx.font = `italic ${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
   octx.fillText(EVT_TITLE_L2, MARGIN, EVT_TITLE_Y2);
   octx.globalCompositeOperation = 'destination-in';
   octx.lineWidth = MARK_WIDTH;
@@ -597,29 +624,55 @@ function applyTitleNegativeMask(ctx2d, visiblePoints){
   octx.stroke();
   ctx2d.drawImage(off, 0, 0, LOGICAL, LOGICAL);
 }
-// texto seguindo o caminho, calculado sempre a partir da distância absoluta
-// 0..total — assim, ao "apagar" o começo (dStart > 0), os caracteres que
-// continuam visíveis não mudam de posição (sem reflow)
-function drawTextAlongRange(ctx2d, text, points, fontSize, dStart, dEnd, color){
+// texto seguindo o caminho — mesmo estilo alternado (sans em caixa alta /
+// serifado com a data em itálico) da fita do gerador de marca e do post do
+// evento. Calculado sempre a partir da distância absoluta 0..total — assim,
+// ao "apagar" o começo (dStart > 0), os caracteres que continuam visíveis
+// não mudam de posição (sem reflow)
+const RIBBON_SEP = '   ·   ';
+function buildRibbonRuns(serifFontSize){
+  function xAscent(fontSize, fontFamily, weight){
+    ctx.font = `${weight ? weight+' ' : ''}${fontSize}px ${fontFamily}`;
+    return ctx.measureText('x').actualBoundingBoxAscent;
+  }
+  const serifFamily = "'Instrument Serif', Georgia, serif";
+  const serifAscent = xAscent(serifFontSize, serifFamily, '400');
+  const sansAscentAtSerifSize = xAscent(serifFontSize, SANS_DISPLAY, '350');
+  const sansFontSize = serifFontSize * (serifAscent / sansAscentAtSerifSize) * 0.85;
+  const sansLabel = `${LABEL_L1} ${LABEL_L2}`;
+  return [
+    { text: sansLabel, fontFamily: SANS_DISPLAY, weight:'350', fontSize: sansFontSize },
+    { text: RIBBON_SEP, fontFamily: SANS_DISPLAY, weight:'350', fontSize: sansFontSize },
+    { text: `${EVENT_EYEBROW} `, fontFamily: serifFamily, weight:'400', fontSize: serifFontSize },
+    { text: EVENT_DATES, fontFamily: serifFamily, weight:'400', fontSize: serifFontSize, italic:true },
+    { text: RIBBON_SEP, fontFamily: serifFamily, weight:'400', fontSize: serifFontSize }
+  ];
+}
+function drawRibbonAlongRange(ctx2d, points, serifFontSize, dStart, dEnd, color){
   const total = pathLength(points);
-  if (total < fontSize) return;
-  ctx2d.font = `${fontSize}px 'Instrument Serif', Georgia, serif`;
+  if (total < serifFontSize) return;
+  const runs = buildRibbonRuns(serifFontSize);
+  const chars = [];
+  runs.forEach(run => { for (const ch of run.text) chars.push({ ch, run }); });
   ctx2d.fillStyle = color;
-  const unit = text + '   ·   ';
-  let d = 0, safety = 0, uidx = 0;
+  ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'middle';
+  let d = 0, charPos = 0, safety = 0;
   while (d < total && safety < 4000){
-    const ch = unit[uidx % unit.length];
-    const w = ctx2d.measureText(ch).width;
+    const item = chars[charPos % chars.length];
+    const run = item.run;
+    ctx2d.font = `${run.italic ? 'italic ' : ''}${run.weight ? run.weight+' ' : ''}${run.fontSize}px ${run.fontFamily}`;
+    const w = ctx2d.measureText(item.ch).width;
     if (d >= dStart && d <= dEnd){
       const pt = pointAtDistance(points, d);
       ctx2d.save();
       ctx2d.translate(pt.x, pt.y);
       ctx2d.rotate(pt.angle);
-      ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'middle';
-      ctx2d.fillText(ch, 0, 0);
+      ctx2d.fillText(item.ch, 0, 0);
       ctx2d.restore();
     }
-    d += w; uidx++; safety++;
+    d += w;
+    charPos++;
+    safety++;
   }
 }
 // desenha as pernas (legs) de uma marca, cada uma só na faixa visível
@@ -677,21 +730,23 @@ function buildRandomMark(){
   for (let i = 1; i < closed.length; i++) rawLegs.push(buildLegPath(closed[i-1], closed[i]));
   const pts = [ { x: closed[0].x, y: closed[0].y } ];
   rawLegs.forEach(leg => leg.slice(1).forEach(p => pts.push(p)));
-  const t = computeFitTransform(pts, MAP_BOX, 0.94);
-  return rawLegs.map(leg => applyFitTransform(leg, t));
+  const t = computeFitTransform(pts, MAP_BOX, 0.82);
+  const legs = rawLegs.map(leg => applyFitTransform(leg, t));
+  const pins = applyFitTransform(order, t);
+  return { legs, pins };
 }
 
-let currentMarcaLegs = null;
-function drawMarcasFrame(ctx2d, legs){
-  currentMarcaLegs = legs;
+let currentMarca = null;
+function drawMarcasFrame(ctx2d, mark){
+  currentMarca = mark;
   drawBaseLayer(ctx2d);
   drawTitleLayer(ctx2d);
-  const total = totalLegsLength(legs);
-  strokeLegsInRange(ctx2d, legs, 0, total);
-  const flat = flattenLegs(legs);
-  if (showText) drawTextAlongRange(ctx2d, EVENT_TITLE, flat, 20, 0, total, THEMES[currentTheme].bg);
+  const total = totalLegsLength(mark.legs);
+  strokeLegsInRange(ctx2d, mark.legs, 0, total);
+  const flat = flattenLegs(mark.legs);
+  if (showText) drawRibbonAlongRange(ctx2d, flat, 20, 0, total, THEMES[currentTheme].bg);
   applyTitleNegativeMask(ctx2d, flat);
-  drawPinsLayer(ctx2d);
+  drawPinsLayer(ctx2d, mark.pins);
   drawStatsLayer(ctx2d);
 }
 
@@ -817,7 +872,7 @@ function drawCircuitoFrame(){
   drawBaseLayer(ctx);
   drawTitleLayer(ctx);
   strokeLegsInRange(ctx, circuitoLegs, dStart, dEnd);
-  if (showText) drawTextAlongRange(ctx, EVENT_TITLE, circuitoFlat, 20, dStart, dEnd, THEMES[currentTheme].bg);
+  if (showText) drawRibbonAlongRange(ctx, circuitoFlat, 20, dStart, dEnd, THEMES[currentTheme].bg);
   const visible = extractRange(circuitoFlat, dStart, dEnd);
   applyTitleNegativeMask(ctx, visible);
   drawPinsLayer(ctx);
@@ -845,7 +900,7 @@ function stopAllLoops(){
   if (circuitoRafId){ cancelAnimationFrame(circuitoRafId); circuitoRafId = null; }
 }
 function redrawNow(){
-  if (videoTipo === 'marcas' && currentMarcaLegs) drawMarcasFrame(ctx, currentMarcaLegs);
+  if (videoTipo === 'marcas' && currentMarca) drawMarcasFrame(ctx, currentMarca);
   // no modo circuito o próprio rAF já redesenha a cada quadro
 }
 function startPreview(){
@@ -1011,10 +1066,14 @@ async function boot(){
   try{
     await Promise.all([
       document.fonts.load(`${EVT_TITLE_SIZE}px 'Instrument Serif'`),
+      document.fonts.load(`italic ${EVT_TITLE_SIZE}px 'Instrument Serif'`),
       document.fonts.load(`${STATS_SIZE}px 'Instrument Serif'`),
-      document.fonts.load("20px 'Instrument Serif'")
+      document.fonts.load("20px 'Instrument Serif'"),
+      document.fonts.load(`${LABEL_WEIGHT} 100px 'Geist'`),
+      document.fonts.load(`350 20px 'Geist'`)
     ]);
   } catch(e){}
+  computeLabelSize();
   try{
     LOCATIONS = await loadLocationsFromSheet();
   } catch(err){
