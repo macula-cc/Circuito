@@ -1049,7 +1049,11 @@ async function setupFromLocations(){
   computeProjection(bounds);
   PTS = withCoords.map(loc => ({ ...pixelOf(loc.lat, loc.lng), id: loc.id }));
 
-  const sortedForNum = [...withCoords].sort((a,b) =>
+  // numerado entre TODOS os endereços da planilha (não só os com coordenada
+  // já preenchida) — mesmo critério do index.html, senão o número de um
+  // ponto aqui diverge do número mostrado no site conforme endereços novos
+  // vão sendo geocodificados em momentos diferentes
+  const sortedForNum = [...LOCATIONS].sort((a,b) =>
     (a.local||a.endereco).localeCompare(b.local||b.endereco, 'pt-BR', {sensitivity:'base'}));
   alphaNum = {};
   sortedForNum.forEach((loc,i) => { alphaNum[loc.id] = i+1; });
