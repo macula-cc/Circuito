@@ -6,7 +6,7 @@
 <title>Gerador de Marca — Circuito de Ateliês do Centro</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@350&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
@@ -166,11 +166,15 @@
    ============================================================ */
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
 const LOGICAL = 1000;
-const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap";
-const EVENT_TITLE = 'Circuito de Ateliês do Centro';
-const EVENT_EYEBROW = 'Ateliês abertos';
+const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Geist:wght@350&family=Instrument+Serif:ital@0;1&display=swap";
+const SANS_DISPLAY = "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+const EVENT_TITLE = 'Circuito de Ateliês do Centro'; // usado só no modo "símbolo" (fita seguindo o traçado)
+// marca completa: núcleo tipográfico novo — label pequeno em caixa alta
+// (Geist) acima de uma linha só combinando o nome do evento (serifado,
+// normal) com a data (serifado, itálico)
+const EVENT_LABEL = 'CIRCUITO DE ATELIÊS DO CENTRO';
+const EVENT_TAGLINE = 'Ateliês abertos';
 const EVENT_DATES = '18 – 19 de Setembro';
-const EVENT_EYEBROW_DATE = `${EVENT_EYEBROW}: ${EVENT_DATES}`;
 
 // estimativa de largura do texto (fontes serifadas ~0.52× o tamanho por
 // caractere) — só pra centralizar a composição, não precisa ser exata
@@ -180,48 +184,47 @@ function estimateTextWidth(text, fontSize){
   measureCtx.font = `${fontSize}px 'Instrument Serif', Georgia, serif`;
   return measureCtx.measureText(text).width;
 }
+function estimateSansWidth(text, fontSize){
+  measureCtx.font = `350 ${fontSize}px ${SANS_DISPLAY}`;
+  return measureCtx.measureText(text).width;
+}
 
-// marca completa — vertical: símbolo bem grande e grosso, nas mesmas
-// proporções do gerador de símbolo, com o texto logo abaixo; grupo
-// inteiro centralizado no artboard
-const SYMBOL_V_SIZE = 640;
-const SYMBOL_V_STROKE = 35;
-const TITLE_SIZE_V = 64;
-const EYEBROW_SIZE_V = 64;
-const DATE_SIZE_V = 64;
+// marca completa — núcleo tipográfico compartilhado entre vertical e
+// horizontal (mesmo tamanho de fonte nos dois — só a escala/posição do
+// símbolo muda). Razão calibrada pelos valores de referência do design:
+// sans 25pt / serifado 33.5pt ≈ 0,7463
+const TITLE_SIZE = 64; // linha serifada "Ateliês abertos ... data"
+const LABEL_SIZE = TITLE_SIZE * (25/33.5); // ≈ 47.76 — label sans-serif em caixa alta
+
+// vertical: símbolo grande acima, texto embaixo (2 linhas: label + linha
+// principal), grupo inteiro centralizado no artboard
+const SYMBOL_V_SIZE = 720;
+const SYMBOL_V_STROKE = 38;
 const GAP_V = 10; // distância real entre a ponta de baixo do símbolo e a tipografia
-const TITLE_LEAD_V = 62;
-const DATE_GAP_V = 66;
-const TEXT_BLOCK_H_V = (TITLE_SIZE_V*0.72) + TITLE_LEAD_V + DATE_GAP_V + DATE_GAP_V + (DATE_SIZE_V*0.25);
+const LABEL_GAP_V = 58; // da baseline do label até a baseline da linha principal
+const TEXT_BLOCK_H_V = (LABEL_SIZE*0.72) + LABEL_GAP_V + (TITLE_SIZE*0.25);
 const GROUP_H_V = SYMBOL_V_SIZE + GAP_V + TEXT_BLOCK_H_V;
 const GROUP_TOP_V = (LOGICAL - GROUP_H_V) / 2;
 const MARK_BOX_V = { x: (LOGICAL - SYMBOL_V_SIZE)/2, y: GROUP_TOP_V, w: SYMBOL_V_SIZE, h: SYMBOL_V_SIZE };
 const TITLE_X_V = MARK_BOX_V.x;
 const TEXT_TOP_V = MARK_BOX_V.y + SYMBOL_V_SIZE + GAP_V;
-const TITLE_V_Y1 = TEXT_TOP_V + TITLE_SIZE_V*0.72;
-const TITLE_V_Y2 = TITLE_V_Y1 + TITLE_LEAD_V;
-const EYEBROW_V_Y = TITLE_V_Y2 + DATE_GAP_V;
-const DATE_V_Y = EYEBROW_V_Y + DATE_GAP_V;
+const LABEL_V_Y = TEXT_TOP_V + LABEL_SIZE*0.72;
+const TITLE_V_Y = LABEL_V_Y + LABEL_GAP_V;
 
-// marca completa — horizontal: exatamente a marca vertical (mesma
-// tipografia, mesmo espaçamento), só que com o símbolo 20% menor e o
-// texto ao lado em vez de embaixo, os dois centralizados pela altura
-// marca completa — horizontal: símbolo ligeiramente maior que o texto,
-// composição inteira centralizada no artboard
-const SYMBOL_H_SIZE = 380;
-const SYMBOL_H_STROKE = 18;
-const TITLE_SIZE_H = 56;
-const DATE_SIZE_H = 44;
+// horizontal: símbolo menor ao lado, mesmo núcleo tipográfico da vertical;
+// composição inteira ampliada/centralizada no artboard no fim (scaleUp)
+const SYMBOL_H_SIZE = 420;
+const SYMBOL_H_STROKE = 20;
 const GAP_H = 30;
-let TEXT_W_H, TOTAL_W_H, START_X_H, MARK_BOX_H, TITLE_X_H, TITLE_Y_H, DATE_Y_H;
+let TEXT_W_H, TOTAL_W_H, START_X_H, MARK_BOX_H, TITLE_X_H, LABEL_Y_H, TITLE_Y_H;
 function computeHorizontalLayout(){
-  TEXT_W_H = Math.max(estimateTextWidth(EVENT_TITLE, TITLE_SIZE_H), estimateTextWidth(EVENT_EYEBROW_DATE, TITLE_SIZE_H));
+  TEXT_W_H = Math.max(estimateSansWidth(EVENT_LABEL, LABEL_SIZE), estimateTextWidth(`${EVENT_TAGLINE} ${EVENT_DATES}`, TITLE_SIZE));
   TOTAL_W_H = SYMBOL_H_SIZE + GAP_H + TEXT_W_H;
   START_X_H = Math.max(15, (LOGICAL - TOTAL_W_H) / 2);
   MARK_BOX_H = { x: START_X_H, y: LOGICAL/2 - SYMBOL_H_SIZE/2, w: SYMBOL_H_SIZE, h: SYMBOL_H_SIZE };
   TITLE_X_H = START_X_H + SYMBOL_H_SIZE + GAP_H;
-  TITLE_Y_H = LOGICAL/2 - 8;
-  DATE_Y_H = TITLE_Y_H + 58;
+  LABEL_Y_H = LOGICAL/2 - 8;
+  TITLE_Y_H = LABEL_Y_H + 58;
 }
 computeHorizontalLayout(); // primeira estimativa (fonte de fallback), recalculado depois que a web font carrega de verdade
 
@@ -377,9 +380,20 @@ function pointAtDistance(points, dist){
    como "régua" (nunca é desenhado nem exportado); o resultado
    final continua sendo texto SVG de verdade, vetorial
    ============================================================ */
-function charWidth(ch, fontSize){
-  measureCtx.font = `${fontSize}px 'Instrument Serif', Georgia, serif`;
+function charWidth(ch, fontSize, fontFamily, weight){
+  measureCtx.font = `${weight ? weight+' ' : ''}${fontSize}px ${fontFamily || "'Instrument Serif', Georgia, serif"}`;
   return measureCtx.measureText(ch).width;
+}
+
+// mede a altura real do "x" (aproxima a altura-x) numa fonte/peso/tamanho —
+// usado pra igualar visualmente o tamanho do texto sem serifa (Geist) ao
+// tamanho do texto serifado (Instrument Serif) quando alternam na fita, já
+// que fontes diferentes têm proporções diferentes entre o tamanho nominal
+// e a altura-x de verdade
+function measureXMetrics(fontSize, fontFamily, weight){
+  measureCtx.font = `${weight ? weight+' ' : ''}${fontSize}px ${fontFamily}`;
+  const m = measureCtx.measureText('x');
+  return { ascent: m.actualBoundingBoxAscent, descent: m.actualBoundingBoxDescent };
 }
 
 function buildOpenPathD(points){
@@ -415,8 +429,33 @@ function buildRibbonOnlySVG(legs, ribbonWidth, ribbonColor){
   return out;
 }
 
-function buildRibbonAndTextSVG(text, legs, fontSize, ribbonWidth, ribbonColor, textColor){
-  const unit = text + '   ·   ';
+const RIBBON_SERIF_FONT = "'Instrument Serif', Georgia, serif";
+const RIBBON_SEP = '   ·   ';
+
+// alterna o nome do evento em duas tipografias (sem serifa/caixa alta, com
+// serifa) — os tamanhos são calculados pra terem a MESMA altura-x visual
+// (fontes diferentes têm proporções diferentes entre o tamanho nominal e a
+// altura-x real), e cada um ganha um dy próprio pra ficar centralizado na
+// fita, já que o "centro" de cada fonte não cai exatamente no mesmo lugar
+// em relação à linha de base
+function buildRibbonRuns(serifFontSize){
+  const serifMetrics = measureXMetrics(serifFontSize, RIBBON_SERIF_FONT);
+  const sansMetricsAtSerifSize = measureXMetrics(serifFontSize, SANS_DISPLAY, '350');
+  const sansFontSize = serifFontSize * (serifMetrics.ascent / sansMetricsAtSerifSize.ascent);
+  const sansMetrics = measureXMetrics(sansFontSize, SANS_DISPLAY, '350');
+  const serifDy = (serifMetrics.ascent - serifMetrics.descent) / 2;
+  const sansDy = (sansMetrics.ascent - sansMetrics.descent) / 2;
+  return [
+    { text: EVENT_LABEL, fontFamily: SANS_DISPLAY, weight:'350', fontSize: sansFontSize, dy: sansDy },
+    { text: RIBBON_SEP, fontFamily: SANS_DISPLAY, weight:'350', fontSize: sansFontSize, dy: sansDy },
+    { text: EVENT_TITLE, fontFamily: RIBBON_SERIF_FONT, weight:'400', fontSize: serifFontSize, dy: serifDy },
+    { text: RIBBON_SEP, fontFamily: RIBBON_SERIF_FONT, weight:'400', fontSize: serifFontSize, dy: serifDy }
+  ];
+}
+
+function buildRibbonAndTextSVG(runs, legs, ribbonWidth, ribbonColor, textColor){
+  const chars = [];
+  runs.forEach(run => { for (const ch of run.text) chars.push({ ch, run }); });
   let out = '';
   let charPos = 0; // continua entre pernas, pra frase não reiniciar a cada trecho
 
@@ -437,13 +476,13 @@ function buildRibbonAndTextSVG(text, legs, fontSize, ribbonWidth, ribbonColor, t
     out += `<path d="${pathD}" fill="none" stroke="${stroke}" stroke-width="${ribbonWidth}" stroke-linecap="round" stroke-linejoin="round"/>`;
 
     let d = 0, safety = 0;
-    while (d < total && safety < 3000){
-      const ch = unit[charPos % unit.length];
-      const w = charWidth(ch, fontSize);
+    while (d < total && safety < 4000){
+      const item = chars[charPos % chars.length];
+      const w = charWidth(item.ch, item.run.fontSize, item.run.fontFamily, item.run.weight);
       if (d >= total) break;
       const pt = pointAtDistance(points, d);
       const angleDeg = (pt.angle * 180 / Math.PI).toFixed(2);
-      out += `<text x="0" y="0" transform="translate(${pt.x.toFixed(2)} ${pt.y.toFixed(2)}) rotate(${angleDeg})" font-family="'Instrument Serif', Georgia, serif" font-size="${fontSize}" fill="${textColor}" text-anchor="start" dominant-baseline="middle">${escapeXML(ch)}</text>`;
+      out += `<text x="0" y="${item.run.dy.toFixed(2)}" transform="translate(${pt.x.toFixed(2)} ${pt.y.toFixed(2)}) rotate(${angleDeg})" font-family="${item.run.fontFamily}" font-weight="${item.run.weight}" font-size="${item.run.fontSize.toFixed(2)}" fill="${textColor}" text-anchor="start">${escapeXML(item.ch)}</text>`;
       d += w;
       charPos++;
       safety++;
@@ -635,15 +674,13 @@ function buildContentSVG(includeBg){
     content += pathsOut;
 
     if (orientMarca === 'vertical'){
-      content += `<text x="${TITLE_X_V}" y="${TITLE_V_Y1}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Circuito de</text>`;
-      content += `<text x="${TITLE_X_V}" y="${TITLE_V_Y2}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V}" fill="${theme.ribbon}">Ateliês do Centro</text>`;
-      content += `<text x="${TITLE_X_V}" y="${EYEBROW_V_Y}" font-family="'Instrument Serif', Georgia, serif" font-size="${EYEBROW_SIZE_V}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_EYEBROW)}</text>`;
-      content += `<text x="${TITLE_X_V}" y="${DATE_V_Y}" font-family="'Instrument Serif', Georgia, serif" font-size="${DATE_SIZE_V}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_DATES)}</text>`;
+      content += `<text x="${TITLE_X_V}" y="${LABEL_V_Y}" font-family="${SANS_DISPLAY}" font-weight="350" letter-spacing="-1.2" font-size="${LABEL_SIZE.toFixed(2)}" fill="${theme.ribbon}">${escapeXML(EVENT_LABEL)}</text>`;
+      content += `<text x="${TITLE_X_V}" y="${TITLE_V_Y}" font-size="${TITLE_SIZE}" fill="${theme.ribbon}"><tspan font-family="'Instrument Serif', Georgia, serif">${escapeXML(EVENT_TAGLINE)} </tspan><tspan font-family="'Instrument Serif', Georgia, serif" font-style="italic">${escapeXML(EVENT_DATES)}</tspan></text>`;
       if (showPinsCompleta) content += renderCompletaPins(completeMarkPins, SYMBOL_V_STROKE, theme);
       s += content;
     } else {
-      content += `<text x="${TITLE_X_H}" y="${TITLE_Y_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_H}" fill="${theme.ribbon}">${escapeXML(EVENT_TITLE)}</text>`;
-      content += `<text x="${TITLE_X_H}" y="${DATE_Y_H}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_H}" fill="${theme.ribbon}" opacity="0.65">${escapeXML(EVENT_EYEBROW_DATE)}</text>`;
+      content += `<text x="${TITLE_X_H}" y="${LABEL_Y_H}" font-family="${SANS_DISPLAY}" font-weight="350" letter-spacing="-1.2" font-size="${LABEL_SIZE.toFixed(2)}" fill="${theme.ribbon}">${escapeXML(EVENT_LABEL)}</text>`;
+      content += `<text x="${TITLE_X_H}" y="${TITLE_Y_H}" font-size="${TITLE_SIZE}" fill="${theme.ribbon}"><tspan font-family="'Instrument Serif', Georgia, serif">${escapeXML(EVENT_TAGLINE)} </tspan><tspan font-family="'Instrument Serif', Georgia, serif" font-style="italic">${escapeXML(EVENT_DATES)}</tspan></text>`;
       if (showPinsCompleta) content += renderCompletaPins(completeMarkPins, SYMBOL_H_STROKE, theme);
       // só a apresentação muda aqui: a composição inteira é ampliada em
       // volta do centro do artboard, sem alterar nenhuma proporção da marca
@@ -665,7 +702,7 @@ function buildContentSVG(includeBg){
     }
     resetGradients();
     const ribbonMarkup = showText
-      ? buildRibbonAndTextSVG(EVENT_TITLE, legs, 24, 38, theme.ribbon, theme.text)
+      ? buildRibbonAndTextSVG(buildRibbonRuns(24), legs, 38, theme.ribbon, theme.text)
       : buildRibbonOnlySVG(legs, 38, theme.ribbon);
     if (gradientDefs.length) s += `<defs>${gradientDefs.join('')}</defs>`;
     s += ribbonMarkup;
@@ -774,8 +811,9 @@ async function boot(){
   try{
     await Promise.all([
       document.fonts.load("24px 'Instrument Serif'"),
-      document.fonts.load(`${TITLE_SIZE_H}px 'Instrument Serif'`),
-      document.fonts.load(`${DATE_SIZE_H}px 'Instrument Serif'`)
+      document.fonts.load(`${TITLE_SIZE}px 'Instrument Serif'`),
+      document.fonts.load(`italic ${TITLE_SIZE}px 'Instrument Serif'`),
+      document.fonts.load(`350 ${LABEL_SIZE}px 'Geist'`)
     ]);
   } catch(e){}
   // agora que a fonte de verdade carregou, recalcula a largura do texto
