@@ -380,8 +380,8 @@ function pointAtDistance(points, dist){
    como "régua" (nunca é desenhado nem exportado); o resultado
    final continua sendo texto SVG de verdade, vetorial
    ============================================================ */
-function charWidth(ch, fontSize, fontFamily, weight){
-  measureCtx.font = `${weight ? weight+' ' : ''}${fontSize}px ${fontFamily || "'Instrument Serif', Georgia, serif"}`;
+function charWidth(ch, fontSize, fontFamily, weight, italic){
+  measureCtx.font = `${italic ? 'italic ' : ''}${weight ? weight+' ' : ''}${fontSize}px ${fontFamily || "'Instrument Serif', Georgia, serif"}`;
   return measureCtx.measureText(ch).width;
 }
 
@@ -447,11 +447,11 @@ function buildRibbonRuns(serifFontSize){
   const sansMetrics = measureXMetrics(sansFontSize, SANS_DISPLAY, '350');
   const serifDy = (serifMetrics.ascent - serifMetrics.descent) / 2;
   const sansDy = (sansMetrics.ascent - sansMetrics.descent) / 2;
-  const RIBBON_SERIF_TEXT = `${EVENT_TAGLINE} ${EVENT_DATES}`;
   return [
     { text: EVENT_LABEL, fontFamily: SANS_DISPLAY, weight:'350', fontSize: sansFontSize, dy: sansDy },
     { text: RIBBON_SEP, fontFamily: SANS_DISPLAY, weight:'350', fontSize: sansFontSize, dy: sansDy },
-    { text: RIBBON_SERIF_TEXT, fontFamily: RIBBON_SERIF_FONT, weight:'400', fontSize: serifFontSize, dy: serifDy },
+    { text: `${EVENT_TAGLINE} `, fontFamily: RIBBON_SERIF_FONT, weight:'400', fontSize: serifFontSize, dy: serifDy },
+    { text: EVENT_DATES, fontFamily: RIBBON_SERIF_FONT, weight:'400', italic:true, fontSize: serifFontSize, dy: serifDy },
     { text: RIBBON_SEP, fontFamily: RIBBON_SERIF_FONT, weight:'400', fontSize: serifFontSize, dy: serifDy }
   ];
 }
@@ -481,11 +481,11 @@ function buildRibbonAndTextSVG(runs, legs, ribbonWidth, ribbonColor, textColor){
     let d = 0, safety = 0;
     while (d < total && safety < 4000){
       const item = chars[charPos % chars.length];
-      const w = charWidth(item.ch, item.run.fontSize, item.run.fontFamily, item.run.weight);
+      const w = charWidth(item.ch, item.run.fontSize, item.run.fontFamily, item.run.weight, item.run.italic);
       if (d >= total) break;
       const pt = pointAtDistance(points, d);
       const angleDeg = (pt.angle * 180 / Math.PI).toFixed(2);
-      out += `<text x="0" y="${item.run.dy.toFixed(2)}" transform="translate(${pt.x.toFixed(2)} ${pt.y.toFixed(2)}) rotate(${angleDeg})" font-family="${item.run.fontFamily}" font-weight="${item.run.weight}" font-size="${item.run.fontSize.toFixed(2)}" fill="${textColor}" text-anchor="start">${escapeXML(item.ch)}</text>`;
+      out += `<text x="0" y="${item.run.dy.toFixed(2)}" transform="translate(${pt.x.toFixed(2)} ${pt.y.toFixed(2)}) rotate(${angleDeg})" font-family="${item.run.fontFamily}" font-weight="${item.run.weight}" font-style="${item.run.italic ? 'italic' : 'normal'}" font-size="${item.run.fontSize.toFixed(2)}" fill="${textColor}" text-anchor="start">${escapeXML(item.ch)}</text>`;
       d += w;
       charPos++;
       safety++;
