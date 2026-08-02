@@ -215,7 +215,7 @@ const TITLE_LINE_GAP_V = TITLE_SIZE_V * 0.95; // entrelinha dentro do título (2
 // no artboard
 const SYMBOL_V_SIZE = 720;
 const SYMBOL_V_STROKE = 38;
-const GAP_V = 10; // distância real entre a ponta de baixo do símbolo e a tipografia
+const GAP_V = -20; // distância real entre a ponta de baixo do símbolo e a tipografia (negativo aproxima, compensando a margem do fillFraction do traçado)
 const TEXT_BLOCK_H_V = (LABEL_SIZE_V*0.72) + LABEL_LINE_GAP_V + LABEL_GAP_V + TITLE_LINE_GAP_V + (TITLE_SIZE_V*0.25);
 const GROUP_H_V = SYMBOL_V_SIZE + GAP_V + TEXT_BLOCK_H_V;
 const GROUP_TOP_V = (LOGICAL - GROUP_H_V) / 2;
