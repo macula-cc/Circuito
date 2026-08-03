@@ -484,7 +484,8 @@ let markFill = 'solido'; // solido | degrade
    estado geral
    ============================================================ */
 let LOCATIONS = [];
-let PTS = []; // { x, y, id }
+let PTS = []; // { x, y, id } — projeção real do mapa
+let PTS_TOUR = []; // mesmos pontos, reenquadrados com o fillFraction do "troca de marcas" (0.82)
 let alphaNum = {};
 let numAddresses = 0;
 let numArtists = 0;
@@ -777,9 +778,9 @@ const CIRCUITO_RECORD_CYCLES = 5; // ao gravar vídeo, dura o equivalente a 5 ci
 function easeOutSnap(t){ return t >= 1 ? 1 : 1 - Math.pow(2, -10*t); } // dispara rápido, desacelera forte no fim
 
 function buildTourLegs(){
-  const order = shuffledIndices(PTS.length);
+  const order = shuffledIndices(PTS_TOUR.length);
   const legs = [];
-  for (let i = 1; i < order.length; i++) legs.push(buildLegPath(PTS[order[i-1]], PTS[order[i]]));
+  for (let i = 1; i < order.length; i++) legs.push(buildLegPath(PTS_TOUR[order[i-1]], PTS_TOUR[order[i]]));
   return legs;
 }
 
@@ -877,7 +878,7 @@ function drawCircuitoFrame(){
   if (showText) drawRibbonAlongRange(ctx, circuitoFlat, 20, dStart, dEnd, THEMES[currentTheme].bg);
   const visible = extractRange(circuitoFlat, dStart, dEnd);
   applyTitleNegativeMask(ctx, visible);
-  drawPinsLayer(ctx);
+  drawPinsLayer(ctx, PTS_TOUR);
   drawStatsLayer(ctx);
 
   if (circuitoPhase === 'drawing' && circuitoProgress < circuitoTotal){
@@ -1048,6 +1049,10 @@ async function setupFromLocations(){
   };
   computeProjection(bounds);
   PTS = withCoords.map(loc => ({ ...pixelOf(loc.lat, loc.lng), id: loc.id }));
+  // cobrinha ("circuito vivo") usa o mesmo enquadramento do "troca de
+  // marcas" — mesma escala/zoom visual nos dois tipos de vídeo
+  const tourFit = computeFitTransform(PTS, MAP_BOX, 0.82);
+  PTS_TOUR = applyFitTransform(PTS, tourFit);
 
   // numerado entre TODOS os endereços da planilha (não só os com coordenada
   // já preenchida) — mesmo critério do index.html, senão o número de um
