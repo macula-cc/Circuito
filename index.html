@@ -307,13 +307,13 @@
 
   /* botão fechar em círculo — mesmo visual no drawer, no lightbox e no
      "sobre"; só a posição (pra alinhar com o título de cada um) muda */
-  .icon-close{ width:26px; height:26px; border-radius:50%; background:rgba(0,0,0,0.38); color:var(--ink);
+  .icon-close{ width:26px; height:26px; border-radius:50%; background:rgba(0,0,0,0.3); color:var(--ink);
                backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
                border:none; cursor:pointer; padding:0;
                display:flex; align-items:center; justify-content:center;
                font-family:var(--sans); font-size:0.95rem; line-height:1;
                transition:background 0.15s ease; }
-  .icon-close:hover{ background:rgba(0,0,0,0.52); }
+  .icon-close:hover{ background:rgba(0,0,0,0.44); }
 
   /* alinhado verticalmente com a primeira linha do drawer-title */
   .drawer-close{ position:absolute; top:27px; right:1rem; }
@@ -377,7 +377,7 @@
      o conteúdo (imagem/legenda) fica num bloco separado que começa
      sempre abaixo dela, então nunca disputa o mesmo espaço — mesmo se a
      imagem+legenda for alta o bastante pra rolar */
-  .lightbox-head{ flex-shrink:0; height:30px; position:relative; }
+  .lightbox-head{ flex-shrink:0; height:1.8rem; position:relative; }
 
   /* justify-content:flex-start (não center) é essencial aqui: com o conteúdo
      centralizado, quando a imagem+legenda é mais alta que o espaço visível
@@ -399,7 +399,7 @@
   .lightbox-caption .lb-room{ font-family:var(--mono); font-size:0.83rem; color:var(--gray); margin-bottom:0.5rem; }
   .lightbox-caption .lb-bio{ font-family:var(--sans); font-size:0.97rem; line-height:1.55; color:var(--gray); margin:0.8rem 0 0; }
   /* centralizado na linha dedicada de 40px do lightbox-head */
-  .lightbox-close{ position:absolute; top:2px; right:1rem; }
+  .lightbox-close{ position:absolute; top:1.4px; right:1rem; }
 
   /* ---------------- About modal (same glass treatment as lightbox) ---------------- */
   .about-overlay{ position:fixed; inset:0; z-index:1000;
