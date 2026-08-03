@@ -202,9 +202,10 @@ const TITLE_SIZE = 36;
 // alta (sans) embaixo à direita — mesma hierarquia da marca completa
 const EVT_TITLE_L1 = EVENT_EYEBROW; // 'Ateliês abertos'
 const EVT_TITLE_L2 = EVENT_DATES;   // '18 – 19 de Setembro' (itálico)
-const EVT_TITLE_SIZE = 92;
+const EVT_TITLE_SIZE = 104;
 const EVT_TITLE_Y1 = 126;
-const EVT_TITLE_Y2 = 213;
+const EVT_TITLE_Y2 = 224;
+const EVT_TITLE_X = LOGICAL / 2; // centralizado no artboard
 const EVT_MAP_BOX = { x: 0, y: 0, w: LOGICAL, h: LOGICAL };
 const EVT_MARK_WIDTH = 30;
 const EVT_STATS_SIZE = 40;
@@ -831,12 +832,13 @@ function drawEventFrame(ctx2d, dMark, markPath){
     ctx2d.drawImage(evtBasemapCanvas, EVT_MAP_BOX.x, EVT_MAP_BOX.y, EVT_MAP_BOX.w, EVT_MAP_BOX.h);
   }
 
-  ctx2d.textAlign = 'left'; ctx2d.textBaseline = 'alphabetic';
+  ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'alphabetic';
   ctx2d.fillStyle = theme.ink;
   ctx2d.font = `${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
-  ctx2d.fillText(EVT_TITLE_L1, MARGIN, EVT_TITLE_Y1);
+  ctx2d.fillText(EVT_TITLE_L1, EVT_TITLE_X, EVT_TITLE_Y1);
   ctx2d.font = `italic ${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
-  ctx2d.fillText(EVT_TITLE_L2, MARGIN, EVT_TITLE_Y2);
+  ctx2d.fillText(EVT_TITLE_L2, EVT_TITLE_X, EVT_TITLE_Y2);
+  ctx2d.textAlign = 'left';
 
   if (markPath && markPath.length){
     let remaining = dMark;
@@ -879,11 +881,11 @@ function drawEventFrame(ctx2d, dMark, markPath){
       off.width = LOGICAL; off.height = LOGICAL;
       const octx = off.getContext('2d');
       octx.fillStyle = theme.bg;
-      octx.textAlign = 'left'; octx.textBaseline = 'alphabetic';
+      octx.textAlign = 'center'; octx.textBaseline = 'alphabetic';
       octx.font = `${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
-      octx.fillText(EVT_TITLE_L1, MARGIN, EVT_TITLE_Y1);
+      octx.fillText(EVT_TITLE_L1, EVT_TITLE_X, EVT_TITLE_Y1);
       octx.font = `italic ${EVT_TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
-      octx.fillText(EVT_TITLE_L2, MARGIN, EVT_TITLE_Y2);
+      octx.fillText(EVT_TITLE_L2, EVT_TITLE_X, EVT_TITLE_Y2);
       octx.globalCompositeOperation = 'destination-in';
       octx.lineWidth = EVT_MARK_WIDTH;
       octx.lineCap = 'round';
