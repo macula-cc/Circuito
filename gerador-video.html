@@ -194,13 +194,27 @@ const EVENT_DATES = '18 – 19 de Setembro';
 // ancorado no topo — mesma diagramação do gerador de post
 const EVT_TITLE_L1 = EVENT_EYEBROW; // 'Ateliês abertos'
 const EVT_TITLE_L2 = EVENT_DATES;   // '18 – 19 de Setembro' (itálico)
-const EVT_TITLE_SIZE = 104;
-const EVT_TITLE_Y1 = 126;
-const EVT_TITLE_Y2 = 224;
+// tamanhos de referência (formato quadrado) — no stories (9:16) o artboard
+// fica bem mais alto sem crescer em largura, então os textos ficam
+// visualmente pequenos se mantidos no mesmo tamanho; STORIES_TEXT_SCALE
+// aumenta título/estatísticas/label juntos, proporcionalmente
+const EVT_TITLE_SIZE_BASE = 104;
+const STATS_SIZE_BASE = 40;
+const STORIES_TEXT_SCALE = 1.3;
+let EVT_TITLE_SIZE = EVT_TITLE_SIZE_BASE;
+let STATS_SIZE = STATS_SIZE_BASE;
+let EVT_TITLE_Y1 = 126;
+let EVT_TITLE_Y2 = 224;
+function updateTextSizes(){
+  const scale = videoFormat === 'stories' ? STORIES_TEXT_SCALE : 1;
+  EVT_TITLE_SIZE = EVT_TITLE_SIZE_BASE * scale;
+  STATS_SIZE = STATS_SIZE_BASE * scale;
+  EVT_TITLE_Y1 = 126 * scale;
+  EVT_TITLE_Y2 = EVT_TITLE_Y1 + EVT_TITLE_SIZE * (98/104); // mesma proporção de entrelinha de antes
+}
 const EVT_TITLE_X = LOGICAL_W / 2; // centralizado no artboard
 const MAP_BOX = { x: 0, y: 0, w: LOGICAL_W, h: LOGICAL_H }; // .h atualizado em applyCanvasFormat()
 const MARK_WIDTH = 30;
-const STATS_SIZE = 40;
 // infos secundárias: as duas linhas centralizadas no artboard — estatísticas
 // (serifado) em cima, nome do evento em caixa alta (sans) embaixo, uma
 // linha só cada, ancoradas na base do artboard (por isso dependem da altura,
@@ -208,15 +222,16 @@ const STATS_SIZE = 40;
 const LABEL_L = 'CIRCUITO DE ATELIÊS DO CENTRO';
 const LABEL_WEIGHT = 400;
 // tamanho calculado a partir da altura de caixa alta do serifado das
-// estatísticas (ver computeLabelSize, chamada no boot() depois que a fonte
-// de verdade carrega) — 0.85x o match exato, igual no gerador de post
+// estatísticas (ver computeLabelSize, chamada no boot() e em
+// applyCanvasFormat() sempre que o formato muda) — 0.85x o match exato,
+// igual no gerador de post
 const LABEL_SIZE_FACTOR = 0.85;
 let LABEL_SIZE = 26;
 let EVT_LABEL_Y = LOGICAL_H - 70;
 let EVT_STATS_Y = EVT_LABEL_Y - 44;
 function updateBottomLayout(){
   EVT_LABEL_Y = LOGICAL_H - 70;
-  EVT_STATS_Y = EVT_LABEL_Y - 44;
+  EVT_STATS_Y = EVT_LABEL_Y - STATS_SIZE * 1.1; // mesma proporção de entrelinha de antes (44/40)
 }
 function computeLabelSize(){
   ctx.font = `${STATS_SIZE}px 'Instrument Serif', Georgia, serif`;
@@ -526,6 +541,8 @@ function applyCanvasFormat(){
   canvas.width = LOGICAL_W * RENDER_SCALE;
   canvas.height = LOGICAL_H * RENDER_SCALE;
   ctx.scale(RENDER_SCALE, RENDER_SCALE);
+  updateTextSizes();
+  computeLabelSize();
   updateBottomLayout();
   resizeCanvasFrame();
 }
