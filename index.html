@@ -297,10 +297,7 @@
     .drawer.open{ transform:translateY(0); }
   }
 
-  /* padding-top reservado só pro botão "fechar" — o título fica sempre
-     abaixo dele, mesmo quando o nome do local é longo o bastante pra quebrar
-     linha */
-  .drawer-head{ padding:40px 1.6rem 1.1rem; border-bottom:1px solid var(--line); flex-shrink:0; position:relative; }
+  .drawer-head{ padding:1.6rem 1.6rem 1.1rem; border-bottom:1px solid var(--line); flex-shrink:0; position:relative; }
   .drawer-title{ font-family:var(--serif); font-size:1.54rem; margin:0 0 0.15rem; line-height:1.2; }
   .drawer-addr{ font-family:var(--mono); font-size:0.94rem; color:var(--gray); }
   .drawer-directions{ display:inline-block; font-family:var(--mono); font-size:0.94rem; color:var(--gray);
@@ -310,15 +307,16 @@
 
   /* botão fechar em círculo — mesmo visual no drawer, no lightbox e no
      "sobre"; só a posição (pra alinhar com o título de cada um) muda */
-  .icon-close{ width:26px; height:26px; border-radius:50%; background:#e8e8e8; color:var(--gray);
+  .icon-close{ width:26px; height:26px; border-radius:50%; background:rgba(0,0,0,0.38); color:var(--ink);
+               backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
                border:none; cursor:pointer; padding:0;
                display:flex; align-items:center; justify-content:center;
                font-family:var(--sans); font-size:0.95rem; line-height:1;
-               transition:background 0.15s ease, color 0.15s ease; }
-  .icon-close:hover{ background:#dcdcdc; color:var(--ink); }
+               transition:background 0.15s ease; }
+  .icon-close:hover{ background:rgba(0,0,0,0.52); }
 
   /* alinhado verticalmente com a primeira linha do drawer-title */
-  .drawer-close{ position:absolute; top:41px; right:1rem; }
+  .drawer-close{ position:absolute; top:27px; right:1rem; }
 
   .drawer-list{ overflow-y:auto; -webkit-overflow-scrolling:touch; padding:1rem 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); }
   /* minmax(0,1fr) em vez de 1fr: sem isso, uma coluna com texto mais longo
@@ -379,7 +377,7 @@
      o conteúdo (imagem/legenda) fica num bloco separado que começa
      sempre abaixo dela, então nunca disputa o mesmo espaço — mesmo se a
      imagem+legenda for alta o bastante pra rolar */
-  .lightbox-head{ flex-shrink:0; height:40px; position:relative; }
+  .lightbox-head{ flex-shrink:0; height:30px; position:relative; }
 
   /* justify-content:flex-start (não center) é essencial aqui: com o conteúdo
      centralizado, quando a imagem+legenda é mais alta que o espaço visível
@@ -401,7 +399,7 @@
   .lightbox-caption .lb-room{ font-family:var(--mono); font-size:0.83rem; color:var(--gray); margin-bottom:0.5rem; }
   .lightbox-caption .lb-bio{ font-family:var(--sans); font-size:0.97rem; line-height:1.55; color:var(--gray); margin:0.8rem 0 0; }
   /* centralizado na linha dedicada de 40px do lightbox-head */
-  .lightbox-close{ position:absolute; top:7px; right:1rem; }
+  .lightbox-close{ position:absolute; top:2px; right:1rem; }
 
   /* ---------------- About modal (same glass treatment as lightbox) ---------------- */
   .about-overlay{ position:fixed; inset:0; z-index:1000;
