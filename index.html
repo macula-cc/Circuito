@@ -400,8 +400,10 @@
   .lightbox-caption .lb-name{ font-family:var(--serif); font-size:1.32rem; color:var(--ink); margin:0 0 0.4rem; }
   .lightbox-caption .lb-room{ font-family:var(--mono); font-size:0.83rem; color:var(--gray); margin-bottom:0.5rem; }
   .lightbox-caption .lb-bio{ font-family:var(--sans); font-size:0.97rem; line-height:1.55; color:var(--gray); margin:0.8rem 0 0; }
-  /* centralizado na linha dedicada de 40px do lightbox-head */
-  .lightbox-close{ position:absolute; top:1.4px; right:1rem; }
+  /* centralizado em toda a margem vazia do topo — lightbox-head (1.8rem)
+     + padding-top do lightbox-body (1.6rem) — até onde a imagem começa,
+     não só na faixa estreita do lightbox-head */
+  .lightbox-close{ position:absolute; top:14.2px; right:1rem; }
 
   /* ---------------- About modal (same glass treatment as lightbox) ---------------- */
   .about-overlay{ position:fixed; inset:0; z-index:1000;
