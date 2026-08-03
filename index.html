@@ -670,12 +670,14 @@ function makePinIcon(label, active){
 }
 
 // Alguns endereços ficam a poucos metros um do outro (mesmo prédio, entradas
-// diferentes) e os pins acabam se sobrepondo no mapa. displayLat/displayLng
-// afastam visualmente esses casos numa roda em torno do centro do grupo —
-// loc.lat/loc.lng (a coordenada real) nunca é alterada, então o botão "Como
-// chegar" continua levando pro endereço de verdade.
+// diferentes) e os pins acabam se sobrepondo no mapa. Agrupamos esses casos
+// pela coordenada REAL (loc.lat/loc.lng nunca é alterada — o botão "Como
+// chegar" continua levando pro endereço de verdade) e espalhamos os pins do
+// grupo numa roda ao redor do centro. O afastamento é calculado em PIXELS de
+// tela, não em metros, e recalculado a cada zoom — em metros fixos, os pins
+// voltavam a se sobrepor visualmente assim que o mapa afastava.
 const PIN_OVERLAP_THRESHOLD_M = 8;
-const PIN_OVERLAP_SPREAD_M = 9;
+const PIN_OVERLAP_SPREAD_PX = 13;
 function metersBetween(lat1, lng1, lat2, lng2){
   const R = 6371000;
   const dLat = (lat2-lat1) * Math.PI/180;
@@ -683,15 +685,12 @@ function metersBetween(lat1, lng1, lat2, lng2){
   const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
   return 2*R*Math.asin(Math.sqrt(a));
 }
-function offsetLatLng(lat, lng, meters, angleRad){
-  return {
-    lat: lat + (meters * Math.cos(angleRad)) / 111320,
-    lng: lng + (meters * Math.sin(angleRad)) / (111320 * Math.cos(lat*Math.PI/180))
-  };
-}
-function spreadOverlappingLocations(locations){
+// agrupa por proximidade real e anota em cada loc a que grupo pertence —
+// não calcula posição nenhuma ainda, isso é feito à parte (displayLatLngFor)
+// porque depende do zoom atual do mapa
+function groupOverlappingLocations(locations){
   const withCoords = locations.filter(l => l.lat != null && l.lng != null);
-  withCoords.forEach(loc => { loc.displayLat = loc.lat; loc.displayLng = loc.lng; });
+  withCoords.forEach(loc => { loc._cluster = null; });
   const visited = new Set();
   withCoords.forEach(loc => {
     if (visited.has(loc.id)) return;
@@ -702,23 +701,40 @@ function spreadOverlappingLocations(locations){
     if (cluster.length < 2) return;
     const centerLat = cluster.reduce((s,l)=>s+l.lat,0) / cluster.length;
     const centerLng = cluster.reduce((s,l)=>s+l.lng,0) / cluster.length;
-    cluster.forEach((l, i) => {
-      const angle = (2*Math.PI*i) / cluster.length;
-      const p = offsetLatLng(centerLat, centerLng, PIN_OVERLAP_SPREAD_M, angle);
-      l.displayLat = p.lat;
-      l.displayLng = p.lng;
-    });
+    cluster.forEach((l, i) => { l._cluster = { centerLat, centerLng, index: i, size: cluster.length }; });
+  });
+}
+// posição de exibição de um pin: a coordenada real, ou — se ele faz parte de
+// um grupo sobreposto — um ponto a PIN_OVERLAP_SPREAD_PX pixels do centro do
+// grupo, convertido de volta pra lat/lng na projeção atual do mapa
+function displayLatLngFor(loc){
+  if (!loc._cluster || !map) return [loc.lat, loc.lng];
+  const { centerLat, centerLng, index, size } = loc._cluster;
+  const centerPt = map.latLngToContainerPoint([centerLat, centerLng]);
+  const angle = (2*Math.PI*index) / size;
+  const pt = L.point(centerPt.x + PIN_OVERLAP_SPREAD_PX*Math.cos(angle), centerPt.y + PIN_OVERLAP_SPREAD_PX*Math.sin(angle));
+  const ll = map.containerPointToLatLng(pt);
+  return [ll.lat, ll.lng];
+}
+// reposiciona só os pins que fazem parte de algum grupo — chamado a cada
+// zoom, já que o afastamento em pixels muda de lat/lng conforme o nível
+function repositionClusteredMarkers(){
+  if (!map) return;
+  LOCATIONS.forEach(loc => {
+    if (!loc._cluster) return;
+    const m = markers[loc.id];
+    if (m) m.setLatLng(displayLatLngFor(loc));
   });
 }
 
-// recalcula os deslocamentos (novos endereços podem ter chegado via
-// geocodificação) e cria ou reposiciona cada marcador conforme necessário
+// recalcula os grupos (novos endereços podem ter chegado via geocodificação)
+// e cria ou reposiciona cada marcador conforme necessário
 function syncAllMarkers(){
   if (!map) return;
-  spreadOverlappingLocations(LOCATIONS);
+  groupOverlappingLocations(LOCATIONS);
   LOCATIONS.forEach(loc => {
     if (loc.lat == null || loc.lng == null) return;
-    const pos = [loc.displayLat, loc.displayLng];
+    const pos = displayLatLngFor(loc);
     if (markers[loc.id]){
       markers[loc.id].setLatLng(pos);
     } else {
@@ -776,6 +792,7 @@ function initMap(){
     // exigência de licença. O crédito de OpenStreetMap/CARTO continua
     // (esse sim é exigido pela ODbL e pelos termos do serviço de tiles).
     map.attributionControl.setPrefix(false);
+    map.on('zoom', repositionClusteredMarkers);
     L.control.zoom({ position:'bottomright' }).addTo(map);
 
     const LocateControl = L.Control.extend({
@@ -1164,8 +1181,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ closeLigh
 function goToLocation(loc){
   setView('map');
   if (map && loc.lat != null){
-    const lat = loc.displayLat ?? loc.lat, lng = loc.displayLng ?? loc.lng;
-    setTimeout(() => map.flyTo([lat, lng], 17, { duration:0.6 }), 50);
+    setTimeout(() => map.flyTo(displayLatLngFor(loc), 17, { duration:0.6 }), 50);
   }
   openDrawer(loc.id);
 }
