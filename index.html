@@ -669,12 +669,64 @@ function makePinIcon(label, active){
   });
 }
 
-function addMarkerForLocation(loc){
-  if (!map || loc.lat == null || loc.lng == null) return;
-  if (markers[loc.id]) return; // already placed
-  const marker = L.marker([loc.lat, loc.lng], { icon: makePinIcon(pinLabel(loc), false) }).addTo(map);
-  marker.on('click', () => openDrawer(loc.id));
-  markers[loc.id] = marker;
+// Alguns endereços ficam a poucos metros um do outro (mesmo prédio, entradas
+// diferentes) e os pins acabam se sobrepondo no mapa. displayLat/displayLng
+// afastam visualmente esses casos numa roda em torno do centro do grupo —
+// loc.lat/loc.lng (a coordenada real) nunca é alterada, então o botão "Como
+// chegar" continua levando pro endereço de verdade.
+const PIN_OVERLAP_THRESHOLD_M = 8;
+const PIN_OVERLAP_SPREAD_M = 9;
+function metersBetween(lat1, lng1, lat2, lng2){
+  const R = 6371000;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLng = (lng2-lng1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+function offsetLatLng(lat, lng, meters, angleRad){
+  return {
+    lat: lat + (meters * Math.cos(angleRad)) / 111320,
+    lng: lng + (meters * Math.sin(angleRad)) / (111320 * Math.cos(lat*Math.PI/180))
+  };
+}
+function spreadOverlappingLocations(locations){
+  const withCoords = locations.filter(l => l.lat != null && l.lng != null);
+  withCoords.forEach(loc => { loc.displayLat = loc.lat; loc.displayLng = loc.lng; });
+  const visited = new Set();
+  withCoords.forEach(loc => {
+    if (visited.has(loc.id)) return;
+    const cluster = withCoords.filter(other =>
+      !visited.has(other.id) && metersBetween(loc.lat, loc.lng, other.lat, other.lng) < PIN_OVERLAP_THRESHOLD_M
+    );
+    cluster.forEach(l => visited.add(l.id));
+    if (cluster.length < 2) return;
+    const centerLat = cluster.reduce((s,l)=>s+l.lat,0) / cluster.length;
+    const centerLng = cluster.reduce((s,l)=>s+l.lng,0) / cluster.length;
+    cluster.forEach((l, i) => {
+      const angle = (2*Math.PI*i) / cluster.length;
+      const p = offsetLatLng(centerLat, centerLng, PIN_OVERLAP_SPREAD_M, angle);
+      l.displayLat = p.lat;
+      l.displayLng = p.lng;
+    });
+  });
+}
+
+// recalcula os deslocamentos (novos endereços podem ter chegado via
+// geocodificação) e cria ou reposiciona cada marcador conforme necessário
+function syncAllMarkers(){
+  if (!map) return;
+  spreadOverlappingLocations(LOCATIONS);
+  LOCATIONS.forEach(loc => {
+    if (loc.lat == null || loc.lng == null) return;
+    const pos = [loc.displayLat, loc.displayLng];
+    if (markers[loc.id]){
+      markers[loc.id].setLatLng(pos);
+    } else {
+      const marker = L.marker(pos, { icon: makePinIcon(pinLabel(loc), false) }).addTo(map);
+      marker.on('click', () => openDrawer(loc.id));
+      markers[loc.id] = marker;
+    }
+  });
 }
 
 // ---------------- estações de metrô e VLT (curadas manualmente) ----------------
@@ -795,7 +847,7 @@ function initMap(){
       }
     }, { passive: false });
 
-    LOCATIONS.forEach((loc) => addMarkerForLocation(loc));
+    syncAllMarkers();
     addStationMarkers();
     locateUserAutomatically();
   } catch(err){
@@ -924,7 +976,7 @@ async function resolveMissingCoordinates(){
     if (coords){
       loc.lat = coords.lat;
       loc.lng = coords.lng;
-      addMarkerForLocation(loc);
+      syncAllMarkers(); // recalcula sobreposições — um novo ponto pode colidir com um já existente
       renderRows(); // atualiza a lista, tirando o endereço do estado "pendente"
     }
     // pequena pausa entre chamadas por educação com o serviço gratuito
@@ -1112,7 +1164,8 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ closeLigh
 function goToLocation(loc){
   setView('map');
   if (map && loc.lat != null){
-    setTimeout(() => map.flyTo([loc.lat, loc.lng], 17, { duration:0.6 }), 50);
+    const lat = loc.displayLat ?? loc.lat, lng = loc.displayLng ?? loc.lng;
+    setTimeout(() => map.flyTo([lat, lng], 17, { duration:0.6 }), 50);
   }
   openDrawer(loc.id);
 }
