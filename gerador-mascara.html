@@ -209,10 +209,10 @@ const EVT_TITLE_X = LOGICAL / 2; // centralizado no artboard
 const EVT_MAP_BOX = { x: 0, y: 0, w: LOGICAL, h: LOGICAL };
 const EVT_MARK_WIDTH = 30;
 const EVT_STATS_SIZE = 40;
-const EVT_STATS_Y1 = 884;
-const EVT_STATS_Y2 = 930;
-const EVT_LABEL_L1 = 'CIRCUITO DE';
-const EVT_LABEL_L2 = 'ATELIÊS DO CENTRO';
+// infos secundárias: as duas linhas centralizadas no artboard — estatísticas
+// (serifado) em cima, nome do evento em caixa alta (sans) embaixo, uma
+// linha só cada uma
+const EVT_LABEL_L = 'CIRCUITO DE ATELIÊS DO CENTRO';
 const EVT_LABEL_WEIGHT = 400;
 // tamanho calculado a partir da altura de caixa alta do serifado das
 // estatísticas (ver computeEvtLabelSize, chamada no boot() depois que a
@@ -221,18 +221,14 @@ const EVT_LABEL_WEIGHT = 400;
 // altura de caixa)
 const EVT_LABEL_SIZE_FACTOR = 0.85;
 let EVT_LABEL_SIZE = 26;
-let EVT_LABEL_LINE_GAP = 28;
-let EVT_LABEL_Y2 = EVT_STATS_Y2; // última linha alinhada com a última linha das estatísticas
-let EVT_LABEL_Y1 = EVT_LABEL_Y2 - EVT_LABEL_LINE_GAP;
+const EVT_LABEL_Y = 930; // mesma margem inferior que as estatísticas tinham antes
+const EVT_STATS_Y = EVT_LABEL_Y - 58; // acima do label
 function computeEvtLabelSize(){
   ectx.font = `${EVT_STATS_SIZE}px 'Instrument Serif', Georgia, serif`;
   const serifCap = ectx.measureText('E').actualBoundingBoxAscent;
   ectx.font = `${EVT_LABEL_WEIGHT} 100px ${SANS_DISPLAY}`;
   const sansCapPer100 = ectx.measureText('E').actualBoundingBoxAscent / 100;
   EVT_LABEL_SIZE = (serifCap / sansCapPer100) * EVT_LABEL_SIZE_FACTOR;
-  EVT_LABEL_LINE_GAP = EVT_LABEL_SIZE * (28/26); // mesma proporção tamanho/entrelinha de antes
-  EVT_LABEL_Y2 = EVT_STATS_Y2;
-  EVT_LABEL_Y1 = EVT_LABEL_Y2 - EVT_LABEL_LINE_GAP;
 }
 
 function parseCSV(text){
@@ -498,7 +494,7 @@ function buildRibbonRuns(serifFontSize){
   const serifAscent = xAscent(serifFontSize, serifFamily, '400');
   const sansAscentAtSerifSize = xAscent(serifFontSize, SANS_DISPLAY, '350');
   const sansFontSize = serifFontSize * (serifAscent / sansAscentAtSerifSize) * 0.85;
-  const sansLabel = `${EVT_LABEL_L1} ${EVT_LABEL_L2}`;
+  const sansLabel = EVT_LABEL_L;
   return [
     { text: sansLabel, fontFamily: SANS_DISPLAY, weight:'350', fontSize: sansFontSize },
     { text: RIBBON_SEP, fontFamily: SANS_DISPLAY, weight:'350', fontSize: sansFontSize },
@@ -915,19 +911,14 @@ function drawEventFrame(ctx2d, dMark, markPath){
     });
   }
 
-  ctx2d.textAlign = 'left';
+  ctx2d.textAlign = 'center';
   ctx2d.fillStyle = theme.ink;
   ctx2d.font = `${EVT_STATS_SIZE}px 'Instrument Serif', Georgia, serif`;
-  ctx2d.fillText(`${numAddresses} Endereços`, MARGIN, EVT_STATS_Y1);
-  ctx2d.fillText(`${numArtists} Artistas`, MARGIN, EVT_STATS_Y2);
+  ctx2d.fillText(`${numAddresses} Endereços – ${numArtists} Artistas`, LOGICAL/2, EVT_STATS_Y);
 
-  ctx2d.fillStyle = theme.ink;
   ctx2d.font = `${EVT_LABEL_WEIGHT} ${EVT_LABEL_SIZE}px ${SANS_DISPLAY}`;
-  const labelBlockW = Math.max(ctx2d.measureText(EVT_LABEL_L1).width, ctx2d.measureText(EVT_LABEL_L2).width);
-  const labelX = (LOGICAL - MARGIN) - labelBlockW;
+  ctx2d.fillText(EVT_LABEL_L, LOGICAL/2, EVT_LABEL_Y);
   ctx2d.textAlign = 'left';
-  ctx2d.fillText(EVT_LABEL_L1, labelX, EVT_LABEL_Y1);
-  ctx2d.fillText(EVT_LABEL_L2, labelX, EVT_LABEL_Y2);
 }
 
 function redrawEvent(){
