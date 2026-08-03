@@ -222,7 +222,7 @@ const EVT_LABEL_WEIGHT = 400;
 const EVT_LABEL_SIZE_FACTOR = 0.85;
 let EVT_LABEL_SIZE = 26;
 const EVT_LABEL_Y = 930; // mesma margem inferior que as estatísticas tinham antes
-const EVT_STATS_Y = EVT_LABEL_Y - 58; // acima do label
+const EVT_STATS_Y = EVT_LABEL_Y - 44; // acima do label
 function computeEvtLabelSize(){
   ectx.font = `${EVT_STATS_SIZE}px 'Instrument Serif', Georgia, serif`;
   const serifCap = ectx.measureText('E').actualBoundingBoxAscent;
