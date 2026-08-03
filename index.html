@@ -245,6 +245,8 @@
 
   .list-head{ padding:1.6rem 1.6rem 1rem; border-bottom:1px solid rgba(0,0,0,0.12); flex-shrink:0; }
   .list-head h2{ font-family:var(--serif); font-weight:400; font-size:1.32rem; margin:0 0 0.2rem; }
+  /* alinhado verticalmente com o h2 do list-head — mesmas métricas do about-head */
+  .list-close{ position:absolute; top:26px; right:1.6rem; }
 
   .rows{ overflow-y:auto; -webkit-overflow-scrolling:touch; flex-grow:1; max-width:920px; width:100%; margin:0 auto;
          padding:0 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); }
@@ -307,12 +309,12 @@
 
   /* botão fechar em círculo — mesmo visual no drawer, no lightbox e no
      "sobre"; só a posição (pra alinhar com o título de cada um) muda */
-  .icon-close{ width:26px; height:26px; border-radius:50%; background:rgba(0,0,0,0.3); color:var(--ink);
+  .icon-close{ width:26px; height:26px; border-radius:50%; background:rgba(0,0,0,0.3); color:#333;
                backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
                border:none; cursor:pointer; padding:0;
                display:flex; align-items:center; justify-content:center;
-               font-family:var(--sans); font-size:0.95rem; line-height:1;
                transition:background 0.15s ease; }
+  .icon-close svg{ display:block; }
   .icon-close:hover{ background:rgba(0,0,0,0.44); }
 
   /* alinhado verticalmente com a primeira linha do drawer-title */
@@ -474,6 +476,7 @@
 
 <div class="list-overlay" id="list-overlay">
   <div class="list-modal">
+    <button class="list-close icon-close" id="list-close" aria-label="Fechar lista"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6L18 18M18 6L6 18"/></svg></button>
     <div class="list-head"><h2>Índice do circuito</h2></div>
     <div class="rows" id="rows"></div>
   </div>
@@ -482,7 +485,7 @@
 <div class="overlay" id="overlay"></div>
 <div class="drawer" id="drawer">
   <div class="drawer-head">
-    <button class="drawer-close icon-close" id="drawer-close" aria-label="Fechar">×</button>
+    <button class="drawer-close icon-close" id="drawer-close" aria-label="Fechar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6L18 18M18 6L6 18"/></svg></button>
     <div class="drawer-title" id="drawer-local">—</div>
     <div class="drawer-addr" id="drawer-endereco">—</div>
     <a class="drawer-directions" id="drawer-directions" href="#" target="_blank" rel="noopener">Como chegar →</a>
@@ -493,7 +496,7 @@
 <div class="lightbox" id="lightbox">
   <div class="lightbox-modal">
     <div class="lightbox-head">
-      <button class="lightbox-close icon-close" id="lightbox-close" aria-label="Fechar imagem">×</button>
+      <button class="lightbox-close icon-close" id="lightbox-close" aria-label="Fechar imagem"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6L18 18M18 6L6 18"/></svg></button>
     </div>
     <div class="lightbox-body">
       <img id="lightbox-img" src="" alt="">
@@ -510,7 +513,7 @@
 
 <div class="about-overlay" id="about-overlay">
   <div class="about-modal">
-    <button class="about-close icon-close" id="about-close" aria-label="Fechar">×</button>
+    <button class="about-close icon-close" id="about-close" aria-label="Fechar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6L18 18M18 6L6 18"/></svg></button>
     <div class="about-head"><h2 class="about-title">Circuito de Ateliês do Centro</h2></div>
     <div class="about-body">
       <div class="about-grid">
@@ -1264,6 +1267,7 @@ function setSort(s){
 
 switchMapBtn.addEventListener('click', () => setView('map'));
 switchListBtn.addEventListener('click', () => setView('list'));
+document.getElementById('list-close').addEventListener('click', () => setView('map'));
 sortEnderecoBtn.addEventListener('click', () => setSort('endereco'));
 sortArtistaBtn.addEventListener('click', () => setSort('artista'));
 
