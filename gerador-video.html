@@ -213,6 +213,11 @@ function fitSizeToWidth(text, fontAtSize, targetWidth){
   const w100 = ctx.measureText(text).width;
   return w100 > 0 ? (targetWidth / w100) * 100 : 100;
 }
+// proporção de referência tirada do print do design: título 50pt,
+// estatísticas 30pt, label (nome do evento) 22pt — usada só no stories,
+// calculada a partir do título (que é ajustado pra largura logo abaixo)
+const STORIES_STATS_RATIO = 30/50;
+const STORIES_LABEL_RATIO = 22/50;
 function updateTextSizes(){
   if (videoFormat === 'stories'){
     const targetW = LOGICAL_W * STORIES_FILL_RATIO;
@@ -221,11 +226,20 @@ function updateTextSizes(){
     const size1 = fitSizeToWidth(EVT_TITLE_L1, serifFont, targetW);
     const size2 = fitSizeToWidth(EVT_TITLE_L2, serifItalicFont, targetW);
     EVT_TITLE_SIZE = Math.min(size1, size2);
-    const statsText = `${numAddresses} Endereços – ${numArtists} Artistas`;
-    STATS_SIZE = fitSizeToWidth(statsText, serifFont, targetW);
+    STATS_SIZE = EVT_TITLE_SIZE * STORIES_STATS_RATIO;
+    LABEL_SIZE = EVT_TITLE_SIZE * STORIES_LABEL_RATIO;
+    // trava de segurança: a proporção do print pode não bastar se o texto
+    // real (números/nome do evento) for mais largo que o do mockup original
+    ctx.font = `${STATS_SIZE}px 'Instrument Serif', Georgia, serif`;
+    const statsW = ctx.measureText(`${numAddresses} Endereços – ${numArtists} Artistas`).width;
+    if (statsW > targetW) STATS_SIZE *= targetW / statsW;
+    ctx.font = `${LABEL_WEIGHT} ${LABEL_SIZE}px ${SANS_DISPLAY}`;
+    const labelW = ctx.measureText(LABEL_L).width;
+    if (labelW > targetW) LABEL_SIZE *= targetW / labelW;
   } else {
     EVT_TITLE_SIZE = EVT_TITLE_SIZE_BASE;
     STATS_SIZE = STATS_SIZE_BASE;
+    // LABEL_SIZE calculado em computeLabelSize() (cap-height x serifado)
   }
   const titleScale = EVT_TITLE_SIZE / EVT_TITLE_SIZE_BASE;
   EVT_TITLE_Y1 = 126 * titleScale;
@@ -253,19 +267,15 @@ function updateBottomLayout(){
   EVT_STATS_Y = EVT_LABEL_Y - STATS_SIZE * 1.1; // mesma proporção de entrelinha de antes (44/40)
 }
 function computeLabelSize(){
+  // no stories o LABEL_SIZE já foi calculado em updateTextSizes(), pela
+  // proporção do print (22/50 do título) — só o quadrado usa o casamento de
+  // altura de caixa alta com o serifado das estatísticas
+  if (videoFormat === 'stories') return;
   ctx.font = `${STATS_SIZE}px 'Instrument Serif', Georgia, serif`;
   const serifCap = ctx.measureText('E').actualBoundingBoxAscent;
   ctx.font = `${LABEL_WEIGHT} 100px ${SANS_DISPLAY}`;
   const sansCapPer100 = ctx.measureText('E').actualBoundingBoxAscent / 100;
   LABEL_SIZE = (serifCap / sansCapPer100) * LABEL_SIZE_FACTOR;
-  // trava de segurança: o casamento de altura de caixa alta com as
-  // estatísticas não olha a largura da linha inteira — se o nome do evento
-  // (mais longo) acabar mais largo que a margem seguro do artboard, encolhe
-  // proporcionalmente pra não estourar
-  const maxLabelW = LOGICAL_W * STORIES_FILL_RATIO;
-  ctx.font = `${LABEL_WEIGHT} ${LABEL_SIZE}px ${SANS_DISPLAY}`;
-  const labelW = ctx.measureText(LABEL_L).width;
-  if (labelW > maxLabelW) LABEL_SIZE *= maxLabelW / labelW;
 }
 
 function parseCSV(text){
