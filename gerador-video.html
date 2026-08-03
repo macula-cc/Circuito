@@ -56,7 +56,10 @@
   .note{ font-family:var(--mono); font-size:0.73rem; color:var(--gray); line-height:1.4; }
 
   .stage{ display:flex; align-items:center; justify-content:center; padding:2.4rem; }
-  .canvas-frame{ width:min(74vh, 100%); max-width:640px; aspect-ratio:1/1; border:1px solid var(--line);
+  /* tamanho real (width/height) calculado em JS — ver resizeCanvasFrame().
+     CSS puro (height fixo + max-width) não dá conta de preservar a
+     proporção certa quando o max-width é o lado que aperta primeiro. */
+  .canvas-frame{ border:1px solid var(--line);
                  box-shadow:0 12px 40px rgba(0,0,0,0.08); background:#fff; position:relative; }
   #art{ width:100%; height:100%; display:block; }
   .rec-dot{ position:absolute; top:14px; right:14px; width:10px; height:10px; border-radius:50%; background:#c0392b;
@@ -86,6 +89,15 @@
         <button class="btn" id="tipo-circuito" data-tipo="circuito">cobrinha</button>
       </div>
       <div class="note" id="tipo-note" style="margin-top:0.6rem;"></div>
+    </div>
+
+    <div class="field">
+      <label>Formato</label>
+      <div class="row-btns" id="formato-row">
+        <button class="btn active" id="formato-quadrado" data-formato="quadrado">quadrado</button>
+        <button class="btn" id="formato-stories" data-formato="stories">stories</button>
+      </div>
+      <div class="note" style="margin-top:0.6rem;">quadrado: 1:1 (feed). stories: 9:16 (Instagram Stories).</div>
     </div>
 
     <hr class="divider">
@@ -161,7 +173,7 @@
   </div>
 
   <div class="stage">
-    <div class="canvas-frame">
+    <div class="canvas-frame" id="canvas-frame">
       <canvas id="art" width="1000" height="1000"></canvas>
       <div class="rec-dot" id="rec-dot"></div>
     </div>
@@ -173,45 +185,45 @@
    dados
    ============================================================ */
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
-const LOGICAL = 1000;
+const LOGICAL_W = 1000;
+let LOGICAL_H = 1000; // 1000 = quadrado (1:1); ~1778 = stories (9:16) — ver applyCanvasFormat()
 const SANS_DISPLAY = "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const EVENT_EYEBROW = 'Ateliês abertos';
 const EVENT_DATES = '18 – 19 de Setembro';
-const MARGIN = 36;
-// título grande é o par tagline/data (serifado, 2ª linha em itálico); o
-// nome do evento vira o label pequeno em caixa alta (sans) embaixo à
-// direita — mesma hierarquia do gerador de post
+// título grande é o par tagline/data (serifado, 2ª linha em itálico), sempre
+// ancorado no topo — mesma diagramação do gerador de post
 const EVT_TITLE_L1 = EVENT_EYEBROW; // 'Ateliês abertos'
 const EVT_TITLE_L2 = EVENT_DATES;   // '18 – 19 de Setembro' (itálico)
 const EVT_TITLE_SIZE = 104;
 const EVT_TITLE_Y1 = 126;
 const EVT_TITLE_Y2 = 224;
-const EVT_TITLE_X = LOGICAL / 2; // centralizado no artboard — mesma diagramação do post do evento
-const MAP_BOX = { x: 0, y: 0, w: LOGICAL, h: LOGICAL };
+const EVT_TITLE_X = LOGICAL_W / 2; // centralizado no artboard
+const MAP_BOX = { x: 0, y: 0, w: LOGICAL_W, h: LOGICAL_H }; // .h atualizado em applyCanvasFormat()
 const MARK_WIDTH = 30;
 const STATS_SIZE = 40;
-const STATS_Y1 = 884;
-const STATS_Y2 = 930;
-const LABEL_L1 = 'CIRCUITO DE';
-const LABEL_L2 = 'ATELIÊS DO CENTRO';
+// infos secundárias: as duas linhas centralizadas no artboard — estatísticas
+// (serifado) em cima, nome do evento em caixa alta (sans) embaixo, uma
+// linha só cada, ancoradas na base do artboard (por isso dependem da altura,
+// que muda com o formato — ver updateBottomLayout())
+const LABEL_L = 'CIRCUITO DE ATELIÊS DO CENTRO';
 const LABEL_WEIGHT = 400;
 // tamanho calculado a partir da altura de caixa alta do serifado das
 // estatísticas (ver computeLabelSize, chamada no boot() depois que a fonte
 // de verdade carrega) — 0.85x o match exato, igual no gerador de post
 const LABEL_SIZE_FACTOR = 0.85;
 let LABEL_SIZE = 26;
-let LABEL_LINE_GAP = 28;
-let LABEL_Y2 = STATS_Y2;
-let LABEL_Y1 = LABEL_Y2 - LABEL_LINE_GAP;
+let EVT_LABEL_Y = LOGICAL_H - 70;
+let EVT_STATS_Y = EVT_LABEL_Y - 44;
+function updateBottomLayout(){
+  EVT_LABEL_Y = LOGICAL_H - 70;
+  EVT_STATS_Y = EVT_LABEL_Y - 44;
+}
 function computeLabelSize(){
   ctx.font = `${STATS_SIZE}px 'Instrument Serif', Georgia, serif`;
   const serifCap = ctx.measureText('E').actualBoundingBoxAscent;
   ctx.font = `${LABEL_WEIGHT} 100px ${SANS_DISPLAY}`;
   const sansCapPer100 = ctx.measureText('E').actualBoundingBoxAscent / 100;
   LABEL_SIZE = (serifCap / sansCapPer100) * LABEL_SIZE_FACTOR;
-  LABEL_LINE_GAP = LABEL_SIZE * (28/26);
-  LABEL_Y2 = STATS_Y2;
-  LABEL_Y1 = LABEL_Y2 - LABEL_LINE_GAP;
 }
 
 function parseCSV(text){
@@ -496,16 +508,42 @@ let showText = true;
 let showTitle = true;
 let showStats = true;
 let videoTipo = 'marcas'; // marcas | circuito
+let videoFormat = 'quadrado'; // quadrado | stories
 
 const canvas = document.getElementById('art');
 const ctx = canvas.getContext('2d');
-// grava/desenha numa resolução real maior que a lógica (LOGICAL=1000) —
-// todo o layout continua em coordenadas de 0 a 1000, o ctx.scale só faz
-// cada pixel lógico virar vários pixels reais, pro vídeo exportado sair nítido
+const canvasFrameEl = document.getElementById('canvas-frame');
+// grava/desenha numa resolução real maior que a lógica (LOGICAL_W=1000) —
+// todo o layout continua em coordenadas lógicas, o ctx.scale só faz cada
+// pixel lógico virar vários pixels reais, pro vídeo exportado sair nítido
 const RENDER_SCALE = 2;
-canvas.width = LOGICAL * RENDER_SCALE;
-canvas.height = LOGICAL * RENDER_SCALE;
-ctx.scale(RENDER_SCALE, RENDER_SCALE);
+// muda a altura do artboard conforme o formato (a largura nunca muda) —
+// recalcula tamanho real do canvas, proporção do frame na tela e as
+// posições que dependem da altura (infos secundárias, ancoradas na base)
+function applyCanvasFormat(){
+  LOGICAL_H = videoFormat === 'stories' ? Math.round(LOGICAL_W * 16/9) : LOGICAL_W;
+  MAP_BOX.h = LOGICAL_H;
+  canvas.width = LOGICAL_W * RENDER_SCALE;
+  canvas.height = LOGICAL_H * RENDER_SCALE;
+  ctx.scale(RENDER_SCALE, RENDER_SCALE);
+  updateBottomLayout();
+  resizeCanvasFrame();
+}
+// calcula width/height reais do frame na tela em px, sempre preservando a
+// proporção do artboard (LOGICAL_W:LOGICAL_H) dentro do espaço disponível —
+// feito em JS porque CSS puro (height fixo + max-width) não ajusta a altura
+// quando é a largura que aperta primeiro, e o quadrado acaba virando retângulo
+function resizeCanvasFrame(){
+  const maxW = Math.min(window.innerWidth * 0.9, 640);
+  const maxH = Math.min(window.innerHeight * 0.78, 760);
+  const ratio = LOGICAL_W / LOGICAL_H;
+  let w = maxW, h = w / ratio;
+  if (h > maxH){ h = maxH; w = h * ratio; }
+  canvasFrameEl.style.width = w + 'px';
+  canvasFrameEl.style.height = h + 'px';
+}
+applyCanvasFormat();
+window.addEventListener('resize', resizeCanvasFrame);
 const statusEl = document.getElementById('status');
 const recDot = document.getElementById('rec-dot');
 const btnGerarVideo = document.getElementById('btn-gerar-video');
@@ -554,10 +592,10 @@ Object.keys(bgBtns).forEach(key => {
    ============================================================ */
 function drawBaseLayer(ctx2d){
   const theme = THEMES[currentTheme];
-  ctx2d.clearRect(0, 0, LOGICAL, LOGICAL);
+  ctx2d.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
   ctx2d.fillStyle = theme.bg;
-  ctx2d.fillRect(0, 0, LOGICAL, LOGICAL);
-  if (showMap && basemapCanvas) ctx2d.drawImage(basemapCanvas, 0, 0, LOGICAL, LOGICAL);
+  ctx2d.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+  if (showMap && basemapCanvas) ctx2d.drawImage(basemapCanvas, 0, 0, LOGICAL_W, LOGICAL_H);
 }
 function drawTitleLayer(ctx2d){
   if (!showTitle) return;
@@ -573,17 +611,14 @@ function drawTitleLayer(ctx2d){
 function drawStatsLayer(ctx2d){
   if (!showStats) return;
   const theme = THEMES[currentTheme];
-  ctx2d.textAlign = 'left';
+  ctx2d.textAlign = 'center';
   ctx2d.fillStyle = theme.ink;
   ctx2d.font = `${STATS_SIZE}px 'Instrument Serif', Georgia, serif`;
-  ctx2d.fillText(`${numAddresses} Endereços`, MARGIN, STATS_Y1);
-  ctx2d.fillText(`${numArtists} Artistas`, MARGIN, STATS_Y2);
+  ctx2d.fillText(`${numAddresses} Endereços – ${numArtists} Artistas`, LOGICAL_W/2, EVT_STATS_Y);
 
   ctx2d.font = `${LABEL_WEIGHT} ${LABEL_SIZE}px ${SANS_DISPLAY}`;
-  const labelBlockW = Math.max(ctx2d.measureText(LABEL_L1).width, ctx2d.measureText(LABEL_L2).width);
-  const labelX = (LOGICAL - MARGIN) - labelBlockW;
-  ctx2d.fillText(LABEL_L1, labelX, LABEL_Y1);
-  ctx2d.fillText(LABEL_L2, labelX, LABEL_Y2);
+  ctx2d.fillText(LABEL_L, LOGICAL_W/2, EVT_LABEL_Y);
+  ctx2d.textAlign = 'left';
 }
 function drawPinsLayer(ctx2d, pins){
   if (!showPins) return;
@@ -609,7 +644,7 @@ function applyTitleNegativeMask(ctx2d, visiblePoints){
   if (!showTitle || !visiblePoints || visiblePoints.length < 2) return;
   const theme = THEMES[currentTheme];
   const off = document.createElement('canvas');
-  off.width = LOGICAL; off.height = LOGICAL;
+  off.width = LOGICAL_W; off.height = LOGICAL_H;
   const octx = off.getContext('2d');
   octx.fillStyle = theme.bg;
   octx.textAlign = 'center'; octx.textBaseline = 'alphabetic';
@@ -625,7 +660,7 @@ function applyTitleNegativeMask(ctx2d, visiblePoints){
   octx.beginPath();
   visiblePoints.forEach((p, i) => { if (i === 0) octx.moveTo(p.x, p.y); else octx.lineTo(p.x, p.y); });
   octx.stroke();
-  ctx2d.drawImage(off, 0, 0, LOGICAL, LOGICAL);
+  ctx2d.drawImage(off, 0, 0, LOGICAL_W, LOGICAL_H);
 }
 // texto seguindo o caminho — mesmo estilo alternado (sans em caixa alta /
 // serifado com a data em itálico) da fita do gerador de marca e do post do
@@ -642,7 +677,7 @@ function buildRibbonRuns(serifFontSize){
   const serifAscent = xAscent(serifFontSize, serifFamily, '400');
   const sansAscentAtSerifSize = xAscent(serifFontSize, SANS_DISPLAY, '350');
   const sansFontSize = serifFontSize * (serifAscent / sansAscentAtSerifSize) * 0.85;
-  const sansLabel = `${LABEL_L1} ${LABEL_L2}`;
+  const sansLabel = LABEL_L;
   return [
     { text: sansLabel, fontFamily: SANS_DISPLAY, weight:'350', fontSize: sansFontSize },
     { text: RIBBON_SEP, fontFamily: SANS_DISPLAY, weight:'350', fontSize: sansFontSize },
@@ -933,6 +968,21 @@ document.getElementById('tipo-row').addEventListener('click', (e) => {
 });
 btnRestart.addEventListener('click', () => startPreview());
 
+const formatoQuadradoBtn = document.getElementById('formato-quadrado');
+const formatoStoriesBtn = document.getElementById('formato-stories');
+document.getElementById('formato-row').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-formato]');
+  if (!btn || btn.dataset.formato === videoFormat) return;
+  videoFormat = btn.dataset.formato;
+  formatoQuadradoBtn.classList.toggle('active', videoFormat === 'quadrado');
+  formatoStoriesBtn.classList.toggle('active', videoFormat === 'stories');
+  stopAllLoops();
+  applyCanvasFormat();
+  // a projeção do mapa (zoom/origem) e o enquadramento do fit dependem do
+  // formato do artboard — recalcula tudo e reinicia a prévia
+  if (LOCATIONS.length) await setupFromLocations();
+});
+
 /* ============================================================
    gravação (compartilhada pelos dois tipos)
    ============================================================ */
@@ -968,7 +1018,7 @@ btnGerarVideo.addEventListener('click', () => {
     const blob = new Blob(chunks, { type: isMp4 ? 'video/mp4' : 'video/webm' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `circuito-video-${videoTipo}.${ext}`;
+    a.href = url; a.download = `circuito-video-${videoTipo}-${videoFormat}.${ext}`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
     setStatus(isMp4
