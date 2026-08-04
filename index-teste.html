@@ -687,8 +687,12 @@ function initMap(){
       touchPitch: false
     });
     map.touchZoomRotate.disableRotation();
-    map.addControl(new maplibregl.NavigationControl({ showCompass:false }), 'bottom-right');
+    // pilha de controles no canto empilha em ordem INVERSA à que são
+    // adicionados (o último addControl fica visualmente no topo) — pra
+    // ficar Locate / Zoom (+/-) / Info(créditos) de cima pra baixo, a
+    // ordem de adição precisa ser o inverso disso
     map.addControl(new maplibregl.AttributionControl({ compact:true }), 'bottom-right');
+    map.addControl(new maplibregl.NavigationControl({ showCompass:false }), 'bottom-right');
 
     // botão "minha localização" — mesmo padrão de controle customizado do
     // Leaflet (onAdd devolve um elemento DOM), só que na API do MapLibre
