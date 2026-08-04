@@ -680,6 +680,8 @@ function initMap(){
       style: 'https://tiles.openfreemap.org/styles/liberty',
       center: [-43.1795, -22.9065],
       zoom: 15,
+      pitch: 0,
+      maxPitch: 0, // trava a vista sempre "de cima", sem inclinação 3D possível
       attributionControl: false,
       dragRotate: false,
       touchPitch: false
@@ -799,12 +801,16 @@ function applyMonochromeStyle(){
     const isCasing = id.includes('casing');
     const isBoundary = sl === 'boundary';
     try{
-      if (layer.type === 'background'){
+      if (layer.type === 'fill-extrusion'){
+        // "building-3d" do estilo "liberty" — prédios com altura/sombra.
+        // A gente já tem os prédios "achatados" na camada fill comum
+        // (building), então só esconde a versão 3D em vez de recolorir
+        map.setLayoutProperty(layer.id, 'visibility', 'none');
+      } else if (layer.type === 'background'){
         map.setPaintProperty(layer.id, 'background-color', MONO_COLORS.background);
-      } else if (layer.type === 'fill' || layer.type === 'fill-extrusion'){
-        const prop = layer.type === 'fill' ? 'fill-color' : 'fill-extrusion-color';
+      } else if (layer.type === 'fill'){
         const color = isWater ? MONO_COLORS.water : (isBuilding ? MONO_COLORS.building : MONO_COLORS.landuse);
-        map.setPaintProperty(layer.id, prop, color);
+        map.setPaintProperty(layer.id, 'fill-color', color);
       } else if (layer.type === 'line'){
         let color = MONO_COLORS.landuse; // linhas genéricas (contorno de parque etc.)
         if (isWater) color = MONO_COLORS.water;
