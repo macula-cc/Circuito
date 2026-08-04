@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Circuito de Ateliês do Centro</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@350&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -55,12 +55,10 @@
             backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
             pointer-events:none; transition:opacity 0.6s ease; }
   .map-dim.hidden{ opacity:0; }
-  /* filtro aplicado por tile individual (não na pane inteira) — cada tile é só
-     256x256px, então cada rasterização do filtro é barata; aplicar na pane
-     inteira forçava recalcular o filtro da área visível toda a cada tile novo
-     que chegava, causando as travinhas no zoom */
-  .leaflet-tile-pane img{ filter: grayscale(1) contrast(1.05) brightness(1.03); }
-  .leaflet-container{ background:#e9e9e9; font-family:var(--sans); }
+  /* MapLibre é vetorial — não tem mais tile-pane pra filtrar via CSS; as
+     cores de água/terra são definidas direto no estilo (ver applyMonochromeStyle,
+     JS), camada por camada, em vez de um filtro aproximado por cima do raster */
+  .maplibregl-map{ background:#e9e9e9; font-family:var(--sans); }
 
   .hero-title{ position:absolute; top:0; left:0; right:0;
                padding:calc(1.6rem + env(safe-area-inset-top)) calc(1.6rem + env(safe-area-inset-right)) 0 calc(1.6rem + env(safe-area-inset-left));
@@ -193,14 +191,16 @@
   .station-badge span{ font-family:var(--sans); font-weight:700; font-size:0.62rem; color:#fff; }
   .station-hit:hover .station-badge{ transform:scale(1.15); }
 
-  .leaflet-popup-content-wrapper{ border-radius:2px !important; box-shadow:0 8px 24px rgba(0,0,0,0.18) !important; }
-  .leaflet-popup-content{ font-family:var(--mono); font-size:0.79rem; color:var(--ink); margin:0.7rem 0.9rem !important; }
-  .leaflet-popup-tip{ box-shadow:0 8px 24px rgba(0,0,0,0.1) !important; }
+  .maplibregl-popup-content{ border-radius:2px !important; box-shadow:0 8px 24px rgba(0,0,0,0.18) !important;
+                              font-family:var(--mono); font-size:0.79rem; color:var(--ink); padding:0.7rem 0.9rem !important; }
+  .maplibregl-popup-tip{ box-shadow:0 8px 24px rgba(0,0,0,0.1) !important; }
 
-  .leaflet-control-zoom{ border:none !important; }
-  .leaflet-control-zoom a{ background:#fff !important; color:#111 !important; border:1px solid var(--line) !important;
-                            border-radius:0 !important; font-family:var(--mono) !important; }
-  .leaflet-control-attribution{ font-family:var(--mono); font-size:0.68rem !important; background:rgba(255,255,255,0.75) !important; }
+  .maplibregl-ctrl-group{ border-radius:0 !important; box-shadow:none !important; border:1px solid var(--line) !important; }
+  .maplibregl-ctrl-group button{ background:#fff !important; color:#111 !important; font-family:var(--mono) !important; }
+  .maplibregl-ctrl-attrib{ font-family:var(--mono); font-size:0.68rem !important; background:rgba(255,255,255,0.75) !important; }
+  .locate-control-btn{ width:29px; height:29px; display:flex; align-items:center; justify-content:center;
+                        background:#fff; border:1px solid var(--line); border-top:none; cursor:pointer;
+                        font-size:1rem; color:#111; }
 
   .locate-control a{ background:#fff !important; color:#111 !important; border:1px solid var(--line) !important;
                       border-radius:0 !important; font-size:1rem !important; line-height:26px !important;
@@ -498,7 +498,7 @@
 
 <canvas id="cursor-canvas"></canvas>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 /* ============================================================
    DATA SOURCE
@@ -622,20 +622,20 @@ function updateHeroCount(){
 // ---------------- map (isolated in try/catch so a load failure doesn't break the rest) ----------------
 let map = null;
 const markers = {};
-function makePinIcon(label, active){
-  return L.divIcon({
-    className:'',
-    html:`<div class="pin-hit"><div class="pin${active?' active':''}">${label}</div></div>`,
-    iconSize:[40,40],
-    iconAnchor:[20,20]
-  });
+function makePinEl(label, active){
+  const el = document.createElement('div');
+  el.className = 'pin-hit';
+  el.innerHTML = `<div class="pin${active?' active':''}">${label}</div>`;
+  return el;
 }
 
 function addMarkerForLocation(loc){
   if (!map || loc.lat == null || loc.lng == null) return;
   if (markers[loc.id]) return; // already placed
-  const marker = L.marker([loc.lat, loc.lng], { icon: makePinIcon(pinLabel(loc), false) }).addTo(map);
-  marker.on('click', () => openDrawer(loc.id));
+  const el = makePinEl(pinLabel(loc), false);
+  el.addEventListener('click', () => openDrawer(loc.id));
+  const marker = new maplibregl.Marker({ element: el, anchor:'center' })
+    .setLngLat([loc.lng, loc.lat]).addTo(map);
   markers[loc.id] = marker;
 }
 
@@ -659,61 +659,70 @@ const STATIONS = [
 function addStationMarkers(){
   STATIONS.forEach(st => {
     const label = st.tipo === 'metro' ? 'M' : 'V';
-    const icon = L.divIcon({
-      className:'',
-      html:`<div class="station-hit"><div class="station-badge ${st.tipo}"><span>${label}</span></div></div>`,
-      iconSize:[28,28],
-      iconAnchor:[14,14]
-    });
-    const marker = L.marker([st.lat, st.lng], { icon, zIndexOffset:-100 }).addTo(map);
+    const el = document.createElement('div');
+    el.className = 'station-hit';
+    el.innerHTML = `<div class="station-badge ${st.tipo}"><span>${label}</span></div>`;
+    el.style.zIndex = '0'; // fica atrás dos pins de ateliê (sem zIndexOffset no MapLibre)
+    const marker = new maplibregl.Marker({ element: el, anchor:'center' })
+      .setLngLat([st.lng, st.lat]).addTo(map);
     const tipoLabel = st.tipo === 'metro' ? 'Estação de Metrô' : 'Parada de VLT';
-    marker.bindPopup(`<strong>${st.nome}</strong><br>${tipoLabel}`, { closeButton:true });
+    const popup = new maplibregl.Popup({ closeButton:true, offset:16 })
+      .setHTML(`<strong>${st.nome}</strong><br>${tipoLabel}`);
+    marker.setPopup(popup);
   });
 }
 
 function initMap(){
   try{
-    if (typeof L === 'undefined') throw new Error('Leaflet não carregou');
-    // zoomSnap fracionário: por padrão o Leaflet só faz zoom em níveis inteiros,
-    // o que soa bem no scroll do mouse (poucos "cliques" discretos) mas engasga
-    // no trackpad, que manda uma rajada contínua de eventos — cada nível inteiro
-    // cruzado disparava um salto de zoom animado (recarregando tiles). Com
-    // zoomSnap fracionário o mapa acompanha o gesto de forma contínua.
-    // wheelPxPerZoomLevel mais baixo que o padrão (60) compensa: cada incremento
-    // fracionário passa a valer mais zoom, pra não sentir "fraquinho" no pinch.
-    map = L.map('map', { scrollWheelZoom:true, doubleClickZoom:true, zoomControl:false, zoomSnap:0.25, wheelPxPerZoomLevel:20 });
-    frameMapToPoints();
-    L.control.zoom({ position:'bottomright' }).addTo(map);
-
-    const LocateControl = L.Control.extend({
-      options: { position: 'bottomright' },
-      onAdd: function(){
-        const container = L.DomUtil.create('div', 'leaflet-bar locate-control');
-        const link = L.DomUtil.create('a', '', container);
-        link.href = '#';
-        link.title = 'Minha localização';
-        link.setAttribute('role', 'button');
-        link.setAttribute('aria-label', 'Centralizar o mapa na minha localização');
-        link.innerHTML = '◎';
-        L.DomEvent.disableClickPropagation(container);
-        L.DomEvent.on(link, 'click', (e) => { e.preventDefault(); goToUserLocation(link); });
-        return container;
-      }
+    if (typeof maplibregl === 'undefined') throw new Error('MapLibre não carregou');
+    map = new maplibregl.Map({
+      container: 'map',
+      style: 'https://tiles.openfreemap.org/styles/liberty',
+      center: [-43.1795, -22.9065],
+      zoom: 15,
+      attributionControl: false,
+      dragRotate: false,
+      touchPitch: false
     });
-    new LocateControl().addTo(map);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19,
-      updateWhenZooming:false // evita buscar/desenhar tiles no meio da animação de zoom
-                               // (o filtro grayscale na tile-pane força re-rasterizar a
-                               // pane inteira a cada tile que chega — isso é o que causava
-                               // as pequenas travas "tipo carregando aos poucos" durante o zoom)
-    }).addTo(map);
+    map.touchZoomRotate.disableRotation();
+    map.addControl(new maplibregl.NavigationControl({ showCompass:false }), 'bottom-right');
+    map.addControl(new maplibregl.AttributionControl({ compact:true }), 'bottom-right');
 
-    // Duplo-toque pra dar zoom: escuta touchstart/touchend crus, direto no
-    // elemento do mapa — o Leaflet parece "engolir" o segundo toque de um
-    // duplo-toque antes que ele chegue como 'click', então precisamos ouvir
-    // no nível mais baixo possível. Cuidados: ignora gestos com mais de um
-    // dedo (pinça) e ignora toques que se moveram (arrastar o mapa).
+    // botão "minha localização" — mesmo padrão de controle customizado do
+    // Leaflet (onAdd devolve um elemento DOM), só que na API do MapLibre
+    class LocateControl{
+      onAdd(mapInstance){
+        this._map = mapInstance;
+        this._container = document.createElement('div');
+        this._container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+        const btn = document.createElement('button');
+        btn.className = 'locate-control-btn';
+        btn.type = 'button';
+        btn.title = 'Minha localização';
+        btn.setAttribute('aria-label', 'Centralizar o mapa na minha localização');
+        btn.innerHTML = '◎';
+        btn.addEventListener('click', () => goToUserLocation(btn));
+        this._container.appendChild(btn);
+        return this._container;
+      }
+      onRemove(){ this._container.remove(); this._map = undefined; }
+    }
+    map.addControl(new LocateControl(), 'bottom-right');
+
+    // o estilo carrega de forma assíncrona (diferente do L.map, que já
+    // "existe" de cara) — só dá pra customizar cores, enquadrar nos pontos
+    // e colocar marcadores depois do 'load'
+    map.on('load', () => {
+      applyMonochromeStyle();
+      frameMapToPoints();
+      LOCATIONS.forEach((loc) => addMarkerForLocation(loc));
+      addStationMarkers();
+      locateUserAutomatically();
+    });
+
+    // Duplo-toque pra dar zoom — mesma lógica/cuidados de antes (o MapLibre
+    // também não expõe isso pronto), só troca de API: containerPointToLatLng
+    // vira map.unproject(), setZoomAround vira zoomTo(z, {around})
     const mapContainer = map.getContainer();
     let tapStartPoint = null;
     let lastTapTime = 0;
@@ -743,9 +752,9 @@ function initMap(){
 
       if (isDoubleTap){
         e.preventDefault();
-        const containerPoint = map.mouseEventToContainerPoint(touch);
-        const latlng = map.containerPointToLatLng(containerPoint);
-        map.setZoomAround(latlng, map.getZoom() + 1, { animate: true });
+        const rect = mapContainer.getBoundingClientRect();
+        const lngLat = map.unproject([touch.clientX - rect.left, touch.clientY - rect.top]);
+        map.zoomTo(map.getZoom() + 1, { around: lngLat, duration: 250 });
         lastTapTime = 0;
         lastTapPoint = null;
       } else {
@@ -753,15 +762,40 @@ function initMap(){
         lastTapPoint = point;
       }
     }, { passive: false });
-
-    LOCATIONS.forEach((loc) => addMarkerForLocation(loc));
-    addStationMarkers();
-    locateUserAutomatically();
   } catch(err){
     console.error('Mapa indisponível:', err);
     const mapEl = document.getElementById('map');
     mapEl.innerHTML = '<div class="map-error">Não foi possível carregar o mapa agora.<br>A lista de endereços continua disponível.</div>';
   }
+}
+
+// customiza cores camada por camada — água quase branca, resto em tons de
+// cinza — só é possível porque o MapLibre é vetorial (cada feição chega
+// com seu próprio tipo/nome, ao contrário do tile raster, que a gente só
+// via como pixels prontos e tinha que filtrar por aproximação)
+function applyMonochromeStyle(){
+  const layers = map.getStyle().layers || [];
+  layers.forEach(layer => {
+    const id = layer.id.toLowerCase();
+    const sourceLayer = (layer['source-layer'] || '').toLowerCase();
+    const isWater = id.includes('water') || sourceLayer.includes('water');
+    try{
+      if (layer.type === 'background'){
+        map.setPaintProperty(layer.id, 'background-color', '#f3f3f1');
+      } else if (layer.type === 'fill'){
+        map.setPaintProperty(layer.id, 'fill-color', isWater ? '#ffffff' : '#e3e3e0');
+      } else if (layer.type === 'line'){
+        map.setPaintProperty(layer.id, 'line-color', isWater ? '#ffffff' : '#b8b8b4');
+      } else if (layer.type === 'symbol'){
+        map.setPaintProperty(layer.id, 'text-color', '#555555');
+        map.setPaintProperty(layer.id, 'text-halo-color', '#ffffff');
+        // o estilo "liberty" traz ícones de POI (ônibus, bancos, etc.) que a
+        // gente nunca teve no tile raster do CARTO — escondidos aqui,
+        // mantendo só os rótulos de texto (nomes de rua/bairro)
+        map.setPaintProperty(layer.id, 'icon-opacity', 0);
+      }
+    } catch(e){ /* propriedade pode não existir nessa camada específica — ignora */ }
+  });
 }
 
 // ---------------- localização do visitante ----------------
@@ -770,20 +804,17 @@ function initMap(){
 // em silêncio. Além disso, um botão no mapa permite centralizar nela quando
 // quiser, sem precisar pedir localização de novo se já a tivermos.
 let userMarker = null;
-let userLatLng = null;
+let userLngLat = null;
 
 function placeUserMarker(latitude, longitude){
-  userLatLng = L.latLng(latitude, longitude);
+  userLngLat = [longitude, latitude];
   if (userMarker){
-    userMarker.setLatLng(userLatLng);
+    userMarker.setLngLat(userLngLat);
   } else {
-    const icon = L.divIcon({
-      className: '',
-      html: '<div class="user-dot"></div>',
-      iconSize: [16, 16],
-      iconAnchor: [8, 8]
-    });
-    userMarker = L.marker(userLatLng, { icon, zIndexOffset: 1000 }).addTo(map);
+    const el = document.createElement('div');
+    el.className = 'user-dot';
+    el.style.zIndex = '1000';
+    userMarker = new maplibregl.Marker({ element: el, anchor:'center' }).setLngLat(userLngLat).addTo(map);
   }
 }
 
@@ -793,8 +824,8 @@ function placeUserMarker(latitude, longitude){
 function goToUserLocation(triggerEl){
   if (!map) return;
 
-  if (userLatLng){
-    map.flyTo(userLatLng, Math.max(map.getZoom(), 16), { duration: 0.6 });
+  if (userLngLat){
+    map.flyTo({ center: userLngLat, zoom: Math.max(map.getZoom(), 16), duration: 600 });
     return;
   }
 
@@ -811,7 +842,7 @@ function goToUserLocation(triggerEl){
       (pos) => {
         if (triggerEl) triggerEl.innerHTML = originalText;
         placeUserMarker(pos.coords.latitude, pos.coords.longitude);
-        map.flyTo(userLatLng, Math.max(map.getZoom(), 16), { duration: 0.6 });
+        map.flyTo({ center: userLngLat, zoom: Math.max(map.getZoom(), 16), duration: 600 });
       },
       (err) => {
         if (triggerEl) triggerEl.innerHTML = originalText;
@@ -893,10 +924,13 @@ async function resolveMissingCoordinates(){
 
 
 function setActivePin(activeId){
+  // sem setIcon() no MapLibre — o marcador já É o elemento DOM, então troca
+  // a classe direto nele em vez de trocar o ícone inteiro
   LOCATIONS.forEach((loc) => {
     const m = markers[loc.id];
     if (!m) return;
-    m.setIcon(makePinIcon(pinLabel(loc), loc.id === activeId));
+    const pinDiv = m.getElement().querySelector('.pin');
+    if (pinDiv) pinDiv.classList.toggle('active', loc.id === activeId);
   });
 }
 
@@ -1071,7 +1105,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ closeLigh
 function goToLocation(loc){
   setView('map');
   if (map && loc.lat != null){
-    setTimeout(() => map.flyTo([loc.lat, loc.lng], 17, { duration:0.6 }), 50);
+    setTimeout(() => map.flyTo({ center: [loc.lng, loc.lat], zoom: 17, duration: 600 }), 50);
   }
   openDrawer(loc.id);
 }
@@ -1082,11 +1116,13 @@ function goToLocation(loc){
 function frameMapToPoints(){
   const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
   if (withCoords.length < 2){
-    map.setView([-22.9065, -43.1795], 15);
+    map.setCenter([-43.1795, -22.9065]);
+    map.setZoom(15);
     return;
   }
-  const bounds = L.latLngBounds(withCoords.map(l => [l.lat, l.lng]));
-  map.fitBounds(bounds, { paddingTopLeft: [30, 220], paddingBottomRight: [30, 50] });
+  const lats = withCoords.map(l => l.lat), lngs = withCoords.map(l => l.lng);
+  const bounds = [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]];
+  map.fitBounds(bounds, { padding: { top:220, left:30, right:30, bottom:50 }, duration:0 });
 }
 
 // ---------------- hero title: starts large, shrinks to the corner on first interaction ----------------
