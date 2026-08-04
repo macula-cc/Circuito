@@ -773,22 +773,47 @@ function initMap(){
 // cinza — só é possível porque o MapLibre é vetorial (cada feição chega
 // com seu próprio tipo/nome, ao contrário do tile raster, que a gente só
 // via como pixels prontos e tinha que filtrar por aproximação)
+// paleta calibrada medindo o resultado real do filtro CSS do index.html
+// (grayscale(1) contrast(1.05) brightness(1.03) em cima do tile CARTO) —
+// fundo quase branco, ruas brancas por cima, prédios um cinza claro mas
+// visível por baixo. Ruas mais claras que prédios é o ponto central.
+const MONO_COLORS = {
+  background: '#faf9f7',
+  water: '#ffffff',
+  landuse: '#faf9f7',   // parques, áreas residenciais etc. — igual ao fundo geral
+  building: '#eeeeec',  // única coisa visivelmente mais escura que o resto
+  road: '#ffffff',
+  roadCasing: '#e8e8e5', // borda sutil só pra vias maiores não sumirem no fundo
+  boundary: '#dddddd',
+  text: '#555555',
+  textHalo: '#ffffff'
+};
 function applyMonochromeStyle(){
   const layers = map.getStyle().layers || [];
   layers.forEach(layer => {
     const id = layer.id.toLowerCase();
-    const sourceLayer = (layer['source-layer'] || '').toLowerCase();
-    const isWater = id.includes('water') || sourceLayer.includes('water');
+    const sl = (layer['source-layer'] || '').toLowerCase();
+    const isWater = id.includes('water') || sl.includes('water');
+    const isBuilding = sl === 'building' || id.includes('building');
+    const isRoad = sl === 'transportation' && layer.type === 'line';
+    const isCasing = id.includes('casing');
+    const isBoundary = sl === 'boundary';
     try{
       if (layer.type === 'background'){
-        map.setPaintProperty(layer.id, 'background-color', '#f3f3f1');
-      } else if (layer.type === 'fill'){
-        map.setPaintProperty(layer.id, 'fill-color', isWater ? '#ffffff' : '#e3e3e0');
+        map.setPaintProperty(layer.id, 'background-color', MONO_COLORS.background);
+      } else if (layer.type === 'fill' || layer.type === 'fill-extrusion'){
+        const prop = layer.type === 'fill' ? 'fill-color' : 'fill-extrusion-color';
+        const color = isWater ? MONO_COLORS.water : (isBuilding ? MONO_COLORS.building : MONO_COLORS.landuse);
+        map.setPaintProperty(layer.id, prop, color);
       } else if (layer.type === 'line'){
-        map.setPaintProperty(layer.id, 'line-color', isWater ? '#ffffff' : '#b8b8b4');
+        let color = MONO_COLORS.landuse; // linhas genéricas (contorno de parque etc.)
+        if (isWater) color = MONO_COLORS.water;
+        else if (isBoundary) color = MONO_COLORS.boundary;
+        else if (isRoad) color = isCasing ? MONO_COLORS.roadCasing : MONO_COLORS.road;
+        map.setPaintProperty(layer.id, 'line-color', color);
       } else if (layer.type === 'symbol'){
-        map.setPaintProperty(layer.id, 'text-color', '#555555');
-        map.setPaintProperty(layer.id, 'text-halo-color', '#ffffff');
+        map.setPaintProperty(layer.id, 'text-color', MONO_COLORS.text);
+        map.setPaintProperty(layer.id, 'text-halo-color', MONO_COLORS.textHalo);
         // o estilo "liberty" traz ícones de POI (ônibus, bancos, etc.) que a
         // gente nunca teve no tile raster do CARTO — escondidos aqui,
         // mantendo só os rótulos de texto (nomes de rua/bairro)
