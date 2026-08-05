@@ -788,13 +788,13 @@ function initMap(){
 // (não preenchimento) — mais parecido com um desenho de contorno passado
 // na copiadora do que com um mapa "colorido em cinza"
 const MONO_COLORS = {
-  background: '#ffffff',
-  water: '#f0f0f0',         // cinza bem clarinho, só pra diferenciar da terra
-  landuse: '#ffffff',
-  building: '#ffffff',      // preenchimento invisível — o prédio existe só pelo contorno
-  buildingOutline: '#e6e6e6', // quase branco — prédio quase some, só sugerido
-  road: '#dddddd',            // mais claro que antes
-  roadCasing: '#c8c8c8',
+  background: '#e6e6e6',    // cinza claro dos quarteirões
+  water: '#eeeeee',         // cinza bem clarinho, só pra diferenciar da terra
+  landuse: '#e6e6e6',       // mesmo cinza dos quarteirões
+  building: '#e6e6e6',      // preenchimento igual ao quarteirão — prédio não se destaca
+  buildingOutline: '#e6e6e6', // igual ao preenchimento — contorno some de vez
+  road: '#ffffff',          // ruas brancas, se destacando do cinza dos quarteirões
+  roadCasing: '#ffffff',
   boundary: '#cccccc',
   text: '#111111',
   textHalo: '#ffffff'
