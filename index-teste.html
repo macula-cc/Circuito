@@ -46,8 +46,21 @@
                   mix-blend-mode:difference; }
 
   /* ---------------- Hero: full-bleed map (always mounted) ---------------- */
-  .hero{ position:fixed; inset:0; }
+  /* isolation:isolate é essencial aqui — sem isso, o mix-blend-mode da
+     trama de halftone (.map-halftone) "vaza" pra fora do .hero e mistura
+     com elementos irmãos (toggle mapa/lista, botão sobre etc.), igual ao
+     bug já documentado que exigiu a mesma correção no #map */
+  .hero{ position:fixed; inset:0; isolation:isolate; }
   #map{ position:absolute; inset:0; width:100%; height:100%; background:#e9e9e9; z-index:1; isolation:isolate; }
+  /* trama de pontos uniforme por cima do mapa — estética de xerox/risografia
+     "guerrilha", não é halftone fotográfico de verdade (o tamanho do ponto
+     não varia com a claridade de cada área, é sempre o mesmo). Como os pins
+     já são pretos sólidos, multiply não muda nada neles (preto x preto =
+     preto) — só escurece visivelmente as áreas claras do mapa por baixo. */
+  .map-halftone{ position:absolute; inset:0; z-index:120; pointer-events:none;
+                  background-image:radial-gradient(circle at center, rgba(0,0,0,0.85) 38%, transparent 40%);
+                  background-size:4px 4px;
+                  mix-blend-mode:multiply; }
   /* escurece o mapa (pontos incluídos, ficam por baixo) enquanto o hero title
      está grande, só pra dar destaque ao título/data — some no primeiro toque,
      junto com o encolhimento do título */
@@ -420,6 +433,7 @@
 
 <div class="hero">
   <div id="map"></div>
+  <div class="map-halftone"></div>
   <div class="map-dim" id="map-dim"></div>
   <div class="hero-title" id="hero-title">
     <div class="hero-label">Circuito de Ateliês do Centro</div>
