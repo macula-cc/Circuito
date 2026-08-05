@@ -57,9 +57,10 @@
      não varia com a claridade de cada área, é sempre o mesmo). Como os pins
      já são pretos sólidos, multiply não muda nada neles (preto x preto =
      preto) — só escurece visivelmente as áreas claras do mapa por baixo. */
+  /* background-image é gerado via JS (ver generateNoiseTexture) — ruído
+     orgânico/aleatório, não uma grade regular, pra parecer grão de xerox
+     de verdade em vez de trama decorativa */
   .map-halftone{ position:absolute; inset:0; z-index:120; pointer-events:none;
-                  background-image:radial-gradient(circle at center, rgba(0,0,0,0.85) 38%, transparent 40%);
-                  background-size:4px 4px;
                   mix-blend-mode:multiply; }
   /* escurece o mapa (pontos incluídos, ficam por baixo) enquanto o hero title
      está grande, só pra dar destaque ao título/data — some no primeiro toque,
@@ -734,6 +735,7 @@ function initMap(){
     // e colocar marcadores depois do 'load'
     map.on('load', () => {
       applyMonochromeStyle();
+      applyNoiseTexture();
       frameMapToPoints();
       LOCATIONS.forEach((loc) => addMarkerForLocation(loc));
       addStationMarkers();
@@ -797,19 +799,25 @@ function initMap(){
 // (grayscale(1) contrast(1.05) brightness(1.03) em cima do tile CARTO) —
 // fundo quase branco, ruas brancas por cima, prédios um cinza claro mas
 // visível por baixo. Ruas mais claras que prédios é o ponto central.
+// segunda versão, estética "xerox de linha" — fundo/preenchimentos todos
+// brancos, só o CONTORNO dos prédios e das ruas em preto, feito de linha
+// (não preenchimento) — mais parecido com um desenho de contorno passado
+// na copiadora do que com um mapa "colorido em cinza"
 const MONO_COLORS = {
-  background: '#faf9f7',
+  background: '#ffffff',
   water: '#ffffff',
-  landuse: '#faf9f7',   // parques, áreas residenciais etc. — igual ao fundo geral
-  building: '#eeeeec',  // única coisa visivelmente mais escura que o resto
-  road: '#ffffff',
-  roadCasing: '#e8e8e5', // borda sutil só pra vias maiores não sumirem no fundo
-  boundary: '#dddddd',
-  text: '#555555',
+  landuse: '#ffffff',
+  building: '#ffffff',      // preenchimento invisível — o prédio existe só pelo contorno
+  buildingOutline: '#161616',
+  road: '#222222',
+  roadCasing: '#111111',
+  boundary: '#cccccc',
+  text: '#111111',
   textHalo: '#ffffff'
 };
 function applyMonochromeStyle(){
   const layers = map.getStyle().layers || [];
+  let buildingSource = null, buildingSourceLayer = null;
   layers.forEach(layer => {
     const id = layer.id.toLowerCase();
     const sl = (layer['source-layer'] || '').toLowerCase();
@@ -818,6 +826,7 @@ function applyMonochromeStyle(){
     const isRoad = sl === 'transportation' && layer.type === 'line';
     const isCasing = id.includes('casing');
     const isBoundary = sl === 'boundary';
+    if (isBuilding && layer.type === 'fill'){ buildingSource = layer.source; buildingSourceLayer = layer['source-layer']; }
     try{
       if (layer.type === 'fill-extrusion'){
         // "building-3d" do estilo "liberty" — prédios com altura/sombra.
@@ -845,6 +854,47 @@ function applyMonochromeStyle(){
       }
     } catch(e){ /* propriedade pode não existir nessa camada específica — ignora */ }
   });
+  // o estilo "liberty" não vem com um contorno de prédio separado — cria
+  // uma camada de linha nova em cima da mesma fonte/source-layer da
+  // camada de preenchimento (que ficou branca/invisível logo acima)
+  if (buildingSource && !map.getLayer('building_outline_xerox')){
+    map.addLayer({
+      id: 'building_outline_xerox',
+      type: 'line',
+      source: buildingSource,
+      'source-layer': buildingSourceLayer,
+      paint: { 'line-color': MONO_COLORS.buildingOutline, 'line-width': 1 }
+    });
+  }
+}
+
+// grão de xerox: pontos pretos de tamanho/posição/opacidade aleatórios
+// (não uma grade regular) — gerado uma vez num canvas pequeno e repetido
+// como background-image do .map-halftone. É ruído de verdade, não trama.
+function generateNoiseTexture(size, dotCount){
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
+  for (let i = 0; i < dotCount; i++){
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const r = Math.random() * 1.1 + 0.25;
+    const alpha = Math.random() * 0.55 + 0.35;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(0,0,0,${alpha.toFixed(2)})`;
+    ctx.fill();
+  }
+  return c.toDataURL();
+}
+function applyNoiseTexture(){
+  const el = document.querySelector('.map-halftone');
+  if (!el) return;
+  const size = 140;
+  const dataUrl = generateNoiseTexture(size, 900);
+  el.style.backgroundImage = `url(${dataUrl})`;
+  el.style.backgroundRepeat = 'repeat';
+  el.style.backgroundSize = `${size}px ${size}px`;
 }
 
 // ---------------- localização do visitante ----------------
