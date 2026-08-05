@@ -802,6 +802,7 @@ const MONO_COLORS = {
 function applyMonochromeStyle(){
   const layers = map.getStyle().layers || [];
   let buildingSource = null, buildingSourceLayer = null;
+  let firstSymbolId = null;
   layers.forEach(layer => {
     const id = layer.id.toLowerCase();
     const sl = (layer['source-layer'] || '').toLowerCase();
@@ -811,6 +812,7 @@ function applyMonochromeStyle(){
     const isCasing = id.includes('casing');
     const isBoundary = sl === 'boundary';
     if (isBuilding && layer.type === 'fill'){ buildingSource = layer.source; buildingSourceLayer = layer['source-layer']; }
+    if (layer.type === 'symbol' && firstSymbolId === null){ firstSymbolId = layer.id; }
     try{
       if (layer.type === 'fill-extrusion'){
         // "building-3d" do estilo "liberty" — prédios com altura/sombra.
@@ -840,7 +842,10 @@ function applyMonochromeStyle(){
   });
   // o estilo "liberty" não vem com um contorno de prédio separado — cria
   // uma camada de linha nova em cima da mesma fonte/source-layer da
-  // camada de preenchimento (que ficou branca/invisível logo acima)
+  // camada de preenchimento (que ficou branca/invisível logo acima).
+  // Insere ANTES da primeira camada de texto/símbolo — sem isso o
+  // addLayer joga a linha pro topo absoluto da pilha e ela passa por
+  // cima de nomes de rua/bairro em alguns zooms, apagando um pouco o texto.
   if (buildingSource && !map.getLayer('building_outline_xerox')){
     map.addLayer({
       id: 'building_outline_xerox',
@@ -848,7 +853,7 @@ function applyMonochromeStyle(){
       source: buildingSource,
       'source-layer': buildingSourceLayer,
       paint: { 'line-color': MONO_COLORS.buildingOutline, 'line-width': 1 }
-    });
+    }, firstSymbolId || undefined);
   }
 }
 
