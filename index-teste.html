@@ -831,6 +831,15 @@ function applyMonochromeStyle(){
         else if (isRoad) color = isCasing ? MONO_COLORS.roadCasing : MONO_COLORS.road;
         map.setPaintProperty(layer.id, 'line-color', color);
       } else if (layer.type === 'symbol'){
+        // poi_r1/r7/r20 = POI genérico por ranking (loja, restaurante etc.)
+        // — a gente não quer esses nomes poluindo o mapa. poi_transit fica
+        // de fora dessa exclusão (aeroporto/ônibus/trem = infraestrutura
+        // importante), assim como a camada "airport" (nome do aeroporto).
+        const isGenericPoi = sl === 'poi' && /^poi_r\d+$/.test(id);
+        if (isGenericPoi){
+          map.setLayoutProperty(layer.id, 'visibility', 'none');
+          return;
+        }
         map.setPaintProperty(layer.id, 'text-color', MONO_COLORS.text);
         map.setPaintProperty(layer.id, 'text-halo-color', MONO_COLORS.textHalo);
         // o estilo "liberty" traz ícones de POI (ônibus, bancos, etc.) que a
