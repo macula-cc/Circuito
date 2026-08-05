@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="format-detection" content="telephone=no, address=no, email=no, date=no">
 <title>Circuito de Ateliês do Centro</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@350&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -53,12 +53,10 @@
   /* ---------------- Hero: full-bleed map (always mounted) ---------------- */
   .hero{ position:fixed; inset:0; }
   #map{ position:absolute; inset:0; width:100%; height:100%; background:#e9e9e9; z-index:1; isolation:isolate; }
-  /* filtro aplicado por tile individual (não na pane inteira) — cada tile é só
-     256x256px, então cada rasterização do filtro é barata; aplicar na pane
-     inteira forçava recalcular o filtro da área visível toda a cada tile novo
-     que chegava, causando as travinhas no zoom */
-  .leaflet-tile-pane img{ filter: grayscale(1) contrast(1.05) brightness(1.03); }
-  .leaflet-container{ background:#e9e9e9; font-family:var(--sans); }
+  /* MapLibre é vetorial — não tem mais tile-pane pra filtrar via CSS; as
+     cores de água/terra são definidas direto no estilo (ver applyMonochromeStyle,
+     JS), camada por camada, em vez de um filtro aproximado por cima do raster */
+  .maplibregl-map{ background:#e9e9e9; font-family:var(--sans); }
 
   /* escurece o mapa (pontos incluídos, ficam por baixo) enquanto o hero title
      está grande, só pra dar destaque ao título/data — some no primeiro toque,
@@ -193,25 +191,19 @@
   .station-badge span{ font-family:var(--sans); font-weight:700; font-size:0.62rem; color:#fff; }
   .station-hit:hover .station-badge{ transform:scale(1.15); }
 
-  .leaflet-popup-content-wrapper{ border-radius:2px !important; box-shadow:0 8px 24px rgba(0,0,0,0.18) !important; }
-  .leaflet-popup-content{ font-family:var(--mono); font-size:0.79rem; color:var(--ink); margin:0.7rem 0.9rem !important; }
-  .leaflet-popup-tip{ box-shadow:0 8px 24px rgba(0,0,0,0.1) !important; }
+  .maplibregl-popup-content{ border-radius:2px !important; box-shadow:0 8px 24px rgba(0,0,0,0.18) !important;
+                              font-family:var(--mono); font-size:0.79rem; color:var(--ink); padding:0.7rem 0.9rem !important; }
+  .maplibregl-popup-tip{ box-shadow:0 8px 24px rgba(0,0,0,0.1) !important; }
 
-  .leaflet-control-zoom{ border:none !important; }
-  .leaflet-control-zoom a{ background:#fff !important; color:#111 !important; border:1px solid var(--line) !important;
-                            border-radius:0 !important; font-family:var(--mono) !important; }
-  /* crédito de OSM/CARTO discreto (mas sempre visível — é exigência de
+  /* crédito de OSM/OpenFreeMap discreto (mas sempre visível — é exigência de
      licença, não só estética) — texto/fundo mais fracos que o padrão do
-     Leaflet, e a versão completa também aparece no "Sobre" */
-  .leaflet-control-attribution{ font-family:var(--mono); font-size:0.6rem !important;
-                                 background:rgba(255,255,255,0.45) !important; color:rgba(0,0,0,0.55) !important; }
-  .leaflet-control-attribution a{ color:rgba(0,0,0,0.55) !important; }
-
-  .locate-control a{ background:#fff !important; color:#111 !important; border:1px solid var(--line) !important;
-                      border-radius:0 !important; font-size:1rem !important; line-height:26px !important;
-                      width:26px !important; height:26px !important; display:block; text-align:center;
-                      text-decoration:none !important; }
-  .locate-control a:hover{ background:var(--hover) !important; }
+     MapLibre, e a versão completa também aparece no "Sobre" */
+  .maplibregl-ctrl-group{ border-radius:0 !important; box-shadow:none !important; border:1px solid var(--line) !important; }
+  .maplibregl-ctrl-group button{ background:#fff !important; color:#111 !important; font-family:var(--mono) !important; }
+  .maplibregl-ctrl-attrib{ font-family:var(--mono); font-size:0.68rem !important; background:rgba(255,255,255,0.75) !important; }
+  .locate-control-btn{ width:29px; height:29px; display:flex; align-items:center; justify-content:center;
+                        background:#fff; border:1px solid var(--line); border-top:none; cursor:pointer;
+                        font-size:1rem; color:#111; }
 
   .user-dot{ position:relative; width:14px; height:14px; border-radius:50%; background:#3B82F6; border:2px solid #fff;
              box-shadow:0 0 0 4px rgba(59,130,246,0.28); }
@@ -525,7 +517,7 @@
         <div class="about-credits">
           <p class="about-credits-label">Créditos</p>
           <p>Identidade visual e site:<br>Eduardo Mattos<br><a href="https://instagram.com/macula.cc" target="_blank" rel="noopener">@macula.cc</a></p>
-          <p>Mapa:<br><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a> contributors, tiles por <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>, biblioteca <a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>.</p>
+          <p>Mapa:<br><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a> contributors, tiles por <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, biblioteca <a href="https://maplibre.org" target="_blank" rel="noopener">MapLibre GL JS</a>.</p>
         </div>
       </div>
     </div>
@@ -534,7 +526,7 @@
 
 <canvas id="cursor-canvas"></canvas>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 /* ============================================================
    DATA SOURCE
@@ -670,13 +662,11 @@ function updateHeroCount(){
 // ---------------- map (isolated in try/catch so a load failure doesn't break the rest) ----------------
 let map = null;
 const markers = {};
-function makePinIcon(label, active){
-  return L.divIcon({
-    className:'',
-    html:`<div class="pin-hit"><div class="pin${active?' active':''}">${label}</div></div>`,
-    iconSize:[40,40],
-    iconAnchor:[20,20]
-  });
+function makePinEl(label, active){
+  const el = document.createElement('div');
+  el.className = 'pin-hit';
+  el.innerHTML = `<div class="pin${active?' active':''}">${label}</div>`;
+  return el;
 }
 
 // Alguns endereços ficam a poucos metros um do outro (mesmo prédio, entradas
@@ -716,15 +706,15 @@ function groupOverlappingLocations(locations){
 }
 // posição de exibição de um pin: a coordenada real, ou — se ele faz parte de
 // um grupo sobreposto — um ponto a PIN_OVERLAP_SPREAD_PX pixels do centro do
-// grupo, convertido de volta pra lat/lng na projeção atual do mapa
+// grupo, convertido de volta pra lng/lat na projeção atual do mapa
 function displayLatLngFor(loc){
-  if (!loc._cluster || !map) return [loc.lat, loc.lng];
+  if (!loc._cluster || !map) return [loc.lng, loc.lat];
   const { centerLat, centerLng, index, size } = loc._cluster;
-  const centerPt = map.latLngToContainerPoint([centerLat, centerLng]);
+  const centerPt = map.project([centerLng, centerLat]);
   const angle = (2*Math.PI*index) / size;
-  const pt = L.point(centerPt.x + PIN_OVERLAP_SPREAD_PX*Math.cos(angle), centerPt.y + PIN_OVERLAP_SPREAD_PX*Math.sin(angle));
-  const ll = map.containerPointToLatLng(pt);
-  return [ll.lat, ll.lng];
+  const pt = { x: centerPt.x + PIN_OVERLAP_SPREAD_PX*Math.cos(angle), y: centerPt.y + PIN_OVERLAP_SPREAD_PX*Math.sin(angle) };
+  const ll = map.unproject([pt.x, pt.y]);
+  return [ll.lng, ll.lat];
 }
 // reposiciona só os pins que fazem parte de algum grupo — chamado a cada
 // zoom, já que o afastamento em pixels muda de lat/lng conforme o nível
@@ -733,7 +723,7 @@ function repositionClusteredMarkers(){
   LOCATIONS.forEach(loc => {
     if (!loc._cluster) return;
     const m = markers[loc.id];
-    if (m) m.setLatLng(displayLatLngFor(loc));
+    if (m) m.setLngLat(displayLatLngFor(loc));
   });
 }
 
@@ -746,10 +736,11 @@ function syncAllMarkers(){
     if (loc.lat == null || loc.lng == null) return;
     const pos = displayLatLngFor(loc);
     if (markers[loc.id]){
-      markers[loc.id].setLatLng(pos);
+      markers[loc.id].setLngLat(pos);
     } else {
-      const marker = L.marker(pos, { icon: makePinIcon(pinLabel(loc), false) }).addTo(map);
-      marker.on('click', () => openDrawer(loc.id));
+      const el = makePinEl(pinLabel(loc), false);
+      el.addEventListener('click', () => openDrawer(loc.id));
+      const marker = new maplibregl.Marker({ element: el, anchor:'center' }).setLngLat(pos).addTo(map);
       markers[loc.id] = marker;
     }
   });
@@ -775,65 +766,181 @@ const STATIONS = [
 function addStationMarkers(){
   STATIONS.forEach(st => {
     const label = st.tipo === 'metro' ? 'M' : 'V';
-    const icon = L.divIcon({
-      className:'',
-      html:`<div class="station-hit"><div class="station-badge ${st.tipo}"><span>${label}</span></div></div>`,
-      iconSize:[28,28],
-      iconAnchor:[14,14]
-    });
-    const marker = L.marker([st.lat, st.lng], { icon, zIndexOffset:-100 }).addTo(map);
+    const el = document.createElement('div');
+    el.className = 'station-hit';
+    el.innerHTML = `<div class="station-badge ${st.tipo}"><span>${label}</span></div>`;
+    el.style.zIndex = '0'; // fica atrás dos pins de ateliê (sem zIndexOffset no MapLibre)
+    const marker = new maplibregl.Marker({ element: el, anchor:'center' })
+      .setLngLat([st.lng, st.lat]).addTo(map);
     const tipoLabel = st.tipo === 'metro' ? 'Estação de Metrô' : 'Parada de VLT';
-    marker.bindPopup(`<strong>${st.nome}</strong><br>${tipoLabel}`, { closeButton:true });
+    const popup = new maplibregl.Popup({ closeButton:true, offset:16 })
+      .setHTML(`<strong>${st.nome}</strong><br>${tipoLabel}`);
+    marker.setPopup(popup);
   });
+}
+
+// customiza cores camada por camada — água quase branca, resto em tons de
+// cinza — só é possível porque o MapLibre é vetorial (cada feição chega
+// com seu próprio tipo/nome, ao contrário do tile raster, que a gente só
+// via como pixels prontos e tinha que filtrar por aproximação). Estética
+// "xerox de linha": preenchimentos claros/quase brancos, ruas brancas se
+// destacando do cinza dos quarteirões, contorno de prédio invisível.
+const MONO_COLORS = {
+  background: '#ececec',    // cinza claro dos quarteirões
+  water: '#f8f8f8',         // quase branco, só pra diferenciar da terra
+  landuse: '#ececec',       // mesmo cinza dos quarteirões
+  building: '#ececec',      // preenchimento igual ao quarteirão — prédio não se destaca
+  buildingOutline: '#ececec', // igual ao preenchimento — contorno some de vez
+  road: '#ffffff',          // ruas brancas, se destacando do cinza dos quarteirões
+  roadCasing: '#ffffff',
+  boundary: '#cccccc',
+  text: '#111111',
+  textHalo: '#ffffff'
+};
+function applyMonochromeStyle(){
+  const layers = map.getStyle().layers || [];
+  let buildingSource = null, buildingSourceLayer = null;
+  let firstSymbolId = null;
+  layers.forEach(layer => {
+    const id = layer.id.toLowerCase();
+    const sl = (layer['source-layer'] || '').toLowerCase();
+    const isWater = id.includes('water') || sl.includes('water');
+    const isBuilding = sl === 'building' || id.includes('building');
+    const isRoad = sl === 'transportation' && layer.type === 'line';
+    const isCasing = id.includes('casing');
+    const isBoundary = sl === 'boundary';
+    if (isBuilding && layer.type === 'fill'){ buildingSource = layer.source; buildingSourceLayer = layer['source-layer']; }
+    if (layer.type === 'symbol' && firstSymbolId === null){ firstSymbolId = layer.id; }
+    try{
+      if (layer.type === 'fill-extrusion'){
+        // "building-3d" do estilo "liberty" — prédios com altura/sombra.
+        // A gente já tem os prédios "achatados" na camada fill comum
+        // (building), então só esconde a versão 3D em vez de recolorir
+        map.setLayoutProperty(layer.id, 'visibility', 'none');
+      } else if (layer.type === 'background'){
+        map.setPaintProperty(layer.id, 'background-color', MONO_COLORS.background);
+      } else if (layer.type === 'fill'){
+        const color = isWater ? MONO_COLORS.water : (isBuilding ? MONO_COLORS.building : MONO_COLORS.landuse);
+        map.setPaintProperty(layer.id, 'fill-color', color);
+      } else if (layer.type === 'line'){
+        let color = MONO_COLORS.landuse; // linhas genéricas (contorno de parque etc.)
+        if (isWater) color = MONO_COLORS.water;
+        else if (isBoundary) color = MONO_COLORS.boundary;
+        else if (isRoad) color = isCasing ? MONO_COLORS.roadCasing : MONO_COLORS.road;
+        map.setPaintProperty(layer.id, 'line-color', color);
+      } else if (layer.type === 'symbol'){
+        // poi_r1/r7/r20 = POI genérico por ranking (loja, restaurante etc.)
+        // poi_transit = pontos de ônibus/trem/aeroporto (linha, terminal,
+        // ponto final) — informação de transporte que a gente não quer
+        // exibir. Nenhum dos dois esconde a camada "airport" (nome do
+        // aeroporto), que é separada e continua normalmente.
+        const isGenericPoi = sl === 'poi' && /^poi_r\d+$/.test(id);
+        const isTransitPoi = id === 'poi_transit';
+        if (isGenericPoi || isTransitPoi){
+          map.setLayoutProperty(layer.id, 'visibility', 'none');
+          return;
+        }
+        map.setPaintProperty(layer.id, 'text-color', MONO_COLORS.text);
+        map.setPaintProperty(layer.id, 'text-halo-color', MONO_COLORS.textHalo);
+        // o estilo "liberty" traz ícones de POI (ônibus, bancos, etc.) que a
+        // gente nunca teve no tile raster do CARTO — escondidos aqui,
+        // mantendo só os rótulos de texto (nomes de rua/bairro)
+        map.setPaintProperty(layer.id, 'icon-opacity', 0);
+      }
+    } catch(e){ /* propriedade pode não existir nessa camada específica — ignora */ }
+  });
+  // o estilo "liberty" não vem com um contorno de prédio separado — cria
+  // uma camada de linha nova em cima da mesma fonte/source-layer da
+  // camada de preenchimento (que ficou branca/invisível logo acima).
+  // Insere ANTES da primeira camada de texto/símbolo — sem isso o
+  // addLayer joga a linha pro topo absoluto da pilha e ela passa por
+  // cima de nomes de rua/bairro em alguns zooms, apagando um pouco o texto.
+  if (buildingSource && !map.getLayer('building_outline_xerox')){
+    map.addLayer({
+      id: 'building_outline_xerox',
+      type: 'line',
+      source: buildingSource,
+      'source-layer': buildingSourceLayer,
+      paint: { 'line-color': MONO_COLORS.buildingOutline, 'line-width': 1 }
+    }, firstSymbolId || undefined);
+  }
+}
+
+// enquadramento inicial do mapa: calcula a partir dos pontos reais, com
+// padding maior em cima — reserva "campo livre" pro hero title grande sem
+// os pins ficarem embaixo dele
+function frameMapToPoints(){
+  const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
+  if (withCoords.length < 2){
+    map.setCenter([-43.1795, -22.9065]);
+    map.setZoom(15);
+    return;
+  }
+  const lats = withCoords.map(l => l.lat), lngs = withCoords.map(l => l.lng);
+  const bounds = [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]];
+  map.fitBounds(bounds, { padding: { top:220, left:30, right:30, bottom:50 }, duration:0 });
 }
 
 function initMap(){
   try{
-    if (typeof L === 'undefined') throw new Error('Leaflet não carregou');
-    // zoomSnap fracionário: por padrão o Leaflet só faz zoom em níveis inteiros,
-    // o que soa bem no scroll do mouse (poucos "cliques" discretos) mas engasga
-    // no trackpad, que manda uma rajada contínua de eventos — cada nível inteiro
-    // cruzado disparava um salto de zoom animado (recarregando tiles). Com
-    // zoomSnap fracionário o mapa acompanha o gesto de forma contínua.
-    // wheelPxPerZoomLevel mais baixo que o padrão (60) compensa: cada incremento
-    // fracionário passa a valer mais zoom, pra não sentir "fraquinho" no pinch.
-    map = L.map('map', { scrollWheelZoom:true, doubleClickZoom:true, zoomControl:false, zoomSnap:0.25, wheelPxPerZoomLevel:20 }).setView([-22.9065, -43.1795], 15);
-    // tira só o "Leaflet |" do crédito — isso é cortesia de marca, não
-    // exigência de licença. O crédito de OpenStreetMap/CARTO continua
-    // (esse sim é exigido pela ODbL e pelos termos do serviço de tiles).
-    map.attributionControl.setPrefix(false);
-    map.on('zoom', repositionClusteredMarkers);
-    L.control.zoom({ position:'bottomright' }).addTo(map);
-
-    const LocateControl = L.Control.extend({
-      options: { position: 'bottomright' },
-      onAdd: function(){
-        const container = L.DomUtil.create('div', 'leaflet-bar locate-control');
-        const link = L.DomUtil.create('a', '', container);
-        link.href = '#';
-        link.title = 'Minha localização';
-        link.setAttribute('role', 'button');
-        link.setAttribute('aria-label', 'Centralizar o mapa na minha localização');
-        link.innerHTML = '◎';
-        L.DomEvent.disableClickPropagation(container);
-        L.DomEvent.on(link, 'click', (e) => { e.preventDefault(); goToUserLocation(link); });
-        return container;
-      }
+    if (typeof maplibregl === 'undefined') throw new Error('MapLibre não carregou');
+    map = new maplibregl.Map({
+      container: 'map',
+      style: 'https://tiles.openfreemap.org/styles/liberty',
+      center: [-43.1795, -22.9065],
+      zoom: 15,
+      pitch: 0,
+      maxPitch: 0, // trava a vista sempre "de cima", sem inclinação 3D possível
+      attributionControl: false,
+      dragRotate: false,
+      touchPitch: false
     });
-    new LocateControl().addTo(map);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19,
-      updateWhenZooming:false // evita buscar/desenhar tiles no meio da animação de zoom
-                               // (o filtro grayscale na tile-pane força re-rasterizar a
-                               // pane inteira a cada tile que chega — isso é o que causava
-                               // as pequenas travas "tipo carregando aos poucos" durante o zoom)
-    }).addTo(map);
+    map.touchZoomRotate.disableRotation();
+    map.on('zoom', repositionClusteredMarkers);
+
+    // pilha de controles no canto empilha em ordem INVERSA à que são
+    // adicionados (o último addControl fica visualmente no topo) — pra
+    // ficar Locate / Zoom (+/-) / Info (créditos) de cima pra baixo, a
+    // ordem de adição precisa ser o inverso disso
+    map.addControl(new maplibregl.AttributionControl({ compact:true }), 'bottom-right');
+    map.addControl(new maplibregl.NavigationControl({ showCompass:false }), 'bottom-right');
+
+    // botão "minha localização" — controle customizado (onAdd devolve um
+    // elemento DOM), API própria do MapLibre
+    class LocateControl{
+      onAdd(mapInstance){
+        this._map = mapInstance;
+        this._container = document.createElement('div');
+        this._container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+        const btn = document.createElement('button');
+        btn.className = 'locate-control-btn';
+        btn.type = 'button';
+        btn.title = 'Minha localização';
+        btn.setAttribute('aria-label', 'Centralizar o mapa na minha localização');
+        btn.innerHTML = '◎';
+        btn.addEventListener('click', () => goToUserLocation(btn));
+        this._container.appendChild(btn);
+        return this._container;
+      }
+      onRemove(){ this._container.remove(); this._map = undefined; }
+    }
+    map.addControl(new LocateControl(), 'bottom-right');
+
+    // o estilo carrega de forma assíncrona — só dá pra customizar cores,
+    // enquadrar nos pontos e colocar marcadores depois do 'load'
+    map.on('load', () => {
+      applyMonochromeStyle();
+      frameMapToPoints();
+      syncAllMarkers();
+      addStationMarkers();
+      locateUserAutomatically();
+    });
 
     // Duplo-toque pra dar zoom: escuta touchstart/touchend crus, direto no
-    // elemento do mapa — o Leaflet parece "engolir" o segundo toque de um
-    // duplo-toque antes que ele chegue como 'click', então precisamos ouvir
-    // no nível mais baixo possível. Cuidados: ignora gestos com mais de um
-    // dedo (pinça) e ignora toques que se moveram (arrastar o mapa).
+    // elemento do mapa — o MapLibre não expõe isso pronto, e o dblclick
+    // nativo não é sintetizado de forma confiável a partir de um toque
+    // duplo em alguns navegadores/dispositivos. Cuidados: ignora gestos com
+    // mais de um dedo (pinça) e ignora toques que se moveram (arrastar).
     const mapContainer = map.getContainer();
     let tapStartPoint = null;
     let lastTapTime = 0;
@@ -863,9 +970,9 @@ function initMap(){
 
       if (isDoubleTap){
         e.preventDefault();
-        const containerPoint = map.mouseEventToContainerPoint(touch);
-        const latlng = map.containerPointToLatLng(containerPoint);
-        map.setZoomAround(latlng, map.getZoom() + 1, { animate: true });
+        const rect = mapContainer.getBoundingClientRect();
+        const lngLat = map.unproject([touch.clientX - rect.left, touch.clientY - rect.top]);
+        map.zoomTo(map.getZoom() + 1, { around: lngLat, duration: 250 });
         lastTapTime = 0;
         lastTapPoint = null;
       } else {
@@ -873,10 +980,6 @@ function initMap(){
         lastTapPoint = point;
       }
     }, { passive: false });
-
-    syncAllMarkers();
-    addStationMarkers();
-    locateUserAutomatically();
   } catch(err){
     console.error('Mapa indisponível:', err);
     const mapEl = document.getElementById('map');
@@ -890,20 +993,17 @@ function initMap(){
 // em silêncio. Além disso, um botão no mapa permite centralizar nela quando
 // quiser, sem precisar pedir localização de novo se já a tivermos.
 let userMarker = null;
-let userLatLng = null;
+let userLngLat = null;
 
 function placeUserMarker(latitude, longitude){
-  userLatLng = L.latLng(latitude, longitude);
+  userLngLat = [longitude, latitude];
   if (userMarker){
-    userMarker.setLatLng(userLatLng);
+    userMarker.setLngLat(userLngLat);
   } else {
-    const icon = L.divIcon({
-      className: '',
-      html: '<div class="user-dot"></div>',
-      iconSize: [16, 16],
-      iconAnchor: [8, 8]
-    });
-    userMarker = L.marker(userLatLng, { icon, zIndexOffset: 1000 }).addTo(map);
+    const el = document.createElement('div');
+    el.className = 'user-dot';
+    el.style.zIndex = '1000';
+    userMarker = new maplibregl.Marker({ element: el, anchor:'center' }).setLngLat(userLngLat).addTo(map);
   }
 }
 
@@ -913,8 +1013,8 @@ function placeUserMarker(latitude, longitude){
 function goToUserLocation(triggerEl){
   if (!map) return;
 
-  if (userLatLng){
-    map.flyTo(userLatLng, Math.max(map.getZoom(), 16), { duration: 0.6 });
+  if (userLngLat){
+    map.flyTo({ center: userLngLat, zoom: Math.max(map.getZoom(), 16), duration: 600 });
     return;
   }
 
@@ -931,7 +1031,7 @@ function goToUserLocation(triggerEl){
       (pos) => {
         if (triggerEl) triggerEl.innerHTML = originalText;
         placeUserMarker(pos.coords.latitude, pos.coords.longitude);
-        map.flyTo(userLatLng, Math.max(map.getZoom(), 16), { duration: 0.6 });
+        map.flyTo({ center: userLngLat, zoom: Math.max(map.getZoom(), 16), duration: 600 });
       },
       (err) => {
         if (triggerEl) triggerEl.innerHTML = originalText;
@@ -1013,10 +1113,13 @@ async function resolveMissingCoordinates(){
 
 
 function setActivePin(activeId){
+  // sem setIcon() no MapLibre — o marcador já É o elemento DOM, então troca
+  // a classe direto nele em vez de trocar o ícone inteiro
   LOCATIONS.forEach((loc) => {
     const m = markers[loc.id];
     if (!m) return;
-    m.setIcon(makePinIcon(pinLabel(loc), loc.id === activeId));
+    const pinDiv = m.getElement().querySelector('.pin');
+    if (pinDiv) pinDiv.classList.toggle('active', loc.id === activeId);
   });
 }
 
@@ -1191,7 +1294,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ closeLigh
 function goToLocation(loc){
   setView('map');
   if (map && loc.lat != null){
-    setTimeout(() => map.flyTo(displayLatLngFor(loc), 17, { duration:0.6 }), 50);
+    setTimeout(() => map.flyTo({ center: displayLatLngFor(loc), zoom: 17, duration: 600 }), 50);
   }
   openDrawer(loc.id);
 }
