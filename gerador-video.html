@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 
 <style>
   :root{
@@ -180,6 +181,12 @@
   </div>
 </div>
 
+<!-- mapa MapLibre real, renderizado fora da tela — usado só como fonte da
+     imagem de fundo (buildBasemapMapLibre) e da projeção geográfica exata
+     dos pontos (map.project), nunca mostrado/interagido diretamente -->
+<div id="map-offscreen" style="position:fixed; left:-99999px; top:0; width:1000px; height:1000px; pointer-events:none;"></div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 /* ============================================================
    dados
@@ -330,9 +337,12 @@ async function loadLocationsFromSheet(){
 }
 
 /* ============================================================
-   geometria com mapa real (mercator + tiles) — mesma matemática
-   usada no index.html e no gerador de post, pra que a posição dos
-   pontos faça sentido geograficamente
+   mapa real (MapLibre GL, mesmo estilo xerox do index.html) — o mapa
+   é renderizado fora da tela num container escondido, e serve pra duas
+   coisas: (1) fonte da imagem de fundo (buildBasemapMapLibre) e (2) fonte
+   da projeção geográfica exata dos pontos (mlMap.project), garantindo por
+   construção que os pinos caiam exatamente em cima das ruas certas — sem
+   reimplementar a matemática de projeção Mercator/zoom de tiles à mão.
    ============================================================ */
 function expandBounds(b, factor){
   const cLat = (b.minLat+b.maxLat)/2, cLng = (b.minLng+b.maxLng)/2;
@@ -340,93 +350,112 @@ function expandBounds(b, factor){
   const spanLng = Math.max((b.maxLng-b.minLng)*factor, 0.002);
   return { minLat:cLat-spanLat/2, maxLat:cLat+spanLat/2, minLng:cLng-spanLng/2, maxLng:cLng+spanLng/2 };
 }
-const TILE_SIZE = 256;
-const TILE_URL = (z,x,y,s) => `https://${s}.basemaps.cartocdn.com/light_all/${z}/${x}/${y}.png`;
-const SUBS = ['a','b','c','d'];
 
-function mercProject(lat, lon, zoom){
-  const scale = Math.pow(2, zoom);
-  const x = (lon + 180) / 360 * scale;
-  const rad = lat * Math.PI/180;
-  const y = (1 - Math.log(Math.tan(rad) + 1/Math.cos(rad)) / Math.PI) / 2 * scale;
-  return { x, y };
-}
-function fitZoom(bounds, boxW, boxH, margin){
-  for (let z = 19; z >= 2; z--){
-    const p1 = mercProject(bounds.maxLat, bounds.minLng, z);
-    const p2 = mercProject(bounds.minLat, bounds.maxLng, z);
-    const pxW = (p2.x - p1.x) * TILE_SIZE;
-    const pxH = (p2.y - p1.y) * TILE_SIZE;
-    if (pxW <= (boxW - margin*2) && pxH <= (boxH - margin*2)) return z;
+// mesma paleta/lógica de recoloração do index.html — ver comentários lá
+const MONO_COLORS = {
+  background: '#ececec', water: '#f8f8f8', landuse: '#ececec',
+  building: '#ececec', buildingOutline: '#ececec',
+  road: '#ffffff', roadCasing: '#ffffff', boundary: '#cccccc',
+  text: '#111111', textHalo: '#ffffff'
+};
+function applyMonochromeStyle(mlMap){
+  const layers = mlMap.getStyle().layers || [];
+  let buildingSource = null, buildingSourceLayer = null;
+  let firstSymbolId = null;
+  layers.forEach(layer => {
+    const id = layer.id.toLowerCase();
+    const sl = (layer['source-layer'] || '').toLowerCase();
+    const isWater = id.includes('water') || sl.includes('water');
+    const isBuilding = sl === 'building' || id.includes('building');
+    const isRoad = sl === 'transportation' && layer.type === 'line';
+    const isCasing = id.includes('casing');
+    const isBoundary = sl === 'boundary';
+    if (isBuilding && layer.type === 'fill'){ buildingSource = layer.source; buildingSourceLayer = layer['source-layer']; }
+    if (layer.type === 'symbol' && firstSymbolId === null){ firstSymbolId = layer.id; }
+    try{
+      if (layer.type === 'fill-extrusion'){
+        mlMap.setLayoutProperty(layer.id, 'visibility', 'none');
+      } else if (layer.type === 'background'){
+        mlMap.setPaintProperty(layer.id, 'background-color', MONO_COLORS.background);
+      } else if (layer.type === 'fill'){
+        const color = isWater ? MONO_COLORS.water : (isBuilding ? MONO_COLORS.building : MONO_COLORS.landuse);
+        mlMap.setPaintProperty(layer.id, 'fill-color', color);
+      } else if (layer.type === 'line'){
+        let color = MONO_COLORS.landuse;
+        if (isWater) color = MONO_COLORS.water;
+        else if (isBoundary) color = MONO_COLORS.boundary;
+        else if (isRoad) color = isCasing ? MONO_COLORS.roadCasing : MONO_COLORS.road;
+        mlMap.setPaintProperty(layer.id, 'line-color', color);
+      } else if (layer.type === 'symbol'){
+        const isGenericPoi = sl === 'poi' && /^poi_r\d+$/.test(id);
+        const isTransitPoi = id === 'poi_transit';
+        if (isGenericPoi || isTransitPoi){
+          mlMap.setLayoutProperty(layer.id, 'visibility', 'none');
+          return;
+        }
+        mlMap.setPaintProperty(layer.id, 'text-color', MONO_COLORS.text);
+        mlMap.setPaintProperty(layer.id, 'text-halo-color', MONO_COLORS.textHalo);
+        mlMap.setPaintProperty(layer.id, 'icon-opacity', 0);
+      }
+    } catch(e){ /* propriedade pode não existir nessa camada específica — ignora */ }
+  });
+  if (buildingSource && !mlMap.getLayer('building_outline_xerox')){
+    mlMap.addLayer({
+      id: 'building_outline_xerox', type: 'line',
+      source: buildingSource, 'source-layer': buildingSourceLayer,
+      paint: { 'line-color': MONO_COLORS.buildingOutline, 'line-width': 1 }
+    }, firstSymbolId || undefined);
   }
-  return 2;
 }
-let proj = null; // { zoom, originX, originY, tile }
-function computeProjection(bounds){
-  const expanded = expandBounds(bounds, 1.0);
-  const zoom = fitZoom(expanded, MAP_BOX.w, MAP_BOX.h, 45);
-  const p1 = mercProject(expanded.maxLat, expanded.minLng, zoom);
-  const p2 = mercProject(expanded.minLat, expanded.maxLng, zoom);
-  const pxW = (p2.x - p1.x) * TILE_SIZE;
-  const pxH = (p2.y - p1.y) * TILE_SIZE;
-  const scale = Math.min(8, Math.max(1, Math.min((MAP_BOX.w-90)/pxW, (MAP_BOX.h-90)/pxH)));
-  const tile = TILE_SIZE * scale;
-  const cLat = (expanded.minLat+expanded.maxLat)/2, cLng = (expanded.minLng+expanded.maxLng)/2;
-  const center = mercProject(cLat, cLng, zoom);
-  const originX = center.x - (MAP_BOX.w/2)/tile;
-  const originY = center.y - (MAP_BOX.h/2)/tile;
-  proj = { zoom, originX, originY, tile };
-}
+
+let mlMap = null; // instância MapLibre viva — pixelOf() projeta através dela
 function pixelOf(lat, lon){
-  const p = mercProject(lat, lon, proj.zoom);
-  return { x: MAP_BOX.x + (p.x - proj.originX)*proj.tile, y: MAP_BOX.y + (p.y - proj.originY)*proj.tile };
+  const p = mlMap.project([lon, lat]);
+  return { x: MAP_BOX.x + p.x, y: MAP_BOX.y + p.y };
 }
 
 let basemapCanvas = null;
 let basemapLoading = false;
-async function fetchBasemapTiles(){
-  if (basemapCanvas || basemapLoading) return;
+async function buildBasemapMapLibre(bounds, margin){
+  if (basemapLoading) return;
   basemapLoading = true;
-  const { zoom, originX, originY, tile } = proj;
+  const expanded = expandBounds(bounds, 1.0);
+  if (mlMap){ mlMap.remove(); mlMap = null; }
+
+  const container = document.getElementById('map-offscreen');
+  container.style.width = MAP_BOX.w + 'px';
+  container.style.height = MAP_BOX.h + 'px';
+  container.innerHTML = '';
+
+  mlMap = new maplibregl.Map({
+    container,
+    style: 'https://tiles.openfreemap.org/styles/liberty',
+    center: [(expanded.minLng+expanded.maxLng)/2, (expanded.minLat+expanded.maxLat)/2],
+    zoom: 15,
+    pitch: 0,
+    maxPitch: 0,
+    attributionControl: false,
+    interactive: false,
+    // sem isso o WebGL limpa o buffer de desenho antes da gente conseguir
+    // ler os pixels via drawImage — necessário pra capturar o canvas depois
+    preserveDrawingBuffer: true
+  });
+
+  await new Promise(resolve => mlMap.on('load', resolve));
+  applyMonochromeStyle(mlMap);
+  mlMap.fitBounds(
+    [[expanded.minLng, expanded.minLat], [expanded.maxLng, expanded.maxLat]],
+    { padding: margin, duration: 0 }
+  );
+  // 'idle' garante que o estilo recolorido E o enquadramento (fitBounds)
+  // já renderizaram pelo menos um quadro antes da gente projetar pontos
+  // (pixelOf) ou capturar o canvas
+  await new Promise(resolve => mlMap.once('idle', resolve));
+
   const off = document.createElement('canvas');
   off.width = MAP_BOX.w; off.height = MAP_BOX.h;
   const octx = off.getContext('2d');
-  octx.fillStyle = '#e9e9e9'; octx.fillRect(0,0,MAP_BOX.w,MAP_BOX.h);
-
-  const txStart = Math.floor(originX), txEnd = Math.floor(originX + MAP_BOX.w/tile);
-  const tyStart = Math.floor(originY), tyEnd = Math.floor(originY + MAP_BOX.h/tile);
-  const maxTile = Math.pow(2, zoom);
-  const jobs = [];
-  for (let tx = txStart; tx <= txEnd; tx++){
-    for (let ty = tyStart; ty <= tyEnd; ty++){
-      if (ty < 0 || ty >= maxTile) continue;
-      const wrappedX = ((tx % maxTile) + maxTile) % maxTile;
-      const sub = SUBS[Math.abs(tx+ty) % SUBS.length];
-      const url = TILE_URL(zoom, wrappedX, ty, sub);
-      const px = (tx - originX) * tile - MAP_BOX.x;
-      const py = (ty - originY) * tile - MAP_BOX.y;
-      jobs.push(new Promise(resolve => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => { try{ octx.drawImage(img, px + MAP_BOX.x, py + MAP_BOX.y, tile, tile); }catch(e){} resolve(); };
-        img.onerror = () => resolve();
-        img.src = url;
-      }));
-    }
-  }
-  await Promise.all(jobs);
-  try{
-    const imgData = octx.getImageData(0,0,MAP_BOX.w,MAP_BOX.h);
-    const d = imgData.data;
-    for (let i=0;i<d.length;i+=4){
-      const v = d[i]*0.3 + d[i+1]*0.59 + d[i+2]*0.11;
-      const c = Math.min(255, (v-128)*1.08+128*1.03);
-      d[i]=d[i+1]=d[i+2]=c;
-    }
-    octx.putImageData(imgData,0,0);
-  } catch(e){
-    console.warn('Não foi possível aplicar o tom de cinza (possível restrição de CORS dos tiles):', e);
-  }
+  octx.drawImage(mlMap.getCanvas(), 0, 0, MAP_BOX.w, MAP_BOX.h);
   basemapCanvas = off;
   basemapLoading = false;
 }
@@ -619,13 +648,9 @@ wireToggle('pins-on','pins-off', v => showPins = v);
 wireToggle('text-on','text-off', v => showText = v);
 wireToggle('title-on','title-off', v => showTitle = v);
 wireToggle('stats-on','stats-off', v => showStats = v);
-wireToggle('map-on','map-off', v => showMap = v, async (v) => {
-  if (v && !basemapCanvas){
-    setStatus('carregando mapa…');
-    await fetchBasemapTiles();
-    setStatus('');
-  }
-});
+// o mapa (mlMap) já é carregado eagerly em setupFromLocations() — esse
+// toggle só controla se drawBaseLayer desenha o basemapCanvas ou não
+wireToggle('map-on','map-off', v => showMap = v);
 
 const fillSolidoBtn = document.getElementById('fill-solido');
 const fillDegradeBtn = document.getElementById('fill-degrade');
@@ -1153,7 +1178,14 @@ async function setupFromLocations(){
     minLng: Math.min(...withCoords.map(l=>l.lng)),
     maxLng: Math.max(...withCoords.map(l=>l.lng)),
   };
-  computeProjection(bounds);
+  // sempre carrega o mapa (mesmo com "esconder mapa" ativo) — pixelOf()
+  // depende da instância viva do MapLibre pra projetar os pontos, então
+  // precisamos dela de qualquer jeito; o toggle só decide se o resultado
+  // aparece desenhado (ver drawBaseLayer)
+  setStatus('carregando mapa…');
+  await buildBasemapMapLibre(bounds, 45);
+  setStatus('');
+
   PTS = withCoords.map(loc => ({ ...pixelOf(loc.lat, loc.lng), id: loc.id }));
   // cobrinha ("circuito vivo") usa o mesmo enquadramento do "troca de
   // marcas" — mesma escala/zoom visual nos dois tipos de vídeo
@@ -1168,13 +1200,6 @@ async function setupFromLocations(){
     (a.local||a.endereco).localeCompare(b.local||b.endereco, 'pt-BR', {sensitivity:'base'}));
   alphaNum = {};
   sortedForNum.forEach((loc,i) => { alphaNum[loc.id] = i+1; });
-
-  basemapCanvas = null; // bounds podem ter mudado — o recorte antigo do mapa não serve mais
-  if (showMap){
-    setStatus('carregando mapa…');
-    await fetchBasemapTiles();
-    setStatus('');
-  }
 
   setVideoTipo('marcas');
 }
