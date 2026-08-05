@@ -813,11 +813,13 @@ function applyMonochromeStyle(){
         map.setPaintProperty(layer.id, 'line-color', color);
       } else if (layer.type === 'symbol'){
         // poi_r1/r7/r20 = POI genérico por ranking (loja, restaurante etc.)
-        // — a gente não quer esses nomes poluindo o mapa. poi_transit fica
-        // de fora dessa exclusão (aeroporto/ônibus/trem = infraestrutura
-        // importante), assim como a camada "airport" (nome do aeroporto).
+        // poi_transit = pontos de ônibus/trem/aeroporto (linha, terminal,
+        // ponto final) — informação de transporte que a gente não quer
+        // exibir. Nenhum dos dois esconde a camada "airport" (nome do
+        // aeroporto), que é separada e continua normalmente.
         const isGenericPoi = sl === 'poi' && /^poi_r\d+$/.test(id);
-        if (isGenericPoi){
+        const isTransitPoi = id === 'poi_transit';
+        if (isGenericPoi || isTransitPoi){
           map.setLayoutProperty(layer.id, 'visibility', 'none');
           return;
         }
