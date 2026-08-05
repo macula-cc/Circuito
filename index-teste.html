@@ -741,6 +741,7 @@ function initMap(){
       addStationMarkers();
       locateUserAutomatically();
     });
+    map.on('zoomend', applyNoiseTexture);
 
     // Duplo-toque pra dar zoom — mesma lógica/cuidados de antes (o MapLibre
     // também não expõe isso pronto), só troca de API: containerPointToLatLng
@@ -878,8 +879,8 @@ function generateNoiseTexture(size, dotCount){
   for (let i = 0; i < dotCount; i++){
     const x = Math.random() * size;
     const y = Math.random() * size;
-    const r = Math.random() * 1.1 + 0.25;
-    const alpha = Math.random() * 0.55 + 0.35;
+    const r = Math.random() * 0.8 + 0.2;
+    const alpha = Math.random() * 0.35 + 0.15;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fillStyle = `rgba(0,0,0,${alpha.toFixed(2)})`;
@@ -887,11 +888,15 @@ function generateNoiseTexture(size, dotCount){
   }
   return c.toDataURL();
 }
+// regenerada a cada zoom (não só uma vez no load) — com o padrão fixo, dar
+// zoom deixa óbvio que é uma tela estática por cima do mapa, sem relação
+// com o que está desenhado por baixo; sorteando de novo a cada zoomend o
+// grão nunca repete do mesmo jeito duas vezes
 function applyNoiseTexture(){
   const el = document.querySelector('.map-halftone');
   if (!el) return;
   const size = 140;
-  const dataUrl = generateNoiseTexture(size, 900);
+  const dataUrl = generateNoiseTexture(size, 420);
   el.style.backgroundImage = `url(${dataUrl})`;
   el.style.backgroundRepeat = 'repeat';
   el.style.backgroundSize = `${size}px ${size}px`;
