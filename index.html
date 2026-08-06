@@ -33,23 +33,6 @@
   button{ font:inherit; touch-action:manipulation; }
   .row, .drawer-close, .switcher button, .sort-switch button{ -webkit-tap-highlight-color:transparent; }
 
-  /* cursor customizado: só em desktop de verdade (mouse fino, com hover) —
-     não mexe com touch. #cursor-canvas desenha o ponto + rastro (ver JS). */
-  @media (hover:hover) and (pointer:fine){
-    *{ cursor:none !important; }
-  }
-  /* width/height:100% explícitos são necessários aqui: canvas é elemento
-     "replaced" e, mesmo com inset:0, um replaced element position:fixed
-     sem width/height definido usa o tamanho intrínseco (os atributos
-     width/height em pixels físicos setados via JS) em vez de esticar pro
-     viewport — sem isso o canvas renderiza gigante e tudo sai "pixelado".
-     mix-blend-mode:difference faz o cursor funcionar como máscara de
-     negativo: onde o círculo branco se sobrepõe a algo (o pin preto, por
-     exemplo), o resultado vira a cor invertida — só na área de
-     interseção, não no elemento inteiro. */
-  #cursor-canvas{ position:fixed; inset:0; width:100%; height:100%; z-index:5000; pointer-events:none;
-                  mix-blend-mode:difference; }
-
   /* ---------------- Hero: full-bleed map (always mounted) ---------------- */
   .hero{ position:fixed; inset:0; }
   #map{ position:absolute; inset:0; width:100%; height:100%; background:#e9e9e9; z-index:1; isolation:isolate; }
@@ -170,9 +153,6 @@
         font-family:var(--mono); font-size:0.6rem; font-weight:500; color:#fff; letter-spacing:0.01em;
         transition:transform 0.18s cubic-bezier(.4,0,.2,1), box-shadow 0.18s ease;
         transform:scale(1); }
-  /* o "negativo" no hover não é uma troca de cor daqui — é o próprio
-     cursor customizado (mix-blend-mode:difference) que inverte só onde
-     realmente se sobrepõe ao pin; aqui só o crescimento leve + sombra */
   .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.18); box-shadow:0 4px 16px rgba(0,0,0,0.35); }
   .pin.active{ transform:scale(1.18); box-shadow:0 0 0 3px rgba(0,0,0,0.18); }
 
@@ -523,8 +503,6 @@
     </div>
   </div>
 </div>
-
-<canvas id="cursor-canvas"></canvas>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
@@ -1446,45 +1424,6 @@ async function boot(){
   renderRows();
 }
 boot();
-
-// ---------------- cursor customizado (desktop): só o ponto, sem rastro ----------------
-if (window.matchMedia('(hover:hover) and (pointer:fine)').matches){
-  const cursorCanvas = document.getElementById('cursor-canvas');
-  const cursorCtx = cursorCanvas.getContext('2d');
-  function resizeCursorCanvas(){
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    cursorCanvas.width = window.innerWidth * dpr;
-    cursorCanvas.height = window.innerHeight * dpr;
-    cursorCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-  resizeCursorCanvas();
-  window.addEventListener('resize', resizeCursorCanvas);
-
-  // posição "alvo" (mouse de verdade) e posição "desenhada" (a que
-  // realmente vai pro canvas) são separadas — a desenhada persegue o alvo
-  // suavizada (lerp) em vez de saltar direto pra ele, tirando a brusquidão
-  let cursorTargetX = null, cursorTargetY = null;
-  let cursorDrawX = null, cursorDrawY = null;
-  const CURSOR_EASE = 0.22; // menor = movimento mais suave/com mais atraso
-  document.addEventListener('mousemove', (e) => {
-    cursorTargetX = e.clientX; cursorTargetY = e.clientY;
-    if (cursorDrawX == null){ cursorDrawX = cursorTargetX; cursorDrawY = cursorTargetY; }
-  });
-  document.addEventListener('mouseleave', () => { cursorTargetX = null; cursorTargetY = null; });
-
-  (function cursorLoop(){
-    cursorCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-    if (cursorTargetX != null){
-      cursorDrawX += (cursorTargetX - cursorDrawX) * CURSOR_EASE;
-      cursorDrawY += (cursorTargetY - cursorDrawY) * CURSOR_EASE;
-      cursorCtx.beginPath();
-      cursorCtx.arc(cursorDrawX, cursorDrawY, 12, 0, Math.PI*2);
-      cursorCtx.fillStyle = '#fff';
-      cursorCtx.fill();
-    }
-    requestAnimationFrame(cursorLoop);
-  })();
-}
 </script>
 </body>
 </html>
