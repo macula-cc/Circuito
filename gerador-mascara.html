@@ -257,6 +257,17 @@ function parseCSV(text){
   return rows;
 }
 
+// alguns endereços chegam da planilha com coordenada mal digitada (ex:
+// sem separador decimal, tipo "-229115" em vez de "-22,9115") — passar
+// isso direto pro MapLibre derruba o mapa inteiro (ele lança exceção e
+// nenhum pino aparece, nem os de outros endereços válidos). Em vez disso,
+// tratamos como coordenada ainda não preenchida.
+function parseCoord(raw, min, max){
+  if (!raw) return null;
+  const n = parseFloat(raw.replace(',', '.'));
+  return (isNaN(n) || n < min || n > max) ? null : n;
+}
+
 async function loadLocationsFromSheet(){
   const res = await fetch(`${SHEET_CSV_URL}&_=${Date.now()}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -280,8 +291,8 @@ async function loadLocationsFromSheet(){
     if (!locMap[key]){
       locMap[key] = {
         id: 'loc' + order.length, local, endereco,
-        lat: latRaw ? parseFloat(latRaw.replace(',', '.')) : null,
-        lng: lngRaw ? parseFloat(lngRaw.replace(',', '.')) : null,
+        lat: parseCoord(latRaw, -90, 90),
+        lng: parseCoord(lngRaw, -180, 180),
         artistas: []
       };
       order.push(key);

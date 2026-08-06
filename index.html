@@ -542,6 +542,19 @@ function parseCSV(text){
   return rows;
 }
 
+// alguns endereços chegam da planilha com coordenada mal digitada (ex:
+// sem separador decimal, tipo "-229115" em vez de "-22,9115") — passar
+// isso direto pro MapLibre derruba o mapa inteiro (ele lança exceção e
+// nenhum pino aparece, nem os de outros endereços válidos). Em vez disso,
+// tratamos como coordenada ainda não preenchida: some como "pendente" na
+// lista igual a um endereço sem lat/lng, e a geocodificação automática
+// tenta resolver de novo a partir do texto do endereço.
+function parseCoord(raw, min, max){
+  if (!raw) return null;
+  const n = parseFloat(raw.replace(',', '.'));
+  return (isNaN(n) || n < min || n > max) ? null : n;
+}
+
 // artistas colando o link de "visualizar" do Google Drive (drive.google.com/
 // file/d/ID/view) em vez de um link de imagem direto — isso não é uma
 // imagem, é uma página HTML, então <img>/background-image nunca carrega.
@@ -592,8 +605,8 @@ async function loadLocationsFromSheet(){
       locMap[key] = {
         id: 'loc' + order.length,
         local, endereco,
-        lat: latRaw ? parseFloat(latRaw.replace(',', '.')) : null,
-        lng: lngRaw ? parseFloat(lngRaw.replace(',', '.')) : null,
+        lat: parseCoord(latRaw, -90, 90),
+        lng: parseCoord(lngRaw, -180, 180),
         artistas: []
       };
       order.push(key);
