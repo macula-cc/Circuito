@@ -102,14 +102,6 @@
     </div>
 
     <div class="field">
-      <label>Pontos dos ateliês</label>
-      <div class="row-btns">
-        <button class="btn active" id="pins-on">mostrar</button>
-        <button class="btn" id="pins-off">esconder</button>
-      </div>
-    </div>
-
-    <div class="field">
       <label>Giro automático</label>
       <div class="row-btns">
         <button class="btn active" id="spin-on">ligado</button>
@@ -250,7 +242,6 @@ function planePosOf(proj, lat, lon){
 let LOCATIONS = [];
 let PTS = []; // { x, y, zSeed, loc } — x/y fixos (posição real no plano), zSeed sorteado por embaralhada
 let order = []; // ordem embaralhada de índices em PTS
-let showPins = true;
 let spinning = true;
 let depthAmount = 45; // 0..100, controlado pelo slider
 
@@ -312,9 +303,6 @@ window.addEventListener('resize', resizeRenderer);
    ============================================================ */
 const TUBE_RADIUS = 0.16;
 const markMaterial = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.45, metalness: 0.12 });
-const pinMaterial = new THREE.MeshStandardMaterial({ color: 0xe8834a, roughness: 0.35, metalness: 0.1 });
-const pinGroup = new THREE.Group();
-scene.add(pinGroup);
 
 function depthScale(){
   return (depthAmount/100) * SCENE_SPAN * 0.9;
@@ -331,9 +319,8 @@ function buildLegCurve(a, b){
 }
 
 function rebuildScene(){
-  // limpa a marca/pinos anteriores
+  // limpa a marca anterior
   while (markGroup.children.length) markGroup.remove(markGroup.children[0]);
-  while (pinGroup.children.length) pinGroup.remove(pinGroup.children[0]);
   if (order.length < 2) return;
 
   const dScale = depthScale();
@@ -348,14 +335,16 @@ function rebuildScene(){
     markGroup.add(new THREE.Mesh(geo, markMaterial));
   }
 
-  if (showPins){
-    vecs.forEach(v => {
-      const geo = new THREE.SphereGeometry(TUBE_RADIUS*1.7, 16, 16);
-      const mesh = new THREE.Mesh(geo, pinMaterial);
-      mesh.position.copy(v);
-      pinGroup.add(mesh);
-    });
-  }
+  // esferinha na mesma cor/material do tubo em cada encontro — sem isso,
+  // como cada trecho é um tubo separado (sem tampa), a linha "dobrada"
+  // deixa uma falha visível onde dois tubos se encontram num ângulo mais
+  // fechado. Não é um "pino" marcado, só preenche a curva normalmente.
+  vecs.forEach(v => {
+    const geo = new THREE.SphereGeometry(TUBE_RADIUS, 12, 12);
+    const mesh = new THREE.Mesh(geo, markMaterial);
+    mesh.position.copy(v);
+    markGroup.add(mesh);
+  });
 }
 
 function shuffleOrder(){
@@ -417,11 +406,6 @@ document.getElementById('depth-range').addEventListener('input', (e) => {
   depthAmount = parseFloat(e.target.value);
   rebuildScene();
 });
-
-const pinsOnBtn = document.getElementById('pins-on');
-const pinsOffBtn = document.getElementById('pins-off');
-pinsOnBtn.addEventListener('click', () => { showPins = true; pinsOnBtn.classList.add('active'); pinsOffBtn.classList.remove('active'); rebuildScene(); });
-pinsOffBtn.addEventListener('click', () => { showPins = false; pinsOffBtn.classList.add('active'); pinsOnBtn.classList.remove('active'); rebuildScene(); });
 
 const spinOnBtn = document.getElementById('spin-on');
 const spinOffBtn = document.getElementById('spin-off');
