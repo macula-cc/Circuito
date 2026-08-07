@@ -308,13 +308,30 @@ function depthScale(){
   return (depthAmount/100) * SCENE_SPAN * 0.9;
 }
 
+// vetor unitário aleatório PERPENDICULAR a dir — em 3D existe um plano
+// inteiro de direções perpendiculares (não só duas, como em 2D), então
+// sorteamos um ângulo dentro desse plano
+function randomPerpendicular(dir){
+  const ref = Math.abs(dir.y) < 0.9 ? new THREE.Vector3(0,1,0) : new THREE.Vector3(1,0,0);
+  const u = new THREE.Vector3().crossVectors(dir, ref).normalize();
+  const v = new THREE.Vector3().crossVectors(dir, u).normalize();
+  const theta = Math.random() * Math.PI * 2;
+  return new THREE.Vector3().addScaledVector(u, Math.cos(theta)).addScaledVector(v, Math.sin(theta));
+}
+
+// mesmo princípio da curva 2D (buildLegPath, usada na cobrinha e nos
+// outros geradores): às vezes reta, às vezes um arco suave único com o
+// ponto de controle deslocado PERPENDICULAR ao segmento (não em qualquer
+// direção) — só que aqui o "perpendicular" é o plano inteiro em 3D
 function buildLegCurve(a, b){
   const d = a.distanceTo(b);
-  const mid = new THREE.Vector3(
-    (a.x+b.x)/2 + (Math.random()-0.5) * d * 0.5,
-    (a.y+b.y)/2 + (Math.random()-0.5) * d * 0.5,
-    (a.z+b.z)/2 + (Math.random()-0.5) * d * 0.6
-  );
+  if (Math.random() < 0.3 || d < 0.4){
+    return new THREE.LineCurve3(a, b);
+  }
+  const dir = new THREE.Vector3().subVectors(b, a).normalize();
+  const perp = randomPerpendicular(dir);
+  const offset = d * (0.14 + Math.random()*0.26);
+  const mid = new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5).addScaledVector(perp, offset);
   return new THREE.CatmullRomCurve3([a, mid, b]);
 }
 
