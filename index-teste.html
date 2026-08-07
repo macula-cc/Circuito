@@ -921,7 +921,14 @@ let heroSnakeLastTs = null;
 let heroSnakeActive = false;
 const HERO_SNAKE_LEG_DURATION = 0.32; // s por trecho, igual ao circuito vivo
 const HERO_SNAKE_ERASE_DURATION = 3;  // s pra apagar tudo de uma vez
-const HERO_SNAKE_WIDTH = 90;          // bem mais grosso que o normal (30) — "gigante"
+// a marca inteira cresce como uma unidade só (espaçamento entre pontos E
+// espessura do traço, juntos) — em vez de espessura fixa em pixels, a
+// largura é sempre 3% da caixa (mesma proporção MARK_WIDTH/MAP_BOX do
+// gerador-video.html: 30/1000), multiplicada pelo mesmo fator de
+// crescimento que estoura o espalhamento pra fora da tela
+const HERO_SNAKE_WIDTH_RATIO = 30/1000;
+const HERO_SNAKE_GROW = 2.6; // fator único de crescimento: espalhamento + espessura
+let heroSnakeWidth = 46; // recalculado em buildHeroSnakeLegs() a cada ciclo
 
 function heroEaseOutSnap(t){ return t >= 1 ? 1 : 1 - Math.pow(2, -10*t); }
 
@@ -1028,8 +1035,12 @@ function buildHeroSnakeLegs(){
   };
   // fillFraction > 1 de propósito: estoura pra fora da caixa (e da própria
   // tela, já que o canvas corta tudo que passa da borda) — "gigante,
-  // sangrando na tela", não só preenchendo a metade direita direitinho
-  const fit = heroComputeFitTransform(rawPts, box, 1.55);
+  // sangrando na tela", não só preenchendo a metade direita direitinho.
+  // 0.82 é o fillFraction base (mesmo do "troca de marcas" do gerador de
+  // vídeo) multiplicado pelo fator de crescimento — espessura do traço
+  // escala junto, como a mesma marca só que ampliada como um todo.
+  const fit = heroComputeFitTransform(rawPts, box, 0.82 * HERO_SNAKE_GROW);
+  heroSnakeWidth = Math.min(box.w, box.h) * HERO_SNAKE_WIDTH_RATIO * HERO_SNAKE_GROW;
   const pts = heroApplyFitTransform(rawPts, fit);
   const order = [...pts].sort(() => Math.random()-0.5);
   heroSnakeLegs = [];
@@ -1083,7 +1094,7 @@ function heroStrokeLegsInRange(dStart, dEnd){
         const grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
         grad.addColorStop(0, '#1a0000');
         grad.addColorStop(1, '#ff2020');
-        ctx.lineWidth = HERO_SNAKE_WIDTH;
+        ctx.lineWidth = heroSnakeWidth;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.strokeStyle = grad;
