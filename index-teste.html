@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no, address=no, email=no, date=no">
 <title>Circuito de Ateliês do Centro</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -25,28 +26,52 @@
   html, body{ height:100%; overflow:hidden; }
   body{ margin:0; color:var(--ink); font-family:var(--sans); background:var(--paper); }
   a{ color:inherit; }
+  /* Safari envolve endereço/telefone/data detectados automaticamente num
+     <a x-apple-data-detectors>; sem isso ele reaplica azul/sublinhado por
+     cima do nosso CSS mesmo com format-detection setado */
+  a[x-apple-data-detectors]{ color:inherit !important; text-decoration:inherit !important; }
   button{ font:inherit; touch-action:manipulation; }
   .row, .drawer-close, .switcher button, .sort-switch button{ -webkit-tap-highlight-color:transparent; }
 
   /* ---------------- Hero: full-bleed map (always mounted) ---------------- */
-  .hero{ position:fixed; inset:0; }
+  /* isolation:isolate contém o mix-blend-mode:multiply do .map-dim (TESTE)
+     dentro do .hero — sem isso o navegador pode misturar o vermelho com
+     elementos fora daqui, dependendo da árvore de empilhamento */
+  .hero{ position:fixed; inset:0; isolation:isolate; }
   #map{ position:absolute; inset:0; width:100%; height:100%; background:#e9e9e9; z-index:1; isolation:isolate; }
-  /* escurece o mapa (pontos incluídos, ficam por baixo) enquanto o hero title
-     está grande, só pra dar destaque ao título/data — some no primeiro toque,
-     junto com o encolhimento do título */
-  .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(0,0,0,0.6);
-            backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
-            pointer-events:none; transition:opacity 0.6s ease; }
-  .map-dim.hidden{ opacity:0; }
   /* MapLibre é vetorial — não tem mais tile-pane pra filtrar via CSS; as
      cores de água/terra são definidas direto no estilo (ver applyMonochromeStyle,
      JS), camada por camada, em vez de um filtro aproximado por cima do raster */
   .maplibregl-map{ background:#e9e9e9; font-family:var(--sans); }
 
+  /* escurece o mapa (pontos incluídos, ficam por baixo) enquanto o hero title
+     está grande, só pra dar destaque ao título/data — some no primeiro toque,
+     junto com o encolhimento do título. TESTE: tingido de vermelho via
+     mix-blend-mode:multiply em vez de um preto translúcido comum — multiply
+     preserva os detalhes escuros do mapa/cobrinha por baixo (pretos continuam
+     pretos) em vez de lavar tudo pra um vermelho chapado; branco vira
+     vermelho puro. Fundo praticamente opaco de propósito: quem cria a
+     variação de tom aqui é o multiply, não a transparência. */
+  .map-dim{ position:absolute; inset:0; z-index:150; background:#e21212;
+            mix-blend-mode:multiply;
+            backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+            pointer-events:none; transition:opacity 0.6s ease; }
+  .map-dim.hidden{ opacity:0; }
+
+  /* TESTE: "cobrinha" decorativa atrás do tingimento vermelho — mesmo
+     princípio de animação do "circuito vivo" do gerador de vídeo (desenha
+     progressivamente, depois apaga, recomeça de outro ponto), só que sem os
+     pinos numerados (só a linha) e com traço bem mais grosso/gradiente mais
+     intenso, pra ficar "estourado" por trás do vermelho. Some junto com o
+     overlay quando o hero encolhe (ver shrinkHero). */
+  .hero-snake-canvas{ position:absolute; inset:0; z-index:50; pointer-events:none;
+                       transition:opacity 0.6s ease; }
+  .hero-snake-canvas.hidden{ opacity:0; }
+
   .hero-title{ position:absolute; top:0; left:0; right:0;
                padding:calc(1.6rem + env(safe-area-inset-top)) calc(1.6rem + env(safe-area-inset-right)) 0 calc(1.6rem + env(safe-area-inset-left));
-               z-index:260; pointer-events:none; text-align:center;
-               font-size:clamp(3.8rem, 12vw, 9.5rem);
+               z-index:200; pointer-events:none; text-align:center;
+               font-size:var(--hero-font-size, clamp(3.8rem, 12vw, 9.5rem));
                transition:padding-top 0.75s cubic-bezier(.16,1,.3,1), font-size 0.75s cubic-bezier(.16,1,.3,1); }
 
   /* núcleo tipográfico: label (nome do evento, sans caixa alta, Geist) e o
@@ -56,17 +81,17 @@
      sans 57pt / serifado 212pt ≈ 0,2689; "Edição 01" 24pt / 212pt ≈ 0,1132;
      entrelinha do título 100% (line-height:1); entrelinha da data
      195pt / 212pt ≈ 0,9198 */
-  .hero-label{ font-family:var(--sans-display); font-weight:350; color:#cfcfcf;
+  .hero-label{ font-family:var(--sans-display); font-weight:350; color:#ffffff;
                text-transform:uppercase; letter-spacing:-0.025em;
                font-size:0.2689em; line-height:1.2; margin:0 0 0.3em;
                transition:color 0.4s ease; }
 
-  .hero-title h1{ font-family:var(--serif); font-weight:400; color:#cfcfcf;
+  .hero-title h1{ font-family:var(--serif); font-weight:400; color:#ffffff;
                   font-size:1em;
                   line-height:1; margin:0; white-space:nowrap; letter-spacing:-0.01em;
                   transition:line-height 0.75s cubic-bezier(.16,1,.3,1), color 0.4s ease; }
 
-  .hero-date{ font-family:var(--serif); font-weight:400; font-style:italic; color:#cfcfcf;
+  .hero-date{ font-family:var(--serif); font-weight:400; font-style:italic; color:#ffffff;
               font-size:1em; margin-top:0.05em; margin-bottom:-0.4em;
               line-height:0.9198; white-space:nowrap;
               transition:color 0.4s ease; }
@@ -83,22 +108,16 @@
   .hero-title.shrunk .hero-label{ color:var(--ink); }
   .hero-title.shrunk .hero-edition{ font-size:0.6rem; }
 
-  /* Mobile: fixed sizes per breakpoint no elemento pai (label/data/selo
-     seguem via em), calculadas conservadoramente contra a linha mais longa
-     ("18 – 19 de Setembro") pra nunca quebrar ou estourar, mesmo com as
-     letras mais largas do Instrument Serif. Vertical clearance (padding-top)
-     mantém o bloco abaixo do toggle mapa/lista. */
+  /* Mobile: --hero-font-size é calculado via JS (fitHeroText) pra ocupar
+     100% da largura disponível no estado grande — sem isso (JS
+     desabilitado), cai no clamp(...) fluido acima como fallback.
+     Vertical clearance (padding-top) mantém o bloco abaixo do toggle
+     mapa/lista. */
   @media (max-width:780px){
-    .hero-title{ padding-top:calc(4.8rem + env(safe-area-inset-top)); font-size:2rem; }
+    .hero-title{ padding-top:calc(4.8rem + env(safe-area-inset-top)); }
     .hero-title.shrunk{ padding-top:calc(1.6rem + env(safe-area-inset-top)); }
     .hero-title h1{ white-space:normal; }
     .hero-date{ white-space:normal; }
-  }
-  @media (max-width:430px){
-    .hero-title{ font-size:1.7rem; }
-  }
-  @media (max-width:380px){
-    .hero-title{ font-size:1.5rem; }
   }
 
   .hero-count{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:calc(1.6rem + env(safe-area-inset-left)); z-index:200;
@@ -107,7 +126,7 @@
   /* ---------------- View switcher (glass pill toggle) + about button ----------------
      centralizados na parte inferior da tela — o sort-switch (por endereço/
      por artista) fica numa linha própria acima deles, mesmo esquema */
-  .top-actions{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:600;
+  .top-actions{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:100;
                 display:flex; align-items:center; gap:0.5rem; }
   .switcher{ display:flex; gap:2px; font-family:var(--mono); font-size:0.79rem;
              background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
@@ -117,11 +136,11 @@
   .switcher button{ background:transparent; border:none; cursor:pointer; color:var(--ink);
                      padding:0.55rem 0.9rem; min-height:38px; border-radius:999px;
                      transition:background 0.2s ease, color 0.2s ease; }
-  .switcher button.active{ background:#111; color:#fff; }
+  .switcher button.active{ background:#474747; color:#fff; }
   .switcher button:not(.active):hover{ background:rgba(255,255,255,0.35); }
 
-  /* botão "sobre": separado do toggle mapa/lista, mesmo visual da parte
-     não-selecionada dele (vidro, sem fundo preto) */
+  /* botão "sobre": separado do toggle mapa/lista, mas segue o mesmo visual
+     da parte não-selecionada dele (vidro, sem fundo preto) */
   .about-btn{ font-family:var(--mono); font-size:0.79rem; color:var(--ink); cursor:pointer;
               background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
               -webkit-backdrop-filter:blur(18px) saturate(180%);
@@ -142,20 +161,17 @@
   .sort-switch button{ background:transparent; border:none; cursor:pointer; color:var(--ink);
                         padding:0.5rem 0.7rem; min-height:34px; border-radius:999px;
                         transition:background 0.2s ease, color 0.2s ease; }
-  .sort-switch button.active{ background:#111; color:#fff; }
+  .sort-switch button.active{ background:#474747; color:#fff; }
   .sort-switch button:not(.active):hover{ background:rgba(255,255,255,0.35); }
 
   /* pins: 40px invisible tap target, badge circle with initials centered inside */
   .pin-hit{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
-  .pin{ width:24px; height:24px; border-radius:50%; background:#111;
+  .pin{ width:24px; height:24px; border-radius:50%; background:#474747;
         box-shadow:0 2px 10px rgba(0,0,0,0.08);
         display:flex; align-items:center; justify-content:center;
         font-family:var(--mono); font-size:0.6rem; font-weight:500; color:#fff; letter-spacing:0.01em;
         transition:transform 0.18s cubic-bezier(.4,0,.2,1), box-shadow 0.18s ease;
         transform:scale(1); }
-  /* o "negativo" no hover não é mais uma troca de cor daqui — é o próprio
-     cursor customizado (mix-blend-mode:difference) que inverte só onde
-     realmente se sobrepõe ao pin; aqui só o crescimento leve + sombra */
   .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.18); box-shadow:0 4px 16px rgba(0,0,0,0.35); }
   .pin.active{ transform:scale(1.18); box-shadow:0 0 0 3px rgba(0,0,0,0.18); }
 
@@ -178,18 +194,15 @@
                               font-family:var(--mono); font-size:0.79rem; color:var(--ink); padding:0.7rem 0.9rem !important; }
   .maplibregl-popup-tip{ box-shadow:0 8px 24px rgba(0,0,0,0.1) !important; }
 
+  /* crédito de OSM/OpenFreeMap discreto (mas sempre visível — é exigência de
+     licença, não só estética) — texto/fundo mais fracos que o padrão do
+     MapLibre, e a versão completa também aparece no "Sobre" */
   .maplibregl-ctrl-group{ border-radius:0 !important; box-shadow:none !important; border:1px solid var(--line) !important; }
   .maplibregl-ctrl-group button{ background:#fff !important; color:#111 !important; font-family:var(--mono) !important; }
   .maplibregl-ctrl-attrib{ font-family:var(--mono); font-size:0.68rem !important; background:rgba(255,255,255,0.75) !important; }
   .locate-control-btn{ width:29px; height:29px; display:flex; align-items:center; justify-content:center;
                         background:#fff; border:1px solid var(--line); border-top:none; cursor:pointer;
                         font-size:1rem; color:#111; }
-
-  .locate-control a{ background:#fff !important; color:#111 !important; border:1px solid var(--line) !important;
-                      border-radius:0 !important; font-size:1rem !important; line-height:26px !important;
-                      width:26px !important; height:26px !important; display:block; text-align:center;
-                      text-decoration:none !important; }
-  .locate-control a:hover{ background:var(--hover) !important; }
 
   .user-dot{ position:relative; width:14px; height:14px; border-radius:50%; background:#3B82F6; border:2px solid #fff;
              box-shadow:0 0 0 4px rgba(59,130,246,0.28); }
@@ -223,6 +236,8 @@
 
   .list-head{ padding:1.6rem 1.6rem 1rem; border-bottom:1px solid rgba(0,0,0,0.12); flex-shrink:0; }
   .list-head h2{ font-family:var(--serif); font-weight:400; font-size:1.32rem; margin:0 0 0.2rem; }
+  /* alinhado verticalmente com o h2 do list-head — mesmas métricas do about-head */
+  .list-close{ position:absolute; top:26px; right:1.6rem; }
 
   .rows{ overflow-y:auto; -webkit-overflow-scrolling:touch; flex-grow:1; max-width:920px; width:100%; margin:0 auto;
          padding:0 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); }
@@ -236,6 +251,19 @@
   .row-title{ font-family:var(--serif); font-size:1.16rem; }
   .row-sub{ font-family:var(--mono); font-size:0.79rem; color:var(--gray); display:block; margin-top:0.15rem; }
   .row-count{ font-family:var(--mono); font-size:0.79rem; color:var(--gray); white-space:nowrap; }
+
+  /* lista "por artista": grid com áreas nomeadas — no desktop nome/endereço
+     ficam empilhados à esquerda com o instagram à direita (como antes); no
+     mobile vira uma coluna só, na ordem nome → instagram → endereço */
+  .row-artista{ display:grid; grid-template-columns:1fr auto; grid-template-areas:"title insta" "sub insta";
+                align-items:baseline; column-gap:1rem; row-gap:0.15rem; }
+  .row-artista .row-title{ grid-area:title; }
+  .row-artista .row-sub{ grid-area:sub; margin-top:0; }
+  .row-artista .row-instagram{ grid-area:insta; font-family:var(--mono); font-size:0.79rem; color:var(--gray);
+                                white-space:nowrap; align-self:center; }
+  @media (max-width:780px){
+    .row-artista{ grid-template-columns:1fr; grid-template-areas:"title" "insta" "sub"; }
+  }
 
   /* ---------------- Drawer ---------------- */
   .overlay{ position:fixed; inset:0; background:rgba(0,0,0,0.15); opacity:0; pointer-events:none;
@@ -262,24 +290,36 @@
     .drawer.open{ transform:translateY(0); }
   }
 
-  .drawer-head{ padding:1.5rem 1.6rem 1.1rem; border-bottom:1px solid var(--line); flex-shrink:0; position:relative; }
+  .drawer-head{ padding:1.6rem 1.6rem 1.1rem; border-bottom:1px solid var(--line); flex-shrink:0; position:relative; }
   .drawer-title{ font-family:var(--serif); font-size:1.54rem; margin:0 0 0.15rem; line-height:1.2; }
-  .drawer-addr{ font-family:var(--mono); font-size:0.83rem; color:var(--gray); }
-  .drawer-directions{ display:inline-block; font-family:var(--mono); font-size:0.94rem; color:var(--ink);
+  .drawer-addr{ font-family:var(--mono); font-size:0.94rem; color:var(--gray); }
+  .drawer-directions{ display:inline-block; font-family:var(--mono); font-size:0.94rem; color:var(--gray);
                        text-decoration:underline; text-underline-offset:2px; margin-top:0.4rem; }
   .drawer-directions:hover{ opacity:0.6; }
   .drawer-directions.hidden{ display:none; }
 
-  .drawer-close{ position:absolute; top:0.9rem; right:0.9rem; background:none; border:none; cursor:pointer;
-                 padding:0.7rem; min-height:44px;
-                 font-family:var(--mono); font-size:0.79rem; color:var(--ink); transition:opacity 0.15s ease; }
-  .drawer-close:hover{ opacity:0.5; }
+  /* botão fechar em círculo — mesmo visual no drawer, no lightbox e no
+     "sobre"; só a posição (pra alinhar com o título de cada um) muda */
+  .icon-close{ width:26px; height:26px; border-radius:50%; background:rgba(0,0,0,0.3); color:#333;
+               backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+               border:none; cursor:pointer; padding:0;
+               display:flex; align-items:center; justify-content:center;
+               transition:background 0.15s ease; }
+  .icon-close svg{ display:block; }
+  .icon-close:hover{ background:rgba(0,0,0,0.44); }
+
+  /* alinhado verticalmente com a primeira linha do drawer-title */
+  .drawer-close{ position:absolute; top:27px; right:1rem; }
 
   .drawer-list{ overflow-y:auto; -webkit-overflow-scrolling:touch; padding:1rem 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); }
-  .artist-grid{ display:grid; grid-template-columns:1fr 1fr; gap:1.1rem 0.9rem; }
+  /* minmax(0,1fr) em vez de 1fr: sem isso, uma coluna com texto mais longo
+     (nome, @instagram, sala) força a própria track do grid a crescer além
+     da metade, e a foto — que é width:100% da track — fica maior numa
+     coluna que na outra. Trava as duas colunas exatamente do mesmo tamanho. */
+  .artist-grid{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:1.1rem 0.9rem; }
 
-  .artist-card{ display:flex; flex-direction:column; }
-  .artist-photo{ width:100%; aspect-ratio:4/3; background:#e4e4e4; border:1px solid var(--ink);
+  .artist-card{ display:flex; flex-direction:column; min-width:0; }
+  .artist-photo{ width:100%; aspect-ratio:4/3; background:#e4e4e4; border:1px solid var(--line); border-radius:6px;
                  background-size:cover; background-position:center;
                  display:flex; align-items:center; justify-content:center;
                  font-family:var(--mono); font-size:0.94rem; color:var(--gray);
@@ -289,10 +329,10 @@
   /* fixed min-height reserved for the whole text block, so cards line up
      whether or not the 'sala' line exists — the room element is fully
      removed from the DOM when empty rather than leaving a blank line. */
-  .artist-body{ display:flex; flex-direction:column; min-height:6.1rem; }
+  .artist-body{ display:flex; flex-direction:column; min-height:6.1rem; min-width:0; }
 
-  .artist-name{ font-family:var(--serif); font-size:1.04rem; margin:0.55rem 0 0.15rem; line-height:1.2; }
-  .artist-meta{ font-family:var(--mono); font-size:0.77rem; color:var(--gray); display:flex; flex-wrap:wrap; gap:0.4rem; align-items:center; }
+  .artist-name{ font-family:var(--serif); font-size:1.04rem; margin:0.55rem 0 0.15rem; line-height:1.2; overflow-wrap:break-word; }
+  .artist-meta{ font-family:var(--mono); font-size:0.77rem; color:var(--gray); display:flex; flex-wrap:wrap; gap:0.4rem; align-items:center; min-width:0; overflow-wrap:break-word; }
   .artist-meta a{ color:var(--ink); text-decoration:underline; text-underline-offset:2px; }
   .artist-meta a:hover{ opacity:0.6; }
   .artist-room{ font-family:var(--mono); font-size:0.75rem; color:var(--gray); margin-top:0.3rem; }
@@ -330,7 +370,7 @@
      o conteúdo (imagem/legenda) fica num bloco separado que começa
      sempre abaixo dela, então nunca disputa o mesmo espaço — mesmo se a
      imagem+legenda for alta o bastante pra rolar */
-  .lightbox-head{ flex-shrink:0; height:40px; position:relative; }
+  .lightbox-head{ flex-shrink:0; height:1.8rem; position:relative; }
 
   /* justify-content:flex-start (não center) é essencial aqui: com o conteúdo
      centralizado, quando a imagem+legenda é mais alta que o espaço visível
@@ -351,10 +391,10 @@
   .lightbox-caption .lb-name{ font-family:var(--serif); font-size:1.32rem; color:var(--ink); margin:0 0 0.4rem; }
   .lightbox-caption .lb-room{ font-family:var(--mono); font-size:0.83rem; color:var(--gray); margin-bottom:0.5rem; }
   .lightbox-caption .lb-bio{ font-family:var(--sans); font-size:0.97rem; line-height:1.55; color:var(--gray); margin:0.8rem 0 0; }
-  .lightbox-close{ position:absolute; top:6px; right:1rem;
-                    background:none; border:none; cursor:pointer; padding:0.4rem 0.6rem; min-height:28px;
-                    font-family:var(--mono); font-size:0.75rem; color:var(--ink); }
-  .lightbox-close:hover{ opacity:0.6; }
+  /* centralizado em toda a margem vazia do topo — lightbox-head (1.8rem)
+     + padding-top do lightbox-body (1.6rem) — até onde a imagem começa,
+     não só na faixa estreita do lightbox-head */
+  .lightbox-close{ position:absolute; top:14.2px; right:1rem; }
 
   /* ---------------- About modal (same glass treatment as lightbox) ---------------- */
   .about-overlay{ position:fixed; inset:0; z-index:1000;
@@ -378,6 +418,8 @@
 
   .about-head{ padding:1.6rem 1.6rem 1rem; border-bottom:1px solid rgba(0,0,0,0.12); flex-shrink:0; }
   .about-title{ font-family:var(--serif); font-weight:400; color:var(--ink); font-size:1.32rem; margin:0; }
+  /* alinhado verticalmente com o about-title */
+  .about-close{ position:absolute; top:26px; right:1.6rem; }
 
   .about-body{ overflow-y:auto; -webkit-overflow-scrolling:touch; flex-grow:1;
                max-width:920px; width:100%; margin:0 auto;
@@ -403,6 +445,7 @@
 
 <div class="hero">
   <div id="map"></div>
+  <canvas class="hero-snake-canvas" id="hero-snake-canvas"></canvas>
   <div class="map-dim" id="map-dim"></div>
   <div class="hero-title" id="hero-title">
     <div class="hero-label">Circuito de Ateliês do Centro</div>
@@ -411,15 +454,15 @@
     <span class="hero-edition">Edição 01</span>
   </div>
   <div class="hero-count" id="hero-count">— endereços · — artistas</div>
+  <div class="top-actions">
+    <div class="switcher">
+      <button id="switch-map" class="active">mapa</button>
+      <button id="switch-list">lista</button>
+    </div>
+    <button class="about-btn" id="about-btn">sobre</button>
+  </div>
 </div>
 
-<div class="top-actions">
-  <div class="switcher">
-    <button id="switch-map" class="active">mapa</button>
-    <button id="switch-list">lista</button>
-  </div>
-  <button class="about-btn" id="about-btn">sobre</button>
-</div>
 <div class="sort-switch" id="sort-switch">
   <button id="sort-endereco" class="active">por endereço</button>
   <button id="sort-artista">por artista</button>
@@ -427,6 +470,7 @@
 
 <div class="list-overlay" id="list-overlay">
   <div class="list-modal">
+    <button class="list-close icon-close" id="list-close" aria-label="Fechar lista"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6L18 18M18 6L6 18"/></svg></button>
     <div class="list-head"><h2>Índice do circuito</h2></div>
     <div class="rows" id="rows"></div>
   </div>
@@ -435,7 +479,7 @@
 <div class="overlay" id="overlay"></div>
 <div class="drawer" id="drawer">
   <div class="drawer-head">
-    <button class="drawer-close" id="drawer-close" aria-label="Fechar">fechar ×</button>
+    <button class="drawer-close icon-close" id="drawer-close" aria-label="Fechar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6L18 18M18 6L6 18"/></svg></button>
     <div class="drawer-title" id="drawer-local">—</div>
     <div class="drawer-addr" id="drawer-endereco">—</div>
     <a class="drawer-directions" id="drawer-directions" href="#" target="_blank" rel="noopener">Como chegar →</a>
@@ -446,7 +490,7 @@
 <div class="lightbox" id="lightbox">
   <div class="lightbox-modal">
     <div class="lightbox-head">
-      <button class="lightbox-close" id="lightbox-close" aria-label="Fechar imagem">fechar ×</button>
+      <button class="lightbox-close icon-close" id="lightbox-close" aria-label="Fechar imagem"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6L18 18M18 6L6 18"/></svg></button>
     </div>
     <div class="lightbox-body">
       <img id="lightbox-img" src="" alt="">
@@ -463,7 +507,7 @@
 
 <div class="about-overlay" id="about-overlay">
   <div class="about-modal">
-    <button class="lightbox-close" id="about-close" aria-label="Fechar">fechar ×</button>
+    <button class="about-close icon-close" id="about-close" aria-label="Fechar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6L18 18M18 6L6 18"/></svg></button>
     <div class="about-head"><h2 class="about-title">Circuito de Ateliês do Centro</h2></div>
     <div class="about-body">
       <div class="about-grid">
@@ -472,7 +516,8 @@
         </div>
         <div class="about-credits">
           <p class="about-credits-label">Créditos</p>
-          <p>Identidade visual e site: Eduardo Mattos<br><a href="https://instagram.com/macula.cc" target="_blank" rel="noopener">@macula.cc</a></p>
+          <p>Identidade visual e site:<br>Eduardo Mattos<br><a href="https://instagram.com/macula.cc" target="_blank" rel="noopener">@macula.cc</a></p>
+          <p>Mapa:<br><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a> contributors, tiles por <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, biblioteca <a href="https://maplibre.org" target="_blank" rel="noopener">MapLibre GL JS</a>.</p>
         </div>
       </div>
     </div>
@@ -521,15 +566,29 @@ function parseCSV(text){
 // sem separador decimal, tipo "-229115" em vez de "-22,9115") — passar
 // isso direto pro MapLibre derruba o mapa inteiro (ele lança exceção e
 // nenhum pino aparece, nem os de outros endereços válidos). Em vez disso,
-// tratamos como coordenada ainda não preenchida.
+// tratamos como coordenada ainda não preenchida: some como "pendente" na
+// lista igual a um endereço sem lat/lng, e a geocodificação automática
+// tenta resolver de novo a partir do texto do endereço.
 function parseCoord(raw, min, max){
   if (!raw) return null;
   const n = parseFloat(raw.replace(',', '.'));
   return (isNaN(n) || n < min || n > max) ? null : n;
 }
 
+// artistas colando o link de "visualizar" do Google Drive (drive.google.com/
+// file/d/ID/view) em vez de um link de imagem direto — isso não é uma
+// imagem, é uma página HTML, então <img>/background-image nunca carrega.
+// Convertemos pro endpoint de thumbnail do próprio Drive, que serve a
+// imagem de verdade (o arquivo ainda precisa estar compartilhado como
+// "qualquer pessoa com o link"). Link de pasta do Drive não dá pra
+// converter — não há como saber qual arquivo dentro dela é a foto.
+function resolveDrivePhotoURL(url){
+  const m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1000` : url;
+}
+
 async function loadLocationsFromSheet(){
-  const res = await fetch(SHEET_CSV_URL);
+  const res = await fetch(`${SHEET_CSV_URL}&_=${Date.now()}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('Falha ao buscar a planilha: HTTP ' + res.status);
   const text = await res.text();
   const table = parseCSV(text).filter(r => r.some(c => c !== undefined && c.trim() !== ''));
@@ -553,7 +612,7 @@ async function loadLocationsFromSheet(){
     if (!endereco && !nome) return; // linha em branco
 
     const instagram = get(row, 'Instagram').replace(/^@/, '');
-    const foto = get(row, 'Foto do trabalho (URL)');
+    const foto = resolveDrivePhotoURL(get(row, 'Foto do trabalho (URL)'));
     const bio = get(row, 'Mini bio (1 parágrafo curto)');
     const obs = get(row, 'Observações');
     const latRaw = get(row, 'Latitude');
@@ -621,14 +680,81 @@ function makePinEl(label, active){
   return el;
 }
 
-function addMarkerForLocation(loc){
-  if (!map || loc.lat == null || loc.lng == null) return;
-  if (markers[loc.id]) return; // already placed
-  const el = makePinEl(pinLabel(loc), false);
-  el.addEventListener('click', () => openDrawer(loc.id));
-  const marker = new maplibregl.Marker({ element: el, anchor:'center' })
-    .setLngLat([loc.lng, loc.lat]).addTo(map);
-  markers[loc.id] = marker;
+// Alguns endereços ficam a poucos metros um do outro (mesmo prédio, entradas
+// diferentes) e os pins acabam se sobrepondo no mapa. Agrupamos esses casos
+// pela coordenada REAL (loc.lat/loc.lng nunca é alterada — o botão "Como
+// chegar" continua levando pro endereço de verdade) e espalhamos os pins do
+// grupo numa roda ao redor do centro. O afastamento é calculado em PIXELS de
+// tela, não em metros, e recalculado a cada zoom — em metros fixos, os pins
+// voltavam a se sobrepor visualmente assim que o mapa afastava.
+const PIN_OVERLAP_THRESHOLD_M = 8;
+const PIN_OVERLAP_SPREAD_PX = 13;
+function metersBetween(lat1, lng1, lat2, lng2){
+  const R = 6371000;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLng = (lng2-lng1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+// agrupa por proximidade real e anota em cada loc a que grupo pertence —
+// não calcula posição nenhuma ainda, isso é feito à parte (displayLatLngFor)
+// porque depende do zoom atual do mapa
+function groupOverlappingLocations(locations){
+  const withCoords = locations.filter(l => l.lat != null && l.lng != null);
+  withCoords.forEach(loc => { loc._cluster = null; });
+  const visited = new Set();
+  withCoords.forEach(loc => {
+    if (visited.has(loc.id)) return;
+    const cluster = withCoords.filter(other =>
+      !visited.has(other.id) && metersBetween(loc.lat, loc.lng, other.lat, other.lng) < PIN_OVERLAP_THRESHOLD_M
+    );
+    cluster.forEach(l => visited.add(l.id));
+    if (cluster.length < 2) return;
+    const centerLat = cluster.reduce((s,l)=>s+l.lat,0) / cluster.length;
+    const centerLng = cluster.reduce((s,l)=>s+l.lng,0) / cluster.length;
+    cluster.forEach((l, i) => { l._cluster = { centerLat, centerLng, index: i, size: cluster.length }; });
+  });
+}
+// posição de exibição de um pin: a coordenada real, ou — se ele faz parte de
+// um grupo sobreposto — um ponto a PIN_OVERLAP_SPREAD_PX pixels do centro do
+// grupo, convertido de volta pra lng/lat na projeção atual do mapa
+function displayLatLngFor(loc){
+  if (!loc._cluster || !map) return [loc.lng, loc.lat];
+  const { centerLat, centerLng, index, size } = loc._cluster;
+  const centerPt = map.project([centerLng, centerLat]);
+  const angle = (2*Math.PI*index) / size;
+  const pt = { x: centerPt.x + PIN_OVERLAP_SPREAD_PX*Math.cos(angle), y: centerPt.y + PIN_OVERLAP_SPREAD_PX*Math.sin(angle) };
+  const ll = map.unproject([pt.x, pt.y]);
+  return [ll.lng, ll.lat];
+}
+// reposiciona só os pins que fazem parte de algum grupo — chamado a cada
+// zoom, já que o afastamento em pixels muda de lat/lng conforme o nível
+function repositionClusteredMarkers(){
+  if (!map) return;
+  LOCATIONS.forEach(loc => {
+    if (!loc._cluster) return;
+    const m = markers[loc.id];
+    if (m) m.setLngLat(displayLatLngFor(loc));
+  });
+}
+
+// recalcula os grupos (novos endereços podem ter chegado via geocodificação)
+// e cria ou reposiciona cada marcador conforme necessário
+function syncAllMarkers(){
+  if (!map) return;
+  groupOverlappingLocations(LOCATIONS);
+  LOCATIONS.forEach(loc => {
+    if (loc.lat == null || loc.lng == null) return;
+    const pos = displayLatLngFor(loc);
+    if (markers[loc.id]){
+      markers[loc.id].setLngLat(pos);
+    } else {
+      const el = makePinEl(pinLabel(loc), false);
+      el.addEventListener('click', () => openDrawer(loc.id));
+      const marker = new maplibregl.Marker({ element: el, anchor:'center' }).setLngLat(pos).addTo(map);
+      markers[loc.id] = marker;
+    }
+  });
 }
 
 // ---------------- estações de metrô e VLT (curadas manualmente) ----------------
@@ -664,121 +790,12 @@ function addStationMarkers(){
   });
 }
 
-function initMap(){
-  try{
-    if (typeof maplibregl === 'undefined') throw new Error('MapLibre não carregou');
-    map = new maplibregl.Map({
-      container: 'map',
-      style: 'https://tiles.openfreemap.org/styles/liberty',
-      center: [-43.1795, -22.9065],
-      zoom: 15,
-      pitch: 0,
-      maxPitch: 0, // trava a vista sempre "de cima", sem inclinação 3D possível
-      attributionControl: false,
-      dragRotate: false,
-      touchPitch: false
-    });
-    map.touchZoomRotate.disableRotation();
-    // pilha de controles no canto empilha em ordem INVERSA à que são
-    // adicionados (o último addControl fica visualmente no topo) — pra
-    // ficar Locate / Zoom (+/-) / Info(créditos) de cima pra baixo, a
-    // ordem de adição precisa ser o inverso disso
-    map.addControl(new maplibregl.AttributionControl({ compact:true }), 'bottom-right');
-    map.addControl(new maplibregl.NavigationControl({ showCompass:false }), 'bottom-right');
-
-    // botão "minha localização" — mesmo padrão de controle customizado do
-    // Leaflet (onAdd devolve um elemento DOM), só que na API do MapLibre
-    class LocateControl{
-      onAdd(mapInstance){
-        this._map = mapInstance;
-        this._container = document.createElement('div');
-        this._container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
-        const btn = document.createElement('button');
-        btn.className = 'locate-control-btn';
-        btn.type = 'button';
-        btn.title = 'Minha localização';
-        btn.setAttribute('aria-label', 'Centralizar o mapa na minha localização');
-        btn.innerHTML = '◎';
-        btn.addEventListener('click', () => goToUserLocation(btn));
-        this._container.appendChild(btn);
-        return this._container;
-      }
-      onRemove(){ this._container.remove(); this._map = undefined; }
-    }
-    map.addControl(new LocateControl(), 'bottom-right');
-
-    // o estilo carrega de forma assíncrona (diferente do L.map, que já
-    // "existe" de cara) — só dá pra customizar cores, enquadrar nos pontos
-    // e colocar marcadores depois do 'load'
-    map.on('load', () => {
-      applyMonochromeStyle();
-      frameMapToPoints();
-      LOCATIONS.forEach((loc) => addMarkerForLocation(loc));
-      addStationMarkers();
-      locateUserAutomatically();
-    });
-
-    // Duplo-toque pra dar zoom — mesma lógica/cuidados de antes (o MapLibre
-    // também não expõe isso pronto), só troca de API: containerPointToLatLng
-    // vira map.unproject(), setZoomAround vira zoomTo(z, {around})
-    const mapContainer = map.getContainer();
-    let tapStartPoint = null;
-    let lastTapTime = 0;
-    let lastTapPoint = null;
-
-    mapContainer.addEventListener('touchstart', (e) => {
-      tapStartPoint = e.touches.length === 1
-        ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
-        : null;
-    }, { passive: true });
-
-    mapContainer.addEventListener('touchend', (e) => {
-      if (!tapStartPoint || e.changedTouches.length !== 1 || e.touches.length !== 0){
-        tapStartPoint = null;
-        return;
-      }
-      const touch = e.changedTouches[0];
-      const moved = Math.hypot(touch.clientX - tapStartPoint.x, touch.clientY - tapStartPoint.y);
-      tapStartPoint = null;
-      if (moved > 12) return; // foi um arrastar, não um toque
-
-      const now = Date.now();
-      const point = { x: touch.clientX, y: touch.clientY };
-      const isDoubleTap = lastTapPoint &&
-        (now - lastTapTime) < 350 &&
-        Math.hypot(point.x - lastTapPoint.x, point.y - lastTapPoint.y) < 40;
-
-      if (isDoubleTap){
-        e.preventDefault();
-        const rect = mapContainer.getBoundingClientRect();
-        const lngLat = map.unproject([touch.clientX - rect.left, touch.clientY - rect.top]);
-        map.zoomTo(map.getZoom() + 1, { around: lngLat, duration: 250 });
-        lastTapTime = 0;
-        lastTapPoint = null;
-      } else {
-        lastTapTime = now;
-        lastTapPoint = point;
-      }
-    }, { passive: false });
-  } catch(err){
-    console.error('Mapa indisponível:', err);
-    const mapEl = document.getElementById('map');
-    mapEl.innerHTML = '<div class="map-error">Não foi possível carregar o mapa agora.<br>A lista de endereços continua disponível.</div>';
-  }
-}
-
 // customiza cores camada por camada — água quase branca, resto em tons de
 // cinza — só é possível porque o MapLibre é vetorial (cada feição chega
 // com seu próprio tipo/nome, ao contrário do tile raster, que a gente só
-// via como pixels prontos e tinha que filtrar por aproximação)
-// paleta calibrada medindo o resultado real do filtro CSS do index.html
-// (grayscale(1) contrast(1.05) brightness(1.03) em cima do tile CARTO) —
-// fundo quase branco, ruas brancas por cima, prédios um cinza claro mas
-// visível por baixo. Ruas mais claras que prédios é o ponto central.
-// segunda versão, estética "xerox de linha" — fundo/preenchimentos todos
-// brancos, só o CONTORNO dos prédios e das ruas em preto, feito de linha
-// (não preenchimento) — mais parecido com um desenho de contorno passado
-// na copiadora do que com um mapa "colorido em cinza"
+// via como pixels prontos e tinha que filtrar por aproximação). Estética
+// "xerox de linha": preenchimentos claros/quase brancos, ruas brancas se
+// destacando do cinza dos quarteirões, contorno de prédio invisível.
 const MONO_COLORS = {
   background: '#ececec',    // cinza claro dos quarteirões
   water: '#f8f8f8',         // quase branco, só pra diferenciar da terra
@@ -857,6 +874,338 @@ function applyMonochromeStyle(){
       'source-layer': buildingSourceLayer,
       paint: { 'line-color': MONO_COLORS.buildingOutline, 'line-width': 1 }
     }, firstSymbolId || undefined);
+  }
+}
+
+// enquadramento inicial do mapa: calcula a partir dos pontos reais, com
+// padding maior em cima — reserva "campo livre" pro hero title grande sem
+// os pins ficarem embaixo dele
+function frameMapToPoints(){
+  const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
+  if (withCoords.length < 2){
+    map.setCenter([-43.1795, -22.9065]);
+    map.setZoom(15);
+    return;
+  }
+  const lats = withCoords.map(l => l.lat), lngs = withCoords.map(l => l.lng);
+  const bounds = [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]];
+  map.fitBounds(bounds, { padding: { top:220, left:30, right:30, bottom:50 }, duration:0 });
+}
+
+/* ============================================================
+   TESTE: "cobrinha" decorativa no hero, atrás do tingimento vermelho
+   (mix-blend-mode:multiply). Mesmo princípio de animação do "circuito
+   vivo" do gerador-video.html (desenha progressivamente ponto a ponto,
+   depois apaga tudo de uma vez, recomeça de outro ponto aleatório) —
+   adaptado pra usar as coordenadas REAIS do mapa (map.project) e, a
+   pedido, SEM os pinos numerados: só a linha/traço, nada de círculos.
+   Some junto com o overlay quando o hero encolhe (ver shrinkHero).
+   ============================================================ */
+let heroSnakeCanvas = null, heroSnakeCtx = null;
+let heroSnakeLegs = [];
+let heroSnakeTotal = 0;
+let heroSnakeLegOffsets = [];
+let heroSnakeLegIndex = 0;
+let heroSnakeLegElapsed = 0;
+let heroSnakeEraseElapsed = 0;
+let heroSnakeProgress = 0;
+let heroSnakeErase = 0;
+let heroSnakePhase = 'drawing';
+let heroSnakeRafId = null;
+let heroSnakeLastTs = null;
+let heroSnakeActive = false;
+const HERO_SNAKE_LEG_DURATION = 0.32; // s por trecho, igual ao circuito vivo
+const HERO_SNAKE_ERASE_DURATION = 3;  // s pra apagar tudo de uma vez
+const HERO_SNAKE_WIDTH = 46;          // bem mais grosso que o normal (30) — "estourado"
+
+function heroEaseOutSnap(t){ return t >= 1 ? 1 : 1 - Math.pow(2, -10*t); }
+
+function heroPathLength(points){
+  let len = 0;
+  for (let i=1;i<points.length;i++) len += Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+  return len;
+}
+function heroBuildLegPath(a, b){
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  if (Math.random() < 0.3 || len < 60){
+    return [ { x:a.x, y:a.y }, { x:b.x, y:b.y } ];
+  }
+  const nx = -dy/len, ny = dx/len;
+  const side = Math.random() < 0.5 ? 1 : -1;
+  const offset = len * (0.14 + Math.random()*0.26) * side;
+  const mx = (a.x+b.x)/2 + nx*offset;
+  const my = (a.y+b.y)/2 + ny*offset;
+  const N = Math.max(18, Math.round(len/16));
+  const pts = [];
+  for (let i=0;i<=N;i++){
+    const t = i/N;
+    const it = 1-t;
+    pts.push({ x: it*it*a.x + 2*it*t*mx + t*t*b.x, y: it*it*a.y + 2*it*t*my + t*t*b.y });
+  }
+  return pts;
+}
+function heroSubPathUpTo(points, dist){
+  const out = [points[0]];
+  let d = 0;
+  for (let i = 1; i < points.length; i++){
+    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+    if (d + seg >= dist){
+      const t = seg === 0 ? 0 : (dist-d)/seg;
+      out.push({ x: points[i-1].x + (points[i].x-points[i-1].x)*t, y: points[i-1].y + (points[i].y-points[i-1].y)*t });
+      return out;
+    }
+    out.push(points[i]);
+    d += seg;
+  }
+  return out;
+}
+function heroSubPathFrom(points, dist){
+  if (dist <= 0) return points;
+  let d = 0;
+  for (let i = 1; i < points.length; i++){
+    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+    if (d + seg >= dist){
+      const t = seg === 0 ? 0 : (dist-d)/seg;
+      const cut = { x: points[i-1].x + (points[i].x-points[i-1].x)*t, y: points[i-1].y + (points[i].y-points[i-1].y)*t };
+      return [cut, ...points.slice(i)];
+    }
+    d += seg;
+  }
+  return [points[points.length-1]];
+}
+function heroExtractRange(points, dStart, dEnd){
+  return heroSubPathFrom(heroSubPathUpTo(points, dEnd), dStart);
+}
+
+function resizeHeroSnakeCanvas(){
+  if (!heroSnakeCanvas) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  heroSnakeCanvas.width = window.innerWidth * dpr;
+  heroSnakeCanvas.height = window.innerHeight * dpr;
+  heroSnakeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+// pega a posição de tela REAL de cada endereço com coordenada, projetando
+// através da mesma instância do mapa que está sendo exibida — garante que
+// a cobrinha desenhe em cima dos pontos certos, sem reimplementar projeção
+function buildHeroSnakeLegs(){
+  if (!map) return false;
+  const pts = LOCATIONS
+    .filter(l => l.lat != null && l.lng != null)
+    .map(l => map.project([l.lng, l.lat]));
+  if (pts.length < 2) return false;
+  const order = [...pts].sort(() => Math.random()-0.5);
+  heroSnakeLegs = [];
+  for (let i = 1; i < order.length; i++) heroSnakeLegs.push(heroBuildLegPath(order[i-1], order[i]));
+  heroSnakeTotal = 0;
+  heroSnakeLegOffsets = [];
+  heroSnakeLegs.forEach(leg => { heroSnakeLegOffsets.push(heroSnakeTotal); heroSnakeTotal += heroPathLength(leg); });
+  return true;
+}
+
+function startHeroSnakeCycle(){
+  if (!buildHeroSnakeLegs()) return;
+  heroSnakeLegIndex = 0;
+  heroSnakeLegElapsed = 0;
+  heroSnakeEraseElapsed = 0;
+  heroSnakeProgress = 0;
+  heroSnakeErase = 0;
+  heroSnakePhase = 'drawing';
+  heroSnakeLastTs = null;
+}
+
+function heroSnakeAdvanceLegs(dt){
+  heroSnakeLegElapsed += dt;
+  let t = Math.min(1, heroSnakeLegElapsed / HERO_SNAKE_LEG_DURATION);
+  while (t >= 1 && heroSnakeLegIndex < heroSnakeLegs.length - 1){
+    heroSnakeLegIndex++;
+    heroSnakeLegElapsed -= HERO_SNAKE_LEG_DURATION;
+    t = Math.min(1, Math.max(0, heroSnakeLegElapsed) / HERO_SNAKE_LEG_DURATION);
+  }
+  const legLen = heroPathLength(heroSnakeLegs[heroSnakeLegIndex]);
+  const dist = heroSnakeLegOffsets[heroSnakeLegIndex] + heroEaseOutSnap(t) * legLen;
+  const finished = t >= 1 && heroSnakeLegIndex === heroSnakeLegs.length - 1;
+  return { dist, finished };
+}
+
+// traço grosso com gradiente escuro->vermelho por PERNA (não pelo caminho
+// inteiro), pra cada trecho ter sua própria transição — mesmo princípio do
+// gradiente preto->branco do gerador-marca.html, cores diferentes
+function heroStrokeLegsInRange(dStart, dEnd){
+  const ctx = heroSnakeCtx;
+  let offset = 0;
+  heroSnakeLegs.forEach(leg => {
+    if (leg.length < 2){ return; }
+    const legLen = heroPathLength(leg);
+    const localStart = Math.max(0, dStart - offset);
+    const localEnd = Math.min(legLen, dEnd - offset);
+    if (localEnd > localStart){
+      const sub = heroExtractRange(leg, localStart, localEnd);
+      if (sub.length >= 2){
+        const a = leg[0], b = leg[leg.length-1];
+        const grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+        grad.addColorStop(0, '#1a0000');
+        grad.addColorStop(1, '#ff2020');
+        ctx.lineWidth = HERO_SNAKE_WIDTH;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = grad;
+        ctx.beginPath();
+        sub.forEach((p,i) => { if (i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+        ctx.stroke();
+      }
+    }
+    offset += legLen;
+  });
+}
+
+function drawHeroSnakeFrame(){
+  heroSnakeCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  const dStart = heroSnakePhase === 'erasing' ? heroSnakeErase : 0;
+  const dEnd = heroSnakePhase === 'erasing' ? heroSnakeTotal : heroSnakeProgress;
+  heroStrokeLegsInRange(dStart, dEnd);
+}
+
+function heroSnakeLoop(ts){
+  if (!heroSnakeActive) { heroSnakeRafId = null; return; }
+  heroSnakeRafId = requestAnimationFrame(heroSnakeLoop);
+  if (heroSnakeLastTs == null) heroSnakeLastTs = ts;
+  const dt = Math.min(0.1, (ts - heroSnakeLastTs) / 1000);
+  heroSnakeLastTs = ts;
+
+  if (heroSnakePhase === 'drawing'){
+    const { dist, finished } = heroSnakeAdvanceLegs(dt);
+    heroSnakeProgress = dist;
+    if (finished){ heroSnakePhase = 'erasing'; heroSnakeEraseElapsed = 0; }
+  } else {
+    heroSnakeEraseElapsed += dt;
+    const t = Math.min(1, heroSnakeEraseElapsed / HERO_SNAKE_ERASE_DURATION);
+    heroSnakeErase = heroEaseOutSnap(t) * heroSnakeTotal;
+    if (t >= 1){ startHeroSnakeCycle(); return; }
+  }
+  drawHeroSnakeFrame();
+}
+
+function startHeroSnake(){
+  heroSnakeCanvas = document.getElementById('hero-snake-canvas');
+  if (!heroSnakeCanvas) return;
+  heroSnakeCtx = heroSnakeCanvas.getContext('2d');
+  resizeHeroSnakeCanvas();
+  window.addEventListener('resize', resizeHeroSnakeCanvas);
+  startHeroSnakeCycle();
+  heroSnakeActive = true;
+  if (!heroSnakeRafId) heroSnakeRafId = requestAnimationFrame(heroSnakeLoop);
+}
+function stopHeroSnake(){
+  heroSnakeActive = false;
+  if (heroSnakeRafId){ cancelAnimationFrame(heroSnakeRafId); heroSnakeRafId = null; }
+}
+
+function initMap(){
+  try{
+    if (typeof maplibregl === 'undefined') throw new Error('MapLibre não carregou');
+    map = new maplibregl.Map({
+      container: 'map',
+      style: 'https://tiles.openfreemap.org/styles/liberty',
+      center: [-43.1795, -22.9065],
+      zoom: 15,
+      pitch: 0,
+      maxPitch: 0, // trava a vista sempre "de cima", sem inclinação 3D possível
+      attributionControl: false,
+      dragRotate: false,
+      touchPitch: false
+    });
+    map.touchZoomRotate.disableRotation();
+    map.on('zoom', repositionClusteredMarkers);
+
+    // pilha de controles no canto empilha em ordem INVERSA à que são
+    // adicionados (o último addControl fica visualmente no topo) — pra
+    // ficar Locate / Zoom (+/-) / Info (créditos) de cima pra baixo, a
+    // ordem de adição precisa ser o inverso disso
+    map.addControl(new maplibregl.AttributionControl({ compact:true }), 'bottom-right');
+    map.addControl(new maplibregl.NavigationControl({ showCompass:false }), 'bottom-right');
+
+    // botão "minha localização" — controle customizado (onAdd devolve um
+    // elemento DOM), API própria do MapLibre
+    class LocateControl{
+      onAdd(mapInstance){
+        this._map = mapInstance;
+        this._container = document.createElement('div');
+        this._container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+        const btn = document.createElement('button');
+        btn.className = 'locate-control-btn';
+        btn.type = 'button';
+        btn.title = 'Minha localização';
+        btn.setAttribute('aria-label', 'Centralizar o mapa na minha localização');
+        btn.innerHTML = '◎';
+        btn.addEventListener('click', () => goToUserLocation(btn));
+        this._container.appendChild(btn);
+        return this._container;
+      }
+      onRemove(){ this._container.remove(); this._map = undefined; }
+    }
+    map.addControl(new LocateControl(), 'bottom-right');
+
+    // o estilo carrega de forma assíncrona — só dá pra customizar cores,
+    // enquadrar nos pontos e colocar marcadores depois do 'load'
+    map.on('load', () => {
+      applyMonochromeStyle();
+      frameMapToPoints();
+      syncAllMarkers();
+      addStationMarkers();
+      locateUserAutomatically();
+      if (!heroShrunk) startHeroSnake(); // TESTE: cobrinha atrás do overlay vermelho
+    });
+
+    // Duplo-toque pra dar zoom: escuta touchstart/touchend crus, direto no
+    // elemento do mapa — o MapLibre não expõe isso pronto, e o dblclick
+    // nativo não é sintetizado de forma confiável a partir de um toque
+    // duplo em alguns navegadores/dispositivos. Cuidados: ignora gestos com
+    // mais de um dedo (pinça) e ignora toques que se moveram (arrastar).
+    const mapContainer = map.getContainer();
+    let tapStartPoint = null;
+    let lastTapTime = 0;
+    let lastTapPoint = null;
+
+    mapContainer.addEventListener('touchstart', (e) => {
+      tapStartPoint = e.touches.length === 1
+        ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+        : null;
+    }, { passive: true });
+
+    mapContainer.addEventListener('touchend', (e) => {
+      if (!tapStartPoint || e.changedTouches.length !== 1 || e.touches.length !== 0){
+        tapStartPoint = null;
+        return;
+      }
+      const touch = e.changedTouches[0];
+      const moved = Math.hypot(touch.clientX - tapStartPoint.x, touch.clientY - tapStartPoint.y);
+      tapStartPoint = null;
+      if (moved > 12) return; // foi um arrastar, não um toque
+
+      const now = Date.now();
+      const point = { x: touch.clientX, y: touch.clientY };
+      const isDoubleTap = lastTapPoint &&
+        (now - lastTapTime) < 350 &&
+        Math.hypot(point.x - lastTapPoint.x, point.y - lastTapPoint.y) < 40;
+
+      if (isDoubleTap){
+        e.preventDefault();
+        const rect = mapContainer.getBoundingClientRect();
+        const lngLat = map.unproject([touch.clientX - rect.left, touch.clientY - rect.top]);
+        map.zoomTo(map.getZoom() + 1, { around: lngLat, duration: 250 });
+        lastTapTime = 0;
+        lastTapPoint = null;
+      } else {
+        lastTapTime = now;
+        lastTapPoint = point;
+      }
+    }, { passive: false });
+  } catch(err){
+    console.error('Mapa indisponível:', err);
+    const mapEl = document.getElementById('map');
+    mapEl.innerHTML = '<div class="map-error">Não foi possível carregar o mapa agora.<br>A lista de endereços continua disponível.</div>';
   }
 }
 
@@ -976,7 +1325,7 @@ async function resolveMissingCoordinates(){
     if (coords){
       loc.lat = coords.lat;
       loc.lng = coords.lng;
-      addMarkerForLocation(loc);
+      syncAllMarkers(); // recalcula sobreposições — um novo ponto pode colidir com um já existente
       renderRows(); // atualiza a lista, tirando o endereço do estado "pendente"
     }
     // pequena pausa entre chamadas por educação com o serviço gratuito
@@ -1167,29 +1516,38 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ closeLigh
 function goToLocation(loc){
   setView('map');
   if (map && loc.lat != null){
-    setTimeout(() => map.flyTo({ center: [loc.lng, loc.lat], zoom: 17, duration: 600 }), 50);
+    setTimeout(() => map.flyTo({ center: displayLatLngFor(loc), zoom: 17, duration: 600 }), 50);
   }
   openDrawer(loc.id);
-}
-
-// enquadramento inicial do mapa: calcula a partir dos pontos reais, com
-// padding maior em cima — reserva "campo livre" pro hero title grande sem
-// os pins ficarem embaixo dele
-function frameMapToPoints(){
-  const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
-  if (withCoords.length < 2){
-    map.setCenter([-43.1795, -22.9065]);
-    map.setZoom(15);
-    return;
-  }
-  const lats = withCoords.map(l => l.lat), lngs = withCoords.map(l => l.lng);
-  const bounds = [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]];
-  map.fitBounds(bounds, { padding: { top:220, left:30, right:30, bottom:50 }, duration:0 });
 }
 
 // ---------------- hero title: starts large, shrinks to the corner on first interaction ----------------
 const heroTitle = document.getElementById('hero-title');
 let heroShrunk = false;
+
+// no mobile, calcula o font-size do título/data pra ocupar 100% da largura
+// disponível (a linha mais longa entre título e data) no estado grande —
+// no desktop o clamp(...) fluido do CSS já dá conta sozinho.
+const heroFitCanvas = document.createElement('canvas');
+const heroFitCtx = heroFitCanvas.getContext('2d');
+const HERO_FIT_LINES = ['Ateliês abertos', '18 – 19 de Setembro'];
+function fitHeroText(){
+  if (window.innerWidth > 780){
+    document.documentElement.style.removeProperty('--hero-font-size');
+    return;
+  }
+  const cs = getComputedStyle(heroTitle);
+  const available = heroTitle.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  if (available <= 0) return;
+  const ref = 100;
+  heroFitCtx.font = `${ref}px 'Instrument Serif', Georgia, serif`;
+  const maxLineWidth = Math.max(...HERO_FIT_LINES.map(l => heroFitCtx.measureText(l).width));
+  const fontSize = (available / maxLineWidth) * ref;
+  document.documentElement.style.setProperty('--hero-font-size', fontSize + 'px');
+}
+fitHeroText();
+window.addEventListener('resize', fitHeroText);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHeroText);
 
 function shrinkHero(e){
   if (heroShrunk) return;
@@ -1200,6 +1558,11 @@ function shrinkHero(e){
   heroShrunk = true;
   heroTitle.classList.add('shrunk');
   document.getElementById('map-dim').classList.add('hidden');
+  // TESTE: cobrinha some junto com o overlay vermelho, e para de animar
+  // (sem gasto de CPU desenhando algo que não aparece mais)
+  const snakeCanvas = document.getElementById('hero-snake-canvas');
+  if (snakeCanvas) snakeCanvas.classList.add('hidden');
+  stopHeroSnake();
   document.removeEventListener('pointerdown', shrinkHero);
   document.removeEventListener('wheel', shrinkHero);
   document.removeEventListener('keydown', shrinkHero);
@@ -1236,6 +1599,7 @@ function setSort(s){
 
 switchMapBtn.addEventListener('click', () => setView('map'));
 switchListBtn.addEventListener('click', () => setView('list'));
+document.getElementById('list-close').addEventListener('click', () => setView('map'));
 sortEnderecoBtn.addEventListener('click', () => setSort('endereco'));
 sortArtistaBtn.addEventListener('click', () => setSort('artista'));
 
@@ -1257,7 +1621,6 @@ function renderRowsByEndereco(){
         <span class="row-title">${loc.local || loc.endereco}</span>
         ${loc.local ? `<span class="row-sub">${loc.endereco}</span>` : ''}
       </span>
-      <span class="row-count">${loc.artistas.length}</span>
     `;
     btn.addEventListener('click', () => goToLocation(loc));
     rowsEl.appendChild(btn);
@@ -1276,13 +1639,11 @@ function renderRowsByArtista(){
 
   flat.forEach((entry) => {
     const btn = document.createElement('button');
-    btn.className = 'row' + (entry.loc.lat == null ? ' pending' : '');
+    btn.className = 'row row-artista' + (entry.loc.lat == null ? ' pending' : '');
     btn.innerHTML = `
-      <span class="row-main">
-        <span class="row-title">${entry.nome}</span>
-        <span class="row-sub">${entry.loc.local || entry.loc.endereco}</span>
-      </span>
-      <span class="row-count">${entry.instagram ? '@'+entry.instagram : ''}</span>
+      <span class="row-title">${entry.nome}</span>
+      <span class="row-instagram">${entry.instagram ? '@'+entry.instagram : ''}</span>
+      <span class="row-sub">${entry.loc.local || entry.loc.endereco}</span>
     `;
     btn.addEventListener('click', () => goToLocation(entry.loc));
     rowsEl.appendChild(btn);
