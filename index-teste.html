@@ -49,10 +49,10 @@
      junto com o encolhimento do título. mix-blend-mode:multiply em vez de um
      preto translúcido comum — multiply preserva os detalhes escuros do
      mapa/cobrinha por baixo (pretos continuam pretos) em vez de lavar tudo
-     pra uma cor chapada. Voltou de vermelho pra cinza escuro. Fundo
-     praticamente opaco de propósito: quem cria a variação de tom aqui é o
-     multiply, não a transparência. */
-  .map-dim{ position:absolute; inset:0; z-index:150; background:#2b2b2b;
+     pra uma cor chapada. Cinza médio (mesmo --gray usado no resto do
+     site). Fundo praticamente opaco de propósito: quem cria a variação
+     de tom aqui é o multiply, não a transparência. */
+  .map-dim{ position:absolute; inset:0; z-index:150; background:var(--gray);
             mix-blend-mode:multiply;
             backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
             pointer-events:none; transition:opacity 0.6s ease; }
