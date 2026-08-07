@@ -927,7 +927,7 @@ const HERO_SNAKE_ERASE_DURATION = 3;  // s pra apagar tudo de uma vez
 // gerador-video.html: 30/1000), multiplicada pelo mesmo fator de
 // crescimento que estoura o espalhamento pra fora da tela
 const HERO_SNAKE_WIDTH_RATIO = 30/1000;
-const HERO_SNAKE_GROW = 2.6; // fator único de crescimento: espalhamento + espessura
+const HERO_SNAKE_GROW = 5.5; // fator único de crescimento: espalhamento + espessura
 let heroSnakeWidth = 46; // recalculado em buildHeroSnakeLegs() a cada ciclo
 
 function heroEaseOutSnap(t){ return t >= 1 ? 1 : 1 - Math.pow(2, -10*t); }
@@ -1008,7 +1008,12 @@ function heroComputeFitTransform(points, box, fillFraction){
   const minY = Math.min(...ys), maxY = Math.max(...ys);
   const w = (maxX-minX) || 1, h = (maxY-minY) || 1;
   const scale = Math.min(box.w*fillFraction/w, box.h*fillFraction/h);
-  const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
+  // centraliza pelo CENTROIDE (média de todos os pontos), não pelo meio
+  // da bounding box (min+max)/2 — um único ponto bem distante (ex: pin 16
+  // em Gamboa) desloca o meio da bounding box pra longe de onde a maioria
+  // dos pontos realmente está; o centroide segue o aglomerado denso
+  const cx = xs.reduce((s,v)=>s+v,0) / xs.length;
+  const cy = ys.reduce((s,v)=>s+v,0) / ys.length;
   const boxCx = box.x + box.w/2, boxCy = box.y + box.h/2;
   return { scale, cx, cy, boxCx, boxCy };
 }
@@ -1028,10 +1033,10 @@ function buildHeroSnakeLegs(){
     .map(l => map.project([l.lng, l.lat]));
   if (rawPts.length < 2) return false;
   const box = {
-    x: window.innerWidth * 0.5,
-    y: window.innerHeight * 0.04,
-    w: window.innerWidth * 0.48,
-    h: window.innerHeight * 0.92
+    x: window.innerWidth * 0.30,
+    y: window.innerHeight * 0.02,
+    w: window.innerWidth * 0.68,
+    h: window.innerHeight * 0.96
   };
   // fillFraction > 1 de propósito: estoura pra fora da caixa (e da própria
   // tela, já que o canvas corta tudo que passa da borda) — "gigante,
