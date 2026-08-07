@@ -58,18 +58,18 @@
             pointer-events:none; transition:opacity 0.6s ease; }
   .map-dim.hidden{ opacity:0; }
 
-  /* TESTE: "cobrinha" decorativa atrás do tingimento vermelho — mesmo
-     princípio de animação do "circuito vivo" do gerador de vídeo (desenha
-     progressivamente, depois apaga, recomeça de outro ponto), só que sem os
-     pinos numerados (só a linha) e com traço bem mais grosso/gradiente mais
-     intenso, pra ficar "estourado" por trás do vermelho. Some junto com o
-     overlay quando o hero encolhe (ver shrinkHero). */
+  /* "cobrinha" decorativa: mesmo princípio de animação do "circuito vivo"
+     do gerador de vídeo (desenha progressivamente, depois apaga, recomeça
+     de outro ponto), sem os pinos numerados (só a linha). Fica ACIMA do
+     .map-dim (150) e ABAIXO do texto (200) — não atrás dele — pra não
+     pegar o backdrop-filter:blur(3px) do overlay, que borrava o traço.
+     Some junto com o overlay quando o hero encolhe (ver shrinkHero). */
   /* width/height:100% explícitos são necessários aqui: canvas é elemento
      "replaced" e, mesmo com inset:0, um replaced element position:absolute
      sem width/height definido usa o tamanho intrínseco (os atributos
      width/height em pixels físicos setados via JS) em vez de esticar pro
      viewport — mesmo problema já resolvido antes no cursor customizado. */
-  .hero-snake-canvas{ position:absolute; inset:0; width:100%; height:100%; z-index:50; pointer-events:none;
+  .hero-snake-canvas{ position:absolute; inset:0; width:100%; height:100%; z-index:180; pointer-events:none;
                        transition:opacity 0.6s ease; }
   .hero-snake-canvas.hidden{ opacity:0; }
 
