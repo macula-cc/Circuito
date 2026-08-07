@@ -127,9 +127,6 @@
     .hero-date{ white-space:normal; }
   }
 
-  .hero-count{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:calc(1.6rem + env(safe-area-inset-left)); z-index:200;
-               font-family:var(--mono); font-size:0.79rem; color:var(--gray); pointer-events:none; }
-
   /* ---------------- View switcher (glass pill toggle) + about button ----------------
      centralizados na parte inferior da tela — o sort-switch (por endereço/
      por artista) fica numa linha própria acima deles, mesmo esquema */
@@ -460,7 +457,6 @@
     <div class="hero-date" id="hero-date">18 – 19 de Setembro</div>
     <span class="hero-edition">Edição 01</span>
   </div>
-  <div class="hero-count" id="hero-count">— endereços · — artistas</div>
   <div class="top-actions">
     <div class="switcher">
       <button id="switch-map" class="active">mapa</button>
@@ -670,11 +666,6 @@ function computeLocationNumbers(){
 function pinLabel(loc){
   const n = locationNumberMap[loc.id];
   return n ? String(n).padStart(2, '0') : '?';
-}
-
-function updateHeroCount(){
-  document.getElementById('hero-count').textContent =
-    `${LOCATIONS.length} endereços · ${LOCATIONS.reduce((s,l)=>s+l.artistas.length,0)} artistas`;
 }
 
 // ---------------- map (isolated in try/catch so a load failure doesn't break the rest) ----------------
@@ -1717,7 +1708,6 @@ async function boot(){
       '<p style="font-family:var(--mono);font-size:0.88rem;color:var(--gray);padding:1rem 0.2rem;">Não foi possível carregar os dados agora.</p>';
     return;
   }
-  updateHeroCount();
   computeLocationNumbers();
   initMap();
   resolveMissingCoordinates();
