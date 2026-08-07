@@ -64,7 +64,12 @@
      pinos numerados (só a linha) e com traço bem mais grosso/gradiente mais
      intenso, pra ficar "estourado" por trás do vermelho. Some junto com o
      overlay quando o hero encolhe (ver shrinkHero). */
-  .hero-snake-canvas{ position:absolute; inset:0; z-index:50; pointer-events:none;
+  /* width/height:100% explícitos são necessários aqui: canvas é elemento
+     "replaced" e, mesmo com inset:0, um replaced element position:absolute
+     sem width/height definido usa o tamanho intrínseco (os atributos
+     width/height em pixels físicos setados via JS) em vez de esticar pro
+     viewport — mesmo problema já resolvido antes no cursor customizado. */
+  .hero-snake-canvas{ position:absolute; inset:0; width:100%; height:100%; z-index:50; pointer-events:none;
                        transition:opacity 0.6s ease; }
   .hero-snake-canvas.hidden{ opacity:0; }
 
@@ -986,15 +991,43 @@ function resizeHeroSnakeCanvas(){
   heroSnakeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
-// pega a posição de tela REAL de cada endereço com coordenada, projetando
-// através da mesma instância do mapa que está sendo exibida — garante que
-// a cobrinha desenhe em cima dos pontos certos, sem reimplementar projeção
+// reenquadramento artístico (mesmo princípio do "circuito vivo" do
+// gerador-video.html) — ignora a escala/distância geográfica real e encaixa
+// o conjunto de pontos inteiro dentro de uma caixa alvo, preservando as
+// posições RELATIVAS entre eles (não randomiza, só escala+centraliza)
+function heroComputeFitTransform(points, box, fillFraction){
+  const xs = points.map(p=>p.x), ys = points.map(p=>p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const w = (maxX-minX) || 1, h = (maxY-minY) || 1;
+  const scale = Math.min(box.w*fillFraction/w, box.h*fillFraction/h);
+  const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
+  const boxCx = box.x + box.w/2, boxCy = box.y + box.h/2;
+  return { scale, cx, cy, boxCx, boxCy };
+}
+function heroApplyFitTransform(points, t){
+  return points.map(p => ({ x: t.boxCx + (p.x-t.cx)*t.scale, y: t.boxCy + (p.y-t.cy)*t.scale }));
+}
+
+// pega a posição de tela REAL de cada endereço (projetando pela mesma
+// instância do mapa exibida) só como ponto de partida — o pin 16 (Gamboa)
+// é isolado dos demais, então usar a posição geográfica de verdade puxava
+// a cobrinha inteira até lá, deixando só uma pontinha visível na tela. Em
+// vez disso, reenquadra tudo numa caixa alinhada à direita da tela.
 function buildHeroSnakeLegs(){
   if (!map) return false;
-  const pts = LOCATIONS
+  const rawPts = LOCATIONS
     .filter(l => l.lat != null && l.lng != null)
     .map(l => map.project([l.lng, l.lat]));
-  if (pts.length < 2) return false;
+  if (rawPts.length < 2) return false;
+  const box = {
+    x: window.innerWidth * 0.5,
+    y: window.innerHeight * 0.04,
+    w: window.innerWidth * 0.48,
+    h: window.innerHeight * 0.92
+  };
+  const fit = heroComputeFitTransform(rawPts, box, 0.92);
+  const pts = heroApplyFitTransform(rawPts, fit);
   const order = [...pts].sort(() => Math.random()-0.5);
   heroSnakeLegs = [];
   for (let i = 1; i < order.length; i++) heroSnakeLegs.push(heroBuildLegPath(order[i-1], order[i]));
