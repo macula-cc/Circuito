@@ -1083,8 +1083,8 @@ function heroSnakeAdvanceLegs(dt){
   return { dist, finished };
 }
 
-// traço grosso com gradiente escuro->vermelho por PERNA (não pelo caminho
-// inteiro), pra cada trecho ter sua própria transição — mesmo princípio do
+// traço grosso com gradiente escuro->cinza claro por PERNA (não pelo
+// caminho inteiro), pra cada trecho ter sua própria transição — mesmo princípio do
 // gradiente preto->branco do gerador-marca.html, cores diferentes
 function heroStrokeLegsInRange(dStart, dEnd){
   const ctx = heroSnakeCtx;
@@ -1099,8 +1099,8 @@ function heroStrokeLegsInRange(dStart, dEnd){
       if (sub.length >= 2){
         const a = leg[0], b = leg[leg.length-1];
         const grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-        grad.addColorStop(0, '#1a0000');
-        grad.addColorStop(1, '#ff2020');
+        grad.addColorStop(0, '#0a0a0a');
+        grad.addColorStop(1, '#9a9a9a');
         ctx.lineWidth = heroSnakeWidth;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
