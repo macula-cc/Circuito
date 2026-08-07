@@ -44,7 +44,7 @@
   /* escurece o mapa (pontos incluídos, ficam por baixo) enquanto o hero title
      está grande, só pra dar destaque ao título/data — some no primeiro toque,
      junto com o encolhimento do título */
-  .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(0,0,0,0.6);
+  .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(0,0,0,0.88);
             backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
             pointer-events:none; transition:opacity 0.6s ease; }
   .map-dim.hidden{ opacity:0; }
@@ -62,17 +62,17 @@
      sans 57pt / serifado 212pt ≈ 0,2689; "Edição 01" 24pt / 212pt ≈ 0,1132;
      entrelinha do título 100% (line-height:1); entrelinha da data
      195pt / 212pt ≈ 0,9198 */
-  .hero-label{ font-family:var(--sans-display); font-weight:350; color:#cfcfcf;
+  .hero-label{ font-family:var(--sans-display); font-weight:350; color:#ffffff;
                text-transform:uppercase; letter-spacing:-0.025em;
                font-size:0.2689em; line-height:1.2; margin:0 0 0.3em;
                transition:color 0.4s ease; }
 
-  .hero-title h1{ font-family:var(--serif); font-weight:400; color:#cfcfcf;
+  .hero-title h1{ font-family:var(--serif); font-weight:400; color:#ffffff;
                   font-size:1em;
                   line-height:1; margin:0; white-space:nowrap; letter-spacing:-0.01em;
                   transition:line-height 0.75s cubic-bezier(.16,1,.3,1), color 0.4s ease; }
 
-  .hero-date{ font-family:var(--serif); font-weight:400; font-style:italic; color:#cfcfcf;
+  .hero-date{ font-family:var(--serif); font-weight:400; font-style:italic; color:#ffffff;
               font-size:1em; margin-top:0.05em; margin-bottom:-0.4em;
               line-height:0.9198; white-space:nowrap;
               transition:color 0.4s ease; }
@@ -107,7 +107,7 @@
   /* ---------------- View switcher (glass pill toggle) + about button ----------------
      centralizados na parte inferior da tela — o sort-switch (por endereço/
      por artista) fica numa linha própria acima deles, mesmo esquema */
-  .top-actions{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:600;
+  .top-actions{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:100;
                 display:flex; align-items:center; gap:0.5rem; }
   .switcher{ display:flex; gap:2px; font-family:var(--mono); font-size:0.79rem;
              background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
@@ -434,15 +434,15 @@
     <span class="hero-edition">Edição 01</span>
   </div>
   <div class="hero-count" id="hero-count">— endereços · — artistas</div>
+  <div class="top-actions">
+    <div class="switcher">
+      <button id="switch-map" class="active">mapa</button>
+      <button id="switch-list">lista</button>
+    </div>
+    <button class="about-btn" id="about-btn">sobre</button>
+  </div>
 </div>
 
-<div class="top-actions">
-  <div class="switcher">
-    <button id="switch-map" class="active">mapa</button>
-    <button id="switch-list">lista</button>
-  </div>
-  <button class="about-btn" id="about-btn">sobre</button>
-</div>
 <div class="sort-switch" id="sort-switch">
   <button id="sort-endereco" class="active">por endereço</button>
   <button id="sort-artista">por artista</button>
