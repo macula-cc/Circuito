@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Gerador de Marca 3D — Circuito de Ateliês do Centro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+
+<!-- three.js via CDN, sem build step — mesmo princípio de dependência do
+     MapLibre GL JS já usado nos outros geradores. Import map resolve os
+     módulos ES direto do unpkg, sem precisar instalar nada localmente. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<style>
+  :root{
+    --serif: 'Instrument Serif', Georgia, 'Iowan Old Style', 'Times New Roman', ui-serif, serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --ink:#111; --line: rgba(0,0,0,0.15); --gray:#6b6b6b; --hover:#f0f0f0; --paper:#fff;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; color:var(--ink); font-family:var(--sans); background:var(--paper); }
+  a{ color:inherit; text-decoration:none; }
+  button, select{ font:inherit; touch-action:manipulation; }
+
+  .nav{ display:flex; gap:2px; font-family:var(--mono); font-size:0.75rem;
+        background:#f4f4f4; border:1px solid var(--line); border-radius:999px; padding:3px; width:max-content; margin-bottom:1.6rem; }
+  .nav a{ padding:0.5rem 0.9rem; border-radius:999px; color:var(--gray); }
+  .nav a.active{ background:#111; color:#fff; }
+  .nav a:not(.active):hover{ background:var(--hover); color:var(--ink); }
+
+  .wrap{ display:grid; grid-template-columns:400px 1fr; min-height:100vh; }
+  @media (max-width:900px){ .wrap{ grid-template-columns:1fr; } }
+
+  .panel{ padding:calc(1.6rem + env(safe-area-inset-top)) 1.6rem 2rem; border-right:1px solid var(--line);
+          overflow-y:auto; max-height:100vh; }
+  @media (max-width:900px){ .panel{ border-right:none; border-bottom:1px solid var(--line); max-height:none; } }
+
+  h1{ font-family:var(--serif); font-weight:400; font-size:2.1rem; line-height:1.05; margin:0 0 0.2rem; }
+  .sub{ font-family:var(--mono); font-size:0.79rem; color:var(--gray); margin-bottom:1.6rem; }
+
+  .field{ margin-bottom:1.6rem; }
+  .field label{ display:block; font-family:var(--mono); font-size:0.73rem; text-transform:uppercase;
+                letter-spacing:0.04em; color:var(--gray); margin-bottom:0.5rem; }
+  .note{ font-family:var(--mono); font-size:0.73rem; color:var(--gray); line-height:1.4; }
+
+  input[type="range"]{ width:100%; accent-color:var(--ink); }
+
+  .row-btns{ display:flex; gap:0.5rem; flex-wrap:wrap; }
+  .btn{ font-family:var(--mono); font-size:0.79rem; background:#fff; color:var(--ink); border:1px solid var(--ink);
+        padding:0.6rem 0.9rem; cursor:pointer; border-radius:0; transition:background 0.15s ease, color 0.15s ease; }
+  .btn:hover{ background:var(--ink); color:#fff; }
+  .btn.active{ background:var(--ink); color:#fff; }
+  .btn.primary{ background:var(--ink); color:#fff; flex:1; padding:0.85rem; font-size:0.83rem; }
+  .btn.primary:hover{ opacity:0.8; }
+  .btn:disabled{ opacity:0.35; cursor:default; pointer-events:none; }
+
+  .divider{ border:none; border-top:1px solid var(--line); margin:1.8rem 0; }
+
+  .status{ font-family:var(--mono); font-size:0.75rem; color:var(--gray); margin-top:0.9rem; min-height:1.2em; line-height:1.4; }
+  .status.error{ color:#9A3324; }
+
+  .stage{ display:flex; align-items:center; justify-content:center; padding:2.4rem; }
+  .canvas-frame{ width:min(74vh, 100%); max-width:640px; aspect-ratio:1/1; border:1px solid var(--line);
+                 box-shadow:0 12px 40px rgba(0,0,0,0.08); background:#fff; position:relative; overflow:hidden;
+                 cursor:grab; }
+  .canvas-frame:active{ cursor:grabbing; }
+  .canvas-frame canvas{ display:block; width:100%; height:100%; }
+  .hint{ position:absolute; bottom:10px; left:0; right:0; text-align:center; pointer-events:none;
+         font-family:var(--mono); font-size:0.7rem; color:rgba(0,0,0,0.35); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="nav">
+      <a href="ferramentas.html">ferramentas</a>
+      <a href="gerador-marca.html">marca</a>
+      <a href="gerador-mascara.html">post</a>
+      <a href="gerador-circuito.html">circuito vivo</a>
+      <a href="gerador-video.html">vídeo</a>
+      <a href="gerador-marca-3d.html" class="active">marca 3d</a>
+    </div>
+
+    <h1>Gerador de<br>Marca 3D</h1>
+    <div class="sub">Circuito de Ateliês do Centro · escultura 3D (three.js)</div>
+
+    <div class="field">
+      <label>Profundidade</label>
+      <input type="range" id="depth-range" min="0" max="100" value="45">
+      <div class="note">o quanto os trechos se espalham no eixo Z — 0 é quase achatado, 100 esculpe bem pra fora do plano</div>
+    </div>
+
+    <div class="field">
+      <label>Pontos dos ateliês</label>
+      <div class="row-btns">
+        <button class="btn active" id="pins-on">mostrar</button>
+        <button class="btn" id="pins-off">esconder</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Giro automático</label>
+      <div class="row-btns">
+        <button class="btn active" id="spin-on">ligado</button>
+        <button class="btn" id="spin-off">desligado</button>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="field">
+      <label>Traçado</label>
+      <div class="note" id="count-note">carregando…</div>
+      <div class="row-btns" style="margin-top:0.6rem;">
+        <button class="btn primary" id="btn-shuffle">gerar novo</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Exportar</label>
+      <div class="row-btns">
+        <button class="btn primary" id="btn-download-png">PNG (quadro atual)</button>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="canvas-frame" id="canvas-frame">
+      <div class="hint">arraste pra girar · role pra dar zoom</div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============================================================
+   dados — mesmo parser/planilha dos outros geradores
+   ============================================================ */
+const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
+
+function parseCSV(text){
+  const rows = []; let row = []; let field = ''; let inQuotes = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (inQuotes){
+      if (c === '"'){ if (text[i+1] === '"'){ field += '"'; i++; } else { inQuotes = false; } }
+      else { field += c; }
+    } else {
+      if (c === '"'){ inQuotes = true; }
+      else if (c === ','){ row.push(field); field = ''; }
+      else if (c === '\r'){ /* ignore */ }
+      else if (c === '\n'){ row.push(field); field = ''; rows.push(row); row = []; }
+      else { field += c; }
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+// alguns endereços chegam da planilha com coordenada mal digitada (ex:
+// sem separador decimal) — tratamos como coordenada ainda não preenchida
+// em vez de deixar entrar na projeção e virar NaN em cascata (já vimos
+// esse bug derrubar outros geradores)
+function parseCoord(raw, min, max){
+  if (!raw) return null;
+  const n = parseFloat(raw.replace(',', '.'));
+  return (isNaN(n) || n < min || n > max) ? null : n;
+}
+
+async function loadLocationsFromSheet(){
+  const res = await fetch(`${SHEET_CSV_URL}&_=${Date.now()}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const text = await res.text();
+  const table = parseCSV(text).filter(r => r.some(c => c !== undefined && c.trim() !== ''));
+  if (table.length < 2) throw new Error('planilha vazia');
+  const headers = table[0].map(h => h.trim());
+  const hIdx = {}; headers.forEach((h,i)=>hIdx[h]=i);
+  const get = (row, name) => { const i = hIdx[name]; return (i!=null && row[i]!=null) ? row[i].trim() : ''; };
+  const locMap = {}; const order = [];
+  table.slice(1).forEach(row => {
+    const local = get(row,'Local / Coletivo');
+    const endereco = get(row,'Endereço');
+    const nome = get(row,'Nome do Artista');
+    if (!endereco && !nome) return;
+    const latRaw = get(row,'Latitude');
+    const lngRaw = get(row,'Longitude');
+    const key = endereco;
+    if (!locMap[key]){
+      locMap[key] = {
+        id: 'loc' + order.length, local, endereco,
+        lat: parseCoord(latRaw, -90, 90),
+        lng: parseCoord(lngRaw, -180, 180),
+      };
+      order.push(key);
+    }
+  });
+  return order.map(k => locMap[k]);
+}
+
+/* ============================================================
+   geometria — mesma projeção (sem mapa real) usada no gerador-marca.html,
+   só que o resultado 2D vira a base X/Y de um ponto no espaço 3D
+   ============================================================ */
+function project(lat, lon){
+  const x = (lon + 180) / 360;
+  const rad = lat * Math.PI/180;
+  const y = (1 - Math.log(Math.tan(rad) + 1/Math.cos(rad)) / Math.PI) / 2;
+  return { x, y };
+}
+function expandBounds(b, factor){
+  const cLat = (b.minLat+b.maxLat)/2, cLng = (b.minLng+b.maxLng)/2;
+  const spanLat = Math.max((b.maxLat-b.minLat)*factor, 0.002);
+  const spanLng = Math.max((b.maxLng-b.minLng)*factor, 0.002);
+  return { minLat:cLat-spanLat/2, maxLat:cLat+spanLat/2, minLng:cLng-spanLng/2, maxLng:cLng+spanLng/2 };
+}
+// caixa alvo em unidades de cena three.js (não pixels) — a marca ocupa
+// aproximadamente esse raio ao redor da origem, no plano XY
+const SCENE_SPAN = 5;
+function computeProjection(bounds){
+  const expanded = expandBounds(bounds, 1.0);
+  const p1 = project(expanded.maxLat, expanded.minLng);
+  const p2 = project(expanded.minLat, expanded.maxLng);
+  const worldW = p2.x - p1.x, worldH = p2.y - p1.y;
+  const scale = (SCENE_SPAN*2) / Math.max(worldW, worldH);
+  return { p1, p2, scale };
+}
+function planePosOf(proj, lat, lon){
+  const p = project(lat, lon);
+  const cx = (proj.p1.x + proj.p2.x)/2, cy = (proj.p1.y + proj.p2.y)/2;
+  return { x: (p.x - cx) * proj.scale, y: -(p.y - cy) * proj.scale };
+}
+
+/* ============================================================
+   estado
+   ============================================================ */
+let LOCATIONS = [];
+let PTS = []; // { x, y, zSeed, loc } — x/y fixos (posição real no plano), zSeed sorteado por embaralhada
+let order = []; // ordem embaralhada de índices em PTS
+let showPins = true;
+let spinning = true;
+let depthAmount = 45; // 0..100, controlado pelo slider
+
+const canvasFrame = document.getElementById('canvas-frame');
+const statusEl = document.getElementById('status');
+const countNote = document.getElementById('count-note');
+function setStatus(msg, isError){
+  statusEl.textContent = msg || '';
+  statusEl.classList.toggle('error', !!isError);
+}
+
+/* ============================================================
+   three.js — cena, câmera, luzes, controles de órbita
+   ============================================================ */
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+camera.position.set(0, 2.4, 13);
+
+// preserveDrawingBuffer:true é necessário pra exportação em PNG funcionar
+// (sem isso o WebGL pode limpar o buffer antes da gente conseguir ler os
+// pixels via toDataURL — mesmo cuidado já tomado com os mapas MapLibre
+// offscreen dos outros geradores)
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+canvasFrame.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 1.1;
+controls.minDistance = 4;
+controls.maxDistance = 30;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.3);
+keyLight.position.set(5, 8, 6);
+scene.add(keyLight);
+const fillLight = new THREE.DirectionalLight(0xffffff, 0.4);
+fillLight.position.set(-6, -3, -4);
+scene.add(fillLight);
+
+const markGroup = new THREE.Group();
+scene.add(markGroup);
+
+function resizeRenderer(){
+  const w = canvasFrame.clientWidth, h = canvasFrame.clientHeight;
+  if (w === 0 || h === 0) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resizeRenderer);
+
+/* ============================================================
+   construção da marca — traçado embaralhado, cada trecho vira uma
+   curva suave em 3D (ponto de controle deslocado aleatoriamente,
+   inclusive no eixo Z) transformada num tubo real com espessura
+   ============================================================ */
+const TUBE_RADIUS = 0.16;
+const markMaterial = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.45, metalness: 0.12 });
+const pinMaterial = new THREE.MeshStandardMaterial({ color: 0xe8834a, roughness: 0.35, metalness: 0.1 });
+const pinGroup = new THREE.Group();
+scene.add(pinGroup);
+
+function depthScale(){
+  return (depthAmount/100) * SCENE_SPAN * 0.9;
+}
+
+function buildLegCurve(a, b){
+  const d = a.distanceTo(b);
+  const mid = new THREE.Vector3(
+    (a.x+b.x)/2 + (Math.random()-0.5) * d * 0.5,
+    (a.y+b.y)/2 + (Math.random()-0.5) * d * 0.5,
+    (a.z+b.z)/2 + (Math.random()-0.5) * d * 0.6
+  );
+  return new THREE.CatmullRomCurve3([a, mid, b]);
+}
+
+function rebuildScene(){
+  // limpa a marca/pinos anteriores
+  while (markGroup.children.length) markGroup.remove(markGroup.children[0]);
+  while (pinGroup.children.length) pinGroup.remove(pinGroup.children[0]);
+  if (order.length < 2) return;
+
+  const dScale = depthScale();
+  const vecs = order.map(i => {
+    const p = PTS[i];
+    return new THREE.Vector3(p.x, p.y, p.zSeed * dScale);
+  });
+
+  for (let i = 1; i < vecs.length; i++){
+    const curve = buildLegCurve(vecs[i-1], vecs[i]);
+    const geo = new THREE.TubeGeometry(curve, 24, TUBE_RADIUS, 10, false);
+    markGroup.add(new THREE.Mesh(geo, markMaterial));
+  }
+
+  if (showPins){
+    vecs.forEach(v => {
+      const geo = new THREE.SphereGeometry(TUBE_RADIUS*1.7, 16, 16);
+      const mesh = new THREE.Mesh(geo, pinMaterial);
+      mesh.position.copy(v);
+      pinGroup.add(mesh);
+    });
+  }
+}
+
+function shuffleOrder(){
+  const withCoords = PTS.map((_, i) => i);
+  for (let i = withCoords.length-1; i>0; i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [withCoords[i], withCoords[j]] = [withCoords[j], withCoords[i]];
+  }
+  order = withCoords;
+  countNote.textContent = `${order.length} ateliês conectados, nesta ordem`;
+}
+
+function generateNew(){
+  PTS.forEach(p => { p.zSeed = (Math.random()*2 - 1); }); // -1..1, novo sorteio de profundidade
+  shuffleOrder();
+  rebuildScene();
+}
+
+/* ============================================================
+   boot
+   ============================================================ */
+async function boot(){
+  try{
+    LOCATIONS = await loadLocationsFromSheet();
+  } catch(err){
+    console.error(err);
+    setStatus('Não foi possível carregar os dados da planilha agora. Recarregue a página em instantes.', true);
+    return;
+  }
+
+  const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
+  if (withCoords.length < 3){
+    setStatus('poucos ateliês com coordenadas preenchidas ainda — é preciso pelo menos 3 pra fechar um traçado.', true);
+    return;
+  }
+  const bounds = {
+    minLat: Math.min(...withCoords.map(l=>l.lat)),
+    maxLat: Math.max(...withCoords.map(l=>l.lat)),
+    minLng: Math.min(...withCoords.map(l=>l.lng)),
+    maxLng: Math.max(...withCoords.map(l=>l.lng)),
+  };
+  const proj = computeProjection(bounds);
+  PTS = withCoords.map(loc => {
+    const { x, y } = planePosOf(proj, loc.lat, loc.lng);
+    return { x, y, zSeed: (Math.random()*2 - 1), loc };
+  });
+
+  setStatus('');
+  resizeRenderer();
+  generateNew();
+}
+
+/* ============================================================
+   UI
+   ============================================================ */
+document.getElementById('btn-shuffle').addEventListener('click', generateNew);
+
+document.getElementById('depth-range').addEventListener('input', (e) => {
+  depthAmount = parseFloat(e.target.value);
+  rebuildScene();
+});
+
+const pinsOnBtn = document.getElementById('pins-on');
+const pinsOffBtn = document.getElementById('pins-off');
+pinsOnBtn.addEventListener('click', () => { showPins = true; pinsOnBtn.classList.add('active'); pinsOffBtn.classList.remove('active'); rebuildScene(); });
+pinsOffBtn.addEventListener('click', () => { showPins = false; pinsOffBtn.classList.add('active'); pinsOnBtn.classList.remove('active'); rebuildScene(); });
+
+const spinOnBtn = document.getElementById('spin-on');
+const spinOffBtn = document.getElementById('spin-off');
+spinOnBtn.addEventListener('click', () => { spinning = true; controls.autoRotate = true; spinOnBtn.classList.add('active'); spinOffBtn.classList.remove('active'); });
+spinOffBtn.addEventListener('click', () => { spinning = false; controls.autoRotate = false; spinOffBtn.classList.add('active'); spinOnBtn.classList.remove('active'); });
+
+document.getElementById('btn-download-png').addEventListener('click', () => {
+  try{
+    renderer.render(scene, camera); // garante que o quadro atual está no buffer
+    const url = renderer.domElement.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url; a.download = 'circuito-marca-3d.png';
+    document.body.appendChild(a); a.click(); a.remove();
+  } catch(err){
+    console.error(err);
+    setStatus('Não foi possível exportar o PNG agora.', true);
+  }
+});
+
+/* ============================================================
+   loop de render
+   ============================================================ */
+function animate(){
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+resizeRenderer();
+animate();
+boot();
+</script>
+</body>
+</html>
