@@ -921,7 +921,7 @@ let heroSnakeLastTs = null;
 let heroSnakeActive = false;
 const HERO_SNAKE_LEG_DURATION = 0.32; // s por trecho, igual ao circuito vivo
 const HERO_SNAKE_ERASE_DURATION = 3;  // s pra apagar tudo de uma vez
-const HERO_SNAKE_WIDTH = 46;          // bem mais grosso que o normal (30) — "estourado"
+const HERO_SNAKE_WIDTH = 90;          // bem mais grosso que o normal (30) — "gigante"
 
 function heroEaseOutSnap(t){ return t >= 1 ? 1 : 1 - Math.pow(2, -10*t); }
 
@@ -1026,7 +1026,10 @@ function buildHeroSnakeLegs(){
     w: window.innerWidth * 0.48,
     h: window.innerHeight * 0.92
   };
-  const fit = heroComputeFitTransform(rawPts, box, 0.92);
+  // fillFraction > 1 de propósito: estoura pra fora da caixa (e da própria
+  // tela, já que o canvas corta tudo que passa da borda) — "gigante,
+  // sangrando na tela", não só preenchendo a metade direita direitinho
+  const fit = heroComputeFitTransform(rawPts, box, 1.55);
   const pts = heroApplyFitTransform(rawPts, fit);
   const order = [...pts].sort(() => Math.random()-0.5);
   heroSnakeLegs = [];
