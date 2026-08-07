@@ -302,7 +302,29 @@ window.addEventListener('resize', resizeRenderer);
    inclusive no eixo Z) transformada num tubo real com espessura
    ============================================================ */
 const TUBE_RADIUS = 0.16;
-const markMaterial = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.45, metalness: 0.12 });
+// gradiente escuro->claro por TRECHO (não pelo traçado inteiro) — mesmo
+// princípio do gradiente 2D da cobrinha (createLinearGradient por perna),
+// só que aqui é cor por vértice ao longo do tubo em vez de um gradiente
+// de canvas 2D
+const TUBULAR_SEGMENTS = 24, RADIAL_SEGMENTS = 10;
+const GRAD_DARK = new THREE.Color(0x0a0a0a);
+const GRAD_LIGHT = new THREE.Color(0x9a9a9a);
+const markMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.45, metalness: 0.12, vertexColors: true });
+const jointMaterial = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.45, metalness: 0.12 });
+
+function applyLegGradient(geometry){
+  const ringVerts = RADIAL_SEGMENTS + 1;
+  const colors = new Float32Array((TUBULAR_SEGMENTS+1) * ringVerts * 3);
+  const tmp = new THREE.Color();
+  for (let i = 0; i <= TUBULAR_SEGMENTS; i++){
+    tmp.copy(GRAD_DARK).lerp(GRAD_LIGHT, i / TUBULAR_SEGMENTS);
+    for (let j = 0; j < ringVerts; j++){
+      const idx = (i*ringVerts + j) * 3;
+      colors[idx] = tmp.r; colors[idx+1] = tmp.g; colors[idx+2] = tmp.b;
+    }
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+}
 
 function depthScale(){
   return (depthAmount/100) * SCENE_SPAN * 0.9;
@@ -348,7 +370,8 @@ function rebuildScene(){
 
   for (let i = 1; i < vecs.length; i++){
     const curve = buildLegCurve(vecs[i-1], vecs[i]);
-    const geo = new THREE.TubeGeometry(curve, 24, TUBE_RADIUS, 10, false);
+    const geo = new THREE.TubeGeometry(curve, TUBULAR_SEGMENTS, TUBE_RADIUS, RADIAL_SEGMENTS, false);
+    applyLegGradient(geo);
     markGroup.add(new THREE.Mesh(geo, markMaterial));
   }
 
@@ -358,7 +381,7 @@ function rebuildScene(){
   // fechado. Não é um "pino" marcado, só preenche a curva normalmente.
   vecs.forEach(v => {
     const geo = new THREE.SphereGeometry(TUBE_RADIUS, 12, 12);
-    const mesh = new THREE.Mesh(geo, markMaterial);
+    const mesh = new THREE.Mesh(geo, jointMaterial);
     mesh.position.copy(v);
     markGroup.add(mesh);
   });
