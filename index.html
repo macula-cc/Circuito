@@ -34,7 +34,10 @@
   .row, .drawer-close, .switcher button, .sort-switch button{ -webkit-tap-highlight-color:transparent; }
 
   /* ---------------- Hero: full-bleed map (always mounted) ---------------- */
-  .hero{ position:fixed; inset:0; }
+  /* isolation:isolate contém o mix-blend-mode:multiply do .map-dim (TESTE)
+     dentro do .hero — sem isso o navegador pode misturar o vermelho com
+     elementos fora daqui, dependendo da árvore de empilhamento */
+  .hero{ position:fixed; inset:0; isolation:isolate; }
   #map{ position:absolute; inset:0; width:100%; height:100%; background:#e9e9e9; z-index:1; isolation:isolate; }
   /* MapLibre é vetorial — não tem mais tile-pane pra filtrar via CSS; as
      cores de água/terra são definidas direto no estilo (ver applyMonochromeStyle,
@@ -43,11 +46,32 @@
 
   /* escurece o mapa (pontos incluídos, ficam por baixo) enquanto o hero title
      está grande, só pra dar destaque ao título/data — some no primeiro toque,
-     junto com o encolhimento do título */
-  .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(0,0,0,0.88);
+     junto com o encolhimento do título. mix-blend-mode:multiply em vez de um
+     preto translúcido comum — multiply preserva os detalhes escuros do
+     mapa/cobrinha por baixo (pretos continuam pretos) em vez de lavar tudo
+     pra uma cor chapada. Cinza médio (mesmo --gray usado no resto do
+     site). Fundo praticamente opaco de propósito: quem cria a variação
+     de tom aqui é o multiply, não a transparência. */
+  .map-dim{ position:absolute; inset:0; z-index:150; background:var(--gray);
+            mix-blend-mode:multiply;
             backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
             pointer-events:none; transition:opacity 0.6s ease; }
   .map-dim.hidden{ opacity:0; }
+
+  /* TESTE: "cobrinha" decorativa atrás do tingimento vermelho — mesmo
+     princípio de animação do "circuito vivo" do gerador de vídeo (desenha
+     progressivamente, depois apaga, recomeça de outro ponto), só que sem os
+     pinos numerados (só a linha) e com traço bem mais grosso/gradiente mais
+     intenso, pra ficar "estourado" por trás do vermelho. Some junto com o
+     overlay quando o hero encolhe (ver shrinkHero). */
+  /* width/height:100% explícitos são necessários aqui: canvas é elemento
+     "replaced" e, mesmo com inset:0, um replaced element position:absolute
+     sem width/height definido usa o tamanho intrínseco (os atributos
+     width/height em pixels físicos setados via JS) em vez de esticar pro
+     viewport — mesmo problema já resolvido antes no cursor customizado. */
+  .hero-snake-canvas{ position:absolute; inset:0; width:100%; height:100%; z-index:50; pointer-events:none;
+                       transition:opacity 0.6s ease; }
+  .hero-snake-canvas.hidden{ opacity:0; }
 
   .hero-title{ position:absolute; top:0; left:0; right:0;
                padding:calc(1.6rem + env(safe-area-inset-top)) calc(1.6rem + env(safe-area-inset-right)) 0 calc(1.6rem + env(safe-area-inset-left));
@@ -89,11 +113,13 @@
   .hero-title.shrunk .hero-label{ color:var(--ink); }
   .hero-title.shrunk .hero-edition{ font-size:0.6rem; }
 
-  /* Mobile: --hero-font-size é calculado via JS (fitHeroText) pra ocupar
-     100% da largura disponível no estado grande — sem isso (JS
-     desabilitado), cai no clamp(...) fluido acima como fallback.
-     Vertical clearance (padding-top) mantém o bloco abaixo do toggle
-     mapa/lista. */
+  /* --hero-font-size é calculado via JS (fitHeroText) em qualquer largura
+     de tela pra linha mais longa (a data) ocupar ~92vw no estado grande —
+     sem isso (JS desabilitado), cai no clamp(...) fluido acima como
+     fallback. No mobile, white-space:normal continua como rede de
+     segurança (uma pequena diferença de métrica de fonte não estoura a
+     tela). Vertical clearance (padding-top) mantém o bloco abaixo do
+     toggle mapa/lista. */
   @media (max-width:780px){
     .hero-title{ padding-top:calc(4.8rem + env(safe-area-inset-top)); }
     .hero-title.shrunk{ padding-top:calc(1.6rem + env(safe-area-inset-top)); }
@@ -426,6 +452,7 @@
 
 <div class="hero">
   <div id="map"></div>
+  <canvas class="hero-snake-canvas" id="hero-snake-canvas"></canvas>
   <div class="map-dim" id="map-dim"></div>
   <div class="hero-title" id="hero-title">
     <div class="hero-label">Circuito de Ateliês do Centro</div>
@@ -872,6 +899,263 @@ function frameMapToPoints(){
   map.fitBounds(bounds, { padding: { top:220, left:30, right:30, bottom:50 }, duration:0 });
 }
 
+/* ============================================================
+   TESTE: "cobrinha" decorativa no hero, atrás do tingimento vermelho
+   (mix-blend-mode:multiply). Mesmo princípio de animação do "circuito
+   vivo" do gerador-video.html (desenha progressivamente ponto a ponto,
+   depois apaga tudo de uma vez, recomeça de outro ponto aleatório) —
+   adaptado pra usar as coordenadas REAIS do mapa (map.project) e, a
+   pedido, SEM os pinos numerados: só a linha/traço, nada de círculos.
+   Some junto com o overlay quando o hero encolhe (ver shrinkHero).
+   ============================================================ */
+let heroSnakeCanvas = null, heroSnakeCtx = null;
+let heroSnakeLegs = [];
+let heroSnakeTotal = 0;
+let heroSnakeLegOffsets = [];
+let heroSnakeLegIndex = 0;
+let heroSnakeLegElapsed = 0;
+let heroSnakeEraseElapsed = 0;
+let heroSnakeProgress = 0;
+let heroSnakeErase = 0;
+let heroSnakePhase = 'drawing';
+let heroSnakeRafId = null;
+let heroSnakeLastTs = null;
+let heroSnakeActive = false;
+const HERO_SNAKE_LEG_DURATION = 0.32; // s por trecho, igual ao circuito vivo
+const HERO_SNAKE_ERASE_DURATION = 3;  // s pra apagar tudo de uma vez
+// a marca inteira cresce como uma unidade só (espaçamento entre pontos E
+// espessura do traço, juntos) — em vez de espessura fixa em pixels, a
+// largura é sempre 3% da caixa (mesma proporção MARK_WIDTH/MAP_BOX do
+// gerador-video.html: 30/1000), multiplicada pelo mesmo fator de
+// crescimento que estoura o espalhamento pra fora da tela
+const HERO_SNAKE_WIDTH_RATIO = 30/1000;
+const HERO_SNAKE_GROW = 5.5; // fator único de crescimento: espalhamento + espessura
+let heroSnakeWidth = 46; // recalculado em buildHeroSnakeLegs() a cada ciclo
+
+function heroEaseOutSnap(t){ return t >= 1 ? 1 : 1 - Math.pow(2, -10*t); }
+
+function heroPathLength(points){
+  let len = 0;
+  for (let i=1;i<points.length;i++) len += Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+  return len;
+}
+function heroBuildLegPath(a, b){
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  if (Math.random() < 0.3 || len < 60){
+    return [ { x:a.x, y:a.y }, { x:b.x, y:b.y } ];
+  }
+  const nx = -dy/len, ny = dx/len;
+  const side = Math.random() < 0.5 ? 1 : -1;
+  const offset = len * (0.14 + Math.random()*0.26) * side;
+  const mx = (a.x+b.x)/2 + nx*offset;
+  const my = (a.y+b.y)/2 + ny*offset;
+  const N = Math.max(18, Math.round(len/16));
+  const pts = [];
+  for (let i=0;i<=N;i++){
+    const t = i/N;
+    const it = 1-t;
+    pts.push({ x: it*it*a.x + 2*it*t*mx + t*t*b.x, y: it*it*a.y + 2*it*t*my + t*t*b.y });
+  }
+  return pts;
+}
+function heroSubPathUpTo(points, dist){
+  const out = [points[0]];
+  let d = 0;
+  for (let i = 1; i < points.length; i++){
+    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+    if (d + seg >= dist){
+      const t = seg === 0 ? 0 : (dist-d)/seg;
+      out.push({ x: points[i-1].x + (points[i].x-points[i-1].x)*t, y: points[i-1].y + (points[i].y-points[i-1].y)*t });
+      return out;
+    }
+    out.push(points[i]);
+    d += seg;
+  }
+  return out;
+}
+function heroSubPathFrom(points, dist){
+  if (dist <= 0) return points;
+  let d = 0;
+  for (let i = 1; i < points.length; i++){
+    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+    if (d + seg >= dist){
+      const t = seg === 0 ? 0 : (dist-d)/seg;
+      const cut = { x: points[i-1].x + (points[i].x-points[i-1].x)*t, y: points[i-1].y + (points[i].y-points[i-1].y)*t };
+      return [cut, ...points.slice(i)];
+    }
+    d += seg;
+  }
+  return [points[points.length-1]];
+}
+function heroExtractRange(points, dStart, dEnd){
+  return heroSubPathFrom(heroSubPathUpTo(points, dEnd), dStart);
+}
+
+function resizeHeroSnakeCanvas(){
+  if (!heroSnakeCanvas) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  heroSnakeCanvas.width = window.innerWidth * dpr;
+  heroSnakeCanvas.height = window.innerHeight * dpr;
+  heroSnakeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+// reenquadramento artístico (mesmo princípio do "circuito vivo" do
+// gerador-video.html) — ignora a escala/distância geográfica real e encaixa
+// o conjunto de pontos inteiro dentro de uma caixa alvo, preservando as
+// posições RELATIVAS entre eles (não randomiza, só escala+centraliza)
+function heroComputeFitTransform(points, box, fillFraction){
+  const xs = points.map(p=>p.x), ys = points.map(p=>p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const w = (maxX-minX) || 1, h = (maxY-minY) || 1;
+  const scale = Math.min(box.w*fillFraction/w, box.h*fillFraction/h);
+  // centraliza pelo CENTROIDE (média de todos os pontos), não pelo meio
+  // da bounding box (min+max)/2 — um único ponto bem distante (ex: pin 16
+  // em Gamboa) desloca o meio da bounding box pra longe de onde a maioria
+  // dos pontos realmente está; o centroide segue o aglomerado denso
+  const cx = xs.reduce((s,v)=>s+v,0) / xs.length;
+  const cy = ys.reduce((s,v)=>s+v,0) / ys.length;
+  const boxCx = box.x + box.w/2, boxCy = box.y + box.h/2;
+  return { scale, cx, cy, boxCx, boxCy };
+}
+function heroApplyFitTransform(points, t){
+  return points.map(p => ({ x: t.boxCx + (p.x-t.cx)*t.scale, y: t.boxCy + (p.y-t.cy)*t.scale }));
+}
+
+// pega a posição de tela REAL de cada endereço (projetando pela mesma
+// instância do mapa exibida) só como ponto de partida — o pin 16 (Gamboa)
+// é isolado dos demais, então usar a posição geográfica de verdade puxava
+// a cobrinha inteira até lá, deixando só uma pontinha visível na tela. Em
+// vez disso, reenquadra tudo numa caixa alinhada à direita da tela.
+function buildHeroSnakeLegs(){
+  if (!map) return false;
+  const rawPts = LOCATIONS
+    .filter(l => l.lat != null && l.lng != null)
+    .map(l => map.project([l.lng, l.lat]));
+  if (rawPts.length < 2) return false;
+  const box = {
+    x: window.innerWidth * 0.30,
+    y: window.innerHeight * 0.02,
+    w: window.innerWidth * 0.68,
+    h: window.innerHeight * 0.96
+  };
+  // fillFraction > 1 de propósito: estoura pra fora da caixa (e da própria
+  // tela, já que o canvas corta tudo que passa da borda) — "gigante,
+  // sangrando na tela", não só preenchendo a metade direita direitinho.
+  // 0.82 é o fillFraction base (mesmo do "troca de marcas" do gerador de
+  // vídeo) multiplicado pelo fator de crescimento — espessura do traço
+  // escala junto, como a mesma marca só que ampliada como um todo.
+  const fit = heroComputeFitTransform(rawPts, box, 0.82 * HERO_SNAKE_GROW);
+  heroSnakeWidth = Math.min(box.w, box.h) * HERO_SNAKE_WIDTH_RATIO * HERO_SNAKE_GROW;
+  const pts = heroApplyFitTransform(rawPts, fit);
+  const order = [...pts].sort(() => Math.random()-0.5);
+  heroSnakeLegs = [];
+  for (let i = 1; i < order.length; i++) heroSnakeLegs.push(heroBuildLegPath(order[i-1], order[i]));
+  heroSnakeTotal = 0;
+  heroSnakeLegOffsets = [];
+  heroSnakeLegs.forEach(leg => { heroSnakeLegOffsets.push(heroSnakeTotal); heroSnakeTotal += heroPathLength(leg); });
+  return true;
+}
+
+function startHeroSnakeCycle(){
+  if (!buildHeroSnakeLegs()) return;
+  heroSnakeLegIndex = 0;
+  heroSnakeLegElapsed = 0;
+  heroSnakeEraseElapsed = 0;
+  heroSnakeProgress = 0;
+  heroSnakeErase = 0;
+  heroSnakePhase = 'drawing';
+  heroSnakeLastTs = null;
+}
+
+function heroSnakeAdvanceLegs(dt){
+  heroSnakeLegElapsed += dt;
+  let t = Math.min(1, heroSnakeLegElapsed / HERO_SNAKE_LEG_DURATION);
+  while (t >= 1 && heroSnakeLegIndex < heroSnakeLegs.length - 1){
+    heroSnakeLegIndex++;
+    heroSnakeLegElapsed -= HERO_SNAKE_LEG_DURATION;
+    t = Math.min(1, Math.max(0, heroSnakeLegElapsed) / HERO_SNAKE_LEG_DURATION);
+  }
+  const legLen = heroPathLength(heroSnakeLegs[heroSnakeLegIndex]);
+  const dist = heroSnakeLegOffsets[heroSnakeLegIndex] + heroEaseOutSnap(t) * legLen;
+  const finished = t >= 1 && heroSnakeLegIndex === heroSnakeLegs.length - 1;
+  return { dist, finished };
+}
+
+// traço grosso com gradiente escuro->cinza claro por PERNA (não pelo
+// caminho inteiro), pra cada trecho ter sua própria transição — mesmo princípio do
+// gradiente preto->branco do gerador-marca.html, cores diferentes
+function heroStrokeLegsInRange(dStart, dEnd){
+  const ctx = heroSnakeCtx;
+  let offset = 0;
+  heroSnakeLegs.forEach(leg => {
+    if (leg.length < 2){ return; }
+    const legLen = heroPathLength(leg);
+    const localStart = Math.max(0, dStart - offset);
+    const localEnd = Math.min(legLen, dEnd - offset);
+    if (localEnd > localStart){
+      const sub = heroExtractRange(leg, localStart, localEnd);
+      if (sub.length >= 2){
+        const a = leg[0], b = leg[leg.length-1];
+        const grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+        grad.addColorStop(0, '#0a0a0a');
+        grad.addColorStop(1, '#9a9a9a');
+        ctx.lineWidth = heroSnakeWidth;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = grad;
+        ctx.beginPath();
+        sub.forEach((p,i) => { if (i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+        ctx.stroke();
+      }
+    }
+    offset += legLen;
+  });
+}
+
+function drawHeroSnakeFrame(){
+  heroSnakeCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  const dStart = heroSnakePhase === 'erasing' ? heroSnakeErase : 0;
+  const dEnd = heroSnakePhase === 'erasing' ? heroSnakeTotal : heroSnakeProgress;
+  heroStrokeLegsInRange(dStart, dEnd);
+}
+
+function heroSnakeLoop(ts){
+  if (!heroSnakeActive) { heroSnakeRafId = null; return; }
+  heroSnakeRafId = requestAnimationFrame(heroSnakeLoop);
+  if (heroSnakeLastTs == null) heroSnakeLastTs = ts;
+  const dt = Math.min(0.1, (ts - heroSnakeLastTs) / 1000);
+  heroSnakeLastTs = ts;
+
+  if (heroSnakePhase === 'drawing'){
+    const { dist, finished } = heroSnakeAdvanceLegs(dt);
+    heroSnakeProgress = dist;
+    if (finished){ heroSnakePhase = 'erasing'; heroSnakeEraseElapsed = 0; }
+  } else {
+    heroSnakeEraseElapsed += dt;
+    const t = Math.min(1, heroSnakeEraseElapsed / HERO_SNAKE_ERASE_DURATION);
+    heroSnakeErase = heroEaseOutSnap(t) * heroSnakeTotal;
+    if (t >= 1){ startHeroSnakeCycle(); return; }
+  }
+  drawHeroSnakeFrame();
+}
+
+function startHeroSnake(){
+  heroSnakeCanvas = document.getElementById('hero-snake-canvas');
+  if (!heroSnakeCanvas) return;
+  heroSnakeCtx = heroSnakeCanvas.getContext('2d');
+  resizeHeroSnakeCanvas();
+  window.addEventListener('resize', resizeHeroSnakeCanvas);
+  startHeroSnakeCycle();
+  heroSnakeActive = true;
+  if (!heroSnakeRafId) heroSnakeRafId = requestAnimationFrame(heroSnakeLoop);
+}
+function stopHeroSnake(){
+  heroSnakeActive = false;
+  if (heroSnakeRafId){ cancelAnimationFrame(heroSnakeRafId); heroSnakeRafId = null; }
+}
+
 function initMap(){
   try{
     if (typeof maplibregl === 'undefined') throw new Error('MapLibre não carregou');
@@ -925,6 +1209,7 @@ function initMap(){
       syncAllMarkers();
       addStationMarkers();
       locateUserAutomatically();
+      if (!heroShrunk) startHeroSnake(); // TESTE: cobrinha atrás do overlay vermelho
     });
 
     // Duplo-toque pra dar zoom: escuta touchstart/touchend crus, direto no
@@ -1294,19 +1579,16 @@ function goToLocation(loc){
 const heroTitle = document.getElementById('hero-title');
 let heroShrunk = false;
 
-// no mobile, calcula o font-size do título/data pra ocupar 100% da largura
-// disponível (a linha mais longa entre título e data) no estado grande —
-// no desktop o clamp(...) fluido do CSS já dá conta sozinho.
+// calcula o font-size do título/data pra a linha mais longa entre as duas
+// (título ou data — normalmente a data, "18 – 19 de Setembro", que é mais
+// larga por causa do itálico) ocupar ~92vw — em toda largura de tela, não
+// só no mobile como antes (lá o clamp(...) fluido do CSS cobria o desktop).
 const heroFitCanvas = document.createElement('canvas');
 const heroFitCtx = heroFitCanvas.getContext('2d');
 const HERO_FIT_LINES = ['Ateliês abertos', '18 – 19 de Setembro'];
+const HERO_FIT_TARGET_VW = 0.92;
 function fitHeroText(){
-  if (window.innerWidth > 780){
-    document.documentElement.style.removeProperty('--hero-font-size');
-    return;
-  }
-  const cs = getComputedStyle(heroTitle);
-  const available = heroTitle.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const available = window.innerWidth * HERO_FIT_TARGET_VW;
   if (available <= 0) return;
   const ref = 100;
   heroFitCtx.font = `${ref}px 'Instrument Serif', Georgia, serif`;
@@ -1327,6 +1609,11 @@ function shrinkHero(e){
   heroShrunk = true;
   heroTitle.classList.add('shrunk');
   document.getElementById('map-dim').classList.add('hidden');
+  // TESTE: cobrinha some junto com o overlay vermelho, e para de animar
+  // (sem gasto de CPU desenhando algo que não aparece mais)
+  const snakeCanvas = document.getElementById('hero-snake-canvas');
+  if (snakeCanvas) snakeCanvas.classList.add('hidden');
+  stopHeroSnake();
   document.removeEventListener('pointerdown', shrinkHero);
   document.removeEventListener('wheel', shrinkHero);
   document.removeEventListener('keydown', shrinkHero);
