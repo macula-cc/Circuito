@@ -130,7 +130,7 @@
   /* ---------------- View switcher (glass pill toggle) + about button ----------------
      centralizados na parte inferior da tela — o sort-switch (por endereço/
      por artista) fica numa linha própria acima deles, mesmo esquema */
-  .top-actions{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:100;
+  .top-actions{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:500;
                 display:flex; align-items:center; gap:0.5rem; }
   .switcher{ display:flex; gap:2px; font-family:var(--mono); font-size:0.79rem;
              background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
@@ -457,13 +457,15 @@
     <div class="hero-date" id="hero-date">18 – 19 de Setembro</div>
     <span class="hero-edition">Edição 01</span>
   </div>
-  <div class="top-actions">
-    <div class="switcher">
-      <button id="switch-map" class="active">mapa</button>
-      <button id="switch-list">lista</button>
-    </div>
-    <button class="about-btn" id="about-btn">sobre</button>
+
+</div>
+
+<div class="top-actions">
+  <div class="switcher">
+    <button id="switch-map" class="active">mapa</button>
+    <button id="switch-list">lista</button>
   </div>
+  <button class="about-btn" id="about-btn">sobre</button>
 </div>
 
 <div class="sort-switch" id="sort-switch">
@@ -1577,7 +1579,7 @@ let heroShrunk = false;
 const heroFitCanvas = document.createElement('canvas');
 const heroFitCtx = heroFitCanvas.getContext('2d');
 const HERO_FIT_LINES = ['Ateliês abertos', '18 – 19 de Setembro'];
-const HERO_FIT_TARGET_VW = 0.92;
+const HERO_FIT_TARGET_VW = 0.85;
 function fitHeroText(){
   const available = window.innerWidth * HERO_FIT_TARGET_VW;
   if (available <= 0) return;
