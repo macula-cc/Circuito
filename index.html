@@ -44,16 +44,12 @@
      JS), camada por camada, em vez de um filtro aproximado por cima do raster */
   .maplibregl-map{ background:#e9e9e9; font-family:var(--sans); }
 
-  /* escurece o mapa (pontos incluídos, ficam por baixo) enquanto o hero title
-     está grande, só pra dar destaque ao título/data — some no primeiro toque,
-     junto com o encolhimento do título. mix-blend-mode:multiply em vez de um
-     preto translúcido comum — multiply preserva os detalhes escuros do
-     mapa/cobrinha por baixo (pretos continuam pretos) em vez de lavar tudo
-     pra uma cor chapada. Cinza médio (mesmo --gray usado no resto do
-     site). Fundo praticamente opaco de propósito: quem cria a variação
-     de tom aqui é o multiply, não a transparência. */
-  .map-dim{ position:absolute; inset:0; z-index:150; background:var(--gray);
-            mix-blend-mode:multiply;
+  /* véu branco sutil (10% de opacidade) + blur enquanto o hero title está
+     grande — clareia levemente o mapa por baixo do título sem lavar as
+     cores/pins. Texto grande em cinza escuro (ver .hero-label/.hero-title
+     h1/.hero-date) pra manter contraste com esse fundo mais claro. Some no
+     primeiro toque, junto com o encolhimento do título. */
+  .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(255,255,255,0.1);
             backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
             pointer-events:none; transition:opacity 0.6s ease; }
   .map-dim.hidden{ opacity:0; }
@@ -86,17 +82,17 @@
      sans 57pt / serifado 212pt ≈ 0,2689; "Edição 01" 24pt / 212pt ≈ 0,1132;
      entrelinha do título 100% (line-height:1); entrelinha da data
      195pt / 212pt ≈ 0,9198 */
-  .hero-label{ font-family:var(--sans-display); font-weight:350; color:#ffffff;
+  .hero-label{ font-family:var(--sans-display); font-weight:350; color:var(--ink);
                text-transform:uppercase; letter-spacing:-0.025em;
                font-size:0.2689em; line-height:1.2; margin:0 0 0.3em;
                transition:color 0.4s ease; }
 
-  .hero-title h1{ font-family:var(--serif); font-weight:400; color:#ffffff;
+  .hero-title h1{ font-family:var(--serif); font-weight:400; color:var(--ink);
                   font-size:1em;
                   line-height:1; margin:0; white-space:nowrap; letter-spacing:-0.01em;
                   transition:line-height 0.75s cubic-bezier(.16,1,.3,1), color 0.4s ease; }
 
-  .hero-date{ font-family:var(--serif); font-weight:400; font-style:italic; color:#ffffff;
+  .hero-date{ font-family:var(--serif); font-weight:400; font-style:italic; color:var(--ink);
               font-size:1em; margin-top:0.05em; margin-bottom:-0.4em;
               line-height:0.9198; white-space:nowrap;
               transition:color 0.4s ease; }
@@ -1579,7 +1575,7 @@ let heroShrunk = false;
 const heroFitCanvas = document.createElement('canvas');
 const heroFitCtx = heroFitCanvas.getContext('2d');
 const HERO_FIT_LINES = ['Ateliês abertos', '18 – 19 de Setembro'];
-const HERO_FIT_TARGET_VW = 0.85;
+const HERO_FIT_TARGET_VW = 0.75;
 function fitHeroText(){
   const available = window.innerWidth * HERO_FIT_TARGET_VW;
   if (available <= 0) return;
