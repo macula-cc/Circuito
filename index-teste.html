@@ -415,13 +415,15 @@
              background:rgba(255,255,255,0.12); color:#fff; z-index:2; }
   .about-page .about-close:hover{ background:rgba(255,255,255,0.22); }
 
-  .about-body{ max-width:920px; width:100%; margin:0 auto;
+  .about-body{ width:100%;
                padding:calc(4.6rem + env(safe-area-inset-top)) 1.6rem calc(3rem + env(safe-area-inset-bottom)); }
 
   .about-head{ margin:0 0 2rem; }
-  .about-title{ font-family:var(--serif); font-weight:400; color:#fff; font-size:2rem; margin:0; }
+  .about-title{ font-family:var(--sans-display); font-weight:350; text-transform:uppercase; letter-spacing:-0.025em;
+                color:#fff; font-size:1.77rem; line-height:1.27rem; margin:0 0 0.9rem; }
 
-  .about-grid{ display:grid; grid-template-columns:1fr 200px; gap:2.6rem; align-items:start; }
+  .about-grid{ display:grid; grid-template-columns:1fr 320px; gap:2.6rem; align-items:start; }
+  .about-main{ max-width:700px; }
   .about-main p{ font-family:var(--sans); font-size:0.97rem; line-height:1.7; color:#cfcfcf; margin:0 0 1em; }
   .about-main p:last-child{ margin-bottom:0; }
 
