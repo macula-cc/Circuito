@@ -133,11 +133,11 @@
              background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
              -webkit-backdrop-filter:blur(18px) saturate(180%);
              border:1px solid rgba(255,255,255,0.4); border-radius:999px; padding:3px;
-             box-shadow:0 2px 10px rgba(0,0,0,0.08); }
+             box-shadow:0 3px 12px rgba(0,0,0,0.22); }
   .switcher button{ background:transparent; border:none; cursor:pointer; color:var(--ink);
                      padding:0.55rem 0.9rem; min-height:38px; border-radius:999px;
                      transition:background 0.2s ease, color 0.2s ease; }
-  .switcher button.active{ background:#474747; color:#fff; }
+  .switcher button.active{ background:#ffffff; color:#111; }
   .switcher button:not(.active):hover{ background:rgba(255,255,255,0.35); }
 
   /* botão "sobre": separado do toggle mapa/lista, mas segue o mesmo visual
@@ -167,10 +167,10 @@
 
   /* pins: 40px invisible tap target, badge circle with initials centered inside */
   .pin-hit{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
-  .pin{ width:24px; height:24px; border-radius:50%; background:#e8834a; /* TESTE: laranja */
-        box-shadow:0 2px 10px rgba(0,0,0,0.08);
+  .pin{ width:24px; height:24px; border-radius:50%; background:#ffffff; /* TESTE: branco */
+        box-shadow:0 3px 12px rgba(0,0,0,0.22);
         display:flex; align-items:center; justify-content:center;
-        font-family:var(--mono); font-size:0.6rem; font-weight:500; color:#fff; letter-spacing:0.01em;
+        font-family:var(--mono); font-size:0.6rem; font-weight:500; color:#111; letter-spacing:0.01em;
         transition:transform 0.18s cubic-bezier(.4,0,.2,1), box-shadow 0.18s ease;
         transform:scale(1); }
   .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.18); box-shadow:0 4px 16px rgba(0,0,0,0.35); }
@@ -244,7 +244,7 @@
          padding:0 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); }
   .row{ display:flex; align-items:baseline; gap:1rem; padding:0.85rem 0.2rem; border-bottom:1px solid var(--line);
         cursor:pointer; background:none; border-left:none; border-right:none; border-top:none; width:100%;
-        text-align:left; font-family:inherit; transition:background 0.15s ease, padding-left 0.15s ease; }
+        text-align:left; font-family:inherit; color:var(--ink); transition:background 0.15s ease, padding-left 0.15s ease; }
   .row:hover{ background:var(--hover); padding-left:0.6rem; }
   .row.pending{ color:var(--gray); font-style:italic; }
   .row-num{ font-family:var(--mono); font-size:0.83rem; color:var(--gray); width:1.6rem; flex-shrink:0; }
@@ -799,16 +799,16 @@ function addStationMarkers(){
 // (fundo azul-acinzentado bem claro, ruas/contornos em azul-marinho escuro,
 // pontos em laranja — ver .pin no CSS)
 const MONO_COLORS = {
-  background: '#d7e1ea',    // azul-acinzentado bem claro dos quarteirões
-  water: '#bfd4e3',         // um tom de azul mais forte, pra diferenciar da terra
-  landuse: '#d7e1ea',       // mesmo azul claro dos quarteirões
-  building: '#d7e1ea',      // preenchimento igual ao quarteirão — prédio não se destaca
-  buildingOutline: '#d7e1ea', // igual ao preenchimento/fundo — contorno some de novo
-  road: '#e8e8e8',          // TESTE: cinza bem clarinho
-  roadCasing: '#e8e8e8',
-  boundary: '#5a7ea3',
-  text: '#1c3a5e',
-  textHalo: '#d7e1ea'
+  background: '#ececec',    // cinza claro dos quarteirões
+  water: '#f8f8f8',         // quase branco, só pra diferenciar da terra
+  landuse: '#ececec',       // mesmo cinza dos quarteirões
+  building: '#ececec',      // preenchimento igual ao quarteirão — prédio não se destaca
+  buildingOutline: '#ececec', // igual ao preenchimento — contorno some de vez
+  road: '#ffffff',          // ruas brancas, se destacando do cinza dos quarteirões
+  roadCasing: '#ffffff',
+  boundary: '#cccccc',
+  text: '#111111',
+  textHalo: '#ffffff'
 };
 function applyMonochromeStyle(){
   const layers = map.getStyle().layers || [];
