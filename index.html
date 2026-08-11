@@ -17,13 +17,13 @@
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 
 <style>
   :root{
     --serif: 'Instrument Serif', Georgia, 'Iowan Old Style', 'Times New Roman', ui-serif, serif;
     --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --sans-display: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --sans-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --ink:#111;
     --line: rgba(0,0,0,0.15);
@@ -114,7 +114,7 @@
      ao "Ateliês abertos" gigante (24/212), mas com tamanho fixo e legível no
      estado encolhido (proporcional ficaria ilegível de tão pequeno) */
   .hero-edition{ display:inline-block; margin-top:0.3em;
-                 font-family:var(--mono); font-size:0.1132em; color:#fff; background:var(--gray);
+                 font-family:var(--sans-display); font-size:0.1132em; color:#fff; background:var(--gray);
                  padding:0.35em 0.85em; border-radius:999px; white-space:nowrap; }
 
   .hero-title.shrunk{ font-size:clamp(1.43rem, 3.3vw, 2.09rem) !important; }
@@ -165,6 +165,7 @@
   .about-btn:hover{ background:rgba(255,255,255,0.35); }
 
   .sort-switch{ position:absolute; bottom:calc(5rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:600;
+                width:max-content;
                 display:flex; gap:2px; font-family:var(--mono); font-size:0.73rem;
                 background:rgba(255,255,255,0.18); backdrop-filter:blur(18px) saturate(180%);
                 -webkit-backdrop-filter:blur(18px) saturate(180%);
@@ -173,9 +174,9 @@
                 opacity:0; pointer-events:none; transition:opacity 0.2s ease; }
   .sort-switch.visible{ opacity:1; pointer-events:auto; }
   .sort-switch button{ background:transparent; border:none; cursor:pointer; color:var(--ink);
-                        padding:0.5rem 0.7rem; min-height:34px; border-radius:999px;
+                        padding:0.5rem 0.7rem; min-height:38px; border-radius:999px;
                         transition:background 0.2s ease, color 0.2s ease; }
-  .sort-switch button.active{ background:#474747; color:#fff; }
+  .sort-switch button.active{ background:#ffffff; color:#111; }
   .sort-switch button:not(.active):hover{ background:rgba(255,255,255,0.35); }
 
   /* pins: 40px invisible tap target, badge circle with initials centered inside */
@@ -205,15 +206,15 @@
   .station-hit:hover .station-badge{ transform:scale(1.15); }
 
   .maplibregl-popup-content{ border-radius:2px !important; box-shadow:0 8px 24px rgba(0,0,0,0.18) !important;
-                              font-family:var(--mono); font-size:0.79rem; color:var(--ink); padding:0.7rem 0.9rem !important; }
+                              font-family:var(--sans-display); font-size:0.79rem; color:var(--ink); padding:0.7rem 0.9rem !important; }
   .maplibregl-popup-tip{ box-shadow:0 8px 24px rgba(0,0,0,0.1) !important; }
 
   /* crédito de OSM/OpenFreeMap discreto (mas sempre visível — é exigência de
      licença, não só estética) — texto/fundo mais fracos que o padrão do
      MapLibre, e a versão completa também aparece no "Sobre" */
   .maplibregl-ctrl-group{ border-radius:0 !important; box-shadow:none !important; border:1px solid var(--line) !important; }
-  .maplibregl-ctrl-group button{ background:#fff !important; color:#111 !important; font-family:var(--mono) !important; }
-  .maplibregl-ctrl-attrib{ font-family:var(--mono); font-size:0.68rem !important; background:rgba(255,255,255,0.75) !important; }
+  .maplibregl-ctrl-group button{ background:#fff !important; color:#111 !important; font-family:var(--sans-display) !important; }
+  .maplibregl-ctrl-attrib{ font-family:var(--sans-display); font-size:0.68rem !important; background:rgba(255,255,255,0.75) !important; }
   .locate-control-btn{ width:29px; height:29px; display:flex; align-items:center; justify-content:center;
                         background:#fff; border:1px solid var(--line); border-top:none; cursor:pointer;
                         font-size:1rem; color:#111; }
@@ -249,34 +250,52 @@
   .list-overlay.open .list-modal{ transform:scale(1); }
 
   .list-head{ padding:1.6rem 1.6rem 1rem; border-bottom:1px solid rgba(0,0,0,0.12); flex-shrink:0; }
-  .list-head h2{ font-family:var(--serif); font-weight:400; font-size:1.5rem; margin:0 0 0.2rem; }
+  .list-head h2{ font-family:var(--sans-display); font-weight:400; font-size:1.77rem; letter-spacing:-0.02em; margin:0 0 0.2rem; }
   /* alinhado verticalmente com o h2 do list-head — mesmas métricas do about-head */
   .list-close{ position:absolute; top:26px; right:1.6rem; }
 
-  .rows{ overflow-y:auto; -webkit-overflow-scrolling:touch; flex-grow:1; max-width:920px; width:100%; margin:0 auto;
+  .rows{ overflow-y:auto; -webkit-overflow-scrolling:touch; flex-grow:1; width:100%;
          padding:0 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); }
-  .row{ display:flex; align-items:baseline; gap:1rem; padding:0.85rem 0.2rem; border-bottom:1px solid var(--line);
+  .row{ display:flex; align-items:baseline; gap:0.5rem; padding:0.85rem 0.2rem; border-bottom:1px solid var(--line);
         cursor:pointer; background:none; border-left:none; border-right:none; border-top:none; width:100%;
         text-align:left; font-family:inherit; color:var(--ink); transition:background 0.15s ease, padding-left 0.15s ease; }
   .row:hover{ background:var(--hover); padding-left:0.6rem; }
   .row.pending{ color:var(--gray); font-style:italic; }
   .row-num{ font-family:var(--mono); font-size:0.83rem; color:var(--gray); width:1.6rem; flex-shrink:0; }
   .row-main{ flex-grow:1; min-width:0; }
-  .row-title{ font-family:var(--serif); font-size:1.16rem; }
-  .row-sub{ font-family:var(--mono); font-size:0.79rem; color:var(--gray); display:block; margin-top:0.15rem; }
-  .row-count{ font-family:var(--mono); font-size:0.79rem; color:var(--gray); white-space:nowrap; }
+  .row-title{ font-family:var(--sans-display); font-size:1.16rem; }
+  .row-sub{ font-family:var(--sans-display); font-size:0.79rem; color:var(--gray); display:block; margin-top:0.15rem; }
+  .row-count{ font-family:var(--sans-display); font-size:0.79rem; color:var(--gray); white-space:nowrap; }
 
-  /* lista "por artista": grid com áreas nomeadas — no desktop nome/endereço
-     ficam empilhados à esquerda com o instagram à direita (como antes); no
-     mobile vira uma coluna só, na ordem nome → instagram → endereço */
-  .row-artista{ display:grid; grid-template-columns:1fr auto; grid-template-areas:"title insta" "sub insta";
-                align-items:baseline; column-gap:1rem; row-gap:0.15rem; }
+  /* lista "por artista": só no celular (max-width:640px, mesmo corte já
+     usado na página Sobre pra separar celular de tablet/desktop — mais
+     permissivo que o breakpoint geral do site em 780px, que trataria até
+     um iPad em retrato como "mobile") fica empilhada numa coluna só (nome
+     → instagram → endereço). A partir daí (tablet inclusive), 3 colunas
+     lado a lado: nome | instagram | espaço. */
+  .row-artista{ display:grid; grid-template-columns:1fr 1fr 1fr; grid-template-areas:"title insta sub";
+                align-items:baseline; column-gap:1.6rem; row-gap:0.15rem; }
   .row-artista .row-title{ grid-area:title; }
   .row-artista .row-sub{ grid-area:sub; margin-top:0; }
-  .row-artista .row-instagram{ grid-area:insta; font-family:var(--mono); font-size:0.79rem; color:var(--gray);
-                                white-space:nowrap; align-self:center; }
-  @media (max-width:780px){
+  .row-artista .row-instagram{ grid-area:insta; font-family:var(--sans-display); font-size:0.79rem; color:var(--gray);
+                                white-space:nowrap; align-self:baseline; }
+
+  /* colunas a partir do tablet — só o celular (≤640px) mantém a
+     diagramação empilhada de sempre. .row-main vira display:contents pra
+     "num"/"título"/"endereço" disputarem as colunas do grid do .row
+     diretamente, sem precisar tocar no HTML gerado por JS (que continua o
+     mesmo pros dois breakpoints). */
+  .row:not(.row-artista){ display:grid; grid-template-columns:1.6rem 1fr 1fr; align-items:baseline; }
+  .row:not(.row-artista) .row-main{ display:contents; }
+  .row:not(.row-artista) .row-sub{ margin-top:0; margin-left:0.5rem; }
+
+  @media (max-width:640px){
+    .row:not(.row-artista){ display:flex; align-items:baseline; }
+    .row:not(.row-artista) .row-main{ display:block; }
+    .row:not(.row-artista) .row-sub{ margin-top:0.15rem; margin-left:0; }
+
     .row-artista{ grid-template-columns:1fr; grid-template-areas:"title" "insta" "sub"; }
+    .row-artista .row-instagram{ align-self:center; }
   }
 
   /* ---------------- Drawer ---------------- */
@@ -305,9 +324,9 @@
   }
 
   .drawer-head{ padding:1.6rem 1.6rem 1.1rem; border-bottom:1px solid var(--line); flex-shrink:0; position:relative; }
-  .drawer-title{ font-family:var(--serif); font-size:1.5rem; margin:0 0 0.15rem; line-height:1.2; }
-  .drawer-addr{ font-family:var(--mono); font-size:0.94rem; color:var(--gray); }
-  .drawer-directions{ display:inline-block; font-family:var(--mono); font-size:0.94rem; color:var(--gray);
+  .drawer-title{ font-family:var(--sans-display); font-weight:400; font-size:1.77rem; letter-spacing:-0.02em; margin:0 0 0.15rem; line-height:1.2; }
+  .drawer-addr{ font-family:var(--sans-display); font-size:0.94rem; color:var(--gray); }
+  .drawer-directions{ display:inline-block; font-family:var(--sans-display); font-size:0.94rem; color:var(--gray);
                        text-decoration:underline; text-underline-offset:2px; margin-top:0.4rem; }
   .drawer-directions:hover{ opacity:0.6; }
   .drawer-directions.hidden{ display:none; }
@@ -336,7 +355,7 @@
   .artist-photo{ width:100%; aspect-ratio:4/3; background:#e4e4e4; border:1px solid var(--line); border-radius:6px;
                  background-size:cover; background-position:center;
                  display:flex; align-items:center; justify-content:center;
-                 font-family:var(--mono); font-size:0.94rem; color:var(--gray);
+                 font-family:var(--sans-display); font-size:0.94rem; color:var(--gray);
                  cursor:zoom-in; transition:opacity 0.15s ease; }
   .artist-photo:hover{ opacity:0.85; }
 
@@ -345,20 +364,20 @@
      removed from the DOM when empty rather than leaving a blank line. */
   .artist-body{ display:flex; flex-direction:column; min-height:6.1rem; min-width:0; }
 
-  .artist-name{ font-family:var(--sans-display); font-weight:400; font-size:0.9rem; margin:0.55rem 0 0.15rem; line-height:1.2; overflow-wrap:break-word; }
-  .artist-meta{ font-family:var(--mono); font-size:0.77rem; color:var(--gray); display:flex; flex-wrap:wrap; gap:0.4rem; align-items:center; min-width:0; overflow-wrap:break-word; }
+  .artist-name{ font-family:var(--sans-display); font-weight:450; font-size:0.9rem; margin:0.55rem 0 0.1rem; line-height:1.2; overflow-wrap:break-word; }
+  .artist-meta{ font-family:var(--sans-display); font-size:0.83rem; line-height:1.4; color:var(--gray); margin-bottom:0.3rem; display:flex; flex-wrap:wrap; gap:0.4rem; align-items:center; min-width:0; overflow-wrap:break-word; }
   .artist-meta a{ color:var(--ink); text-decoration:underline; text-underline-offset:2px; }
   .artist-meta a:hover{ opacity:0.6; }
-  .artist-room{ font-family:var(--mono); font-size:0.75rem; color:var(--gray); margin-top:0.3rem; }
+  .artist-room{ font-family:var(--sans-display); font-size:0.75rem; color:var(--gray); margin-top:0.3rem; }
   .artist-room .artist-obs{ border:1px solid var(--line); padding:0.05rem 0.3rem; }
   .day-badges{ display:flex; gap:0.35rem; margin-top:0.45rem; flex-wrap:wrap; }
-  .day-pill{ font-family:var(--mono); font-size:0.68rem; padding:0.15rem 0.45rem; border-radius:3px; border:1px solid transparent; }
+  .day-pill{ font-family:var(--sans-display); font-size:0.68rem; padding:0.15rem 0.45rem; border-radius:3px; border:1px solid transparent; }
   .day-pill.present{ background:#DFF3E3; color:#1F6B33; border-color:#B9E0C2; }
   .day-pill.absent{ background:#FBE2E0; color:#9A3324; border-color:#F0C4C0; }
-  .photo-note{ font-family:var(--mono); font-size:0.75rem; color:var(--gray); font-style:italic; margin-top:0.9rem; grid-column:1 / -1; }
+  .photo-note{ font-family:var(--sans-display); font-size:0.75rem; color:var(--gray); font-style:italic; margin-top:0.9rem; grid-column:1 / -1; }
 
   .map-error{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-              font-family:var(--mono); font-size:0.88rem; color:var(--gray); text-align:center; padding:2rem; }
+              font-family:var(--sans-display); font-size:0.88rem; color:var(--gray); text-align:center; padding:2rem; }
 
   /* ---------------- Lightbox (modal, glassmorphism) ---------------- */
   .lightbox{ position:fixed; inset:0; z-index:1000;
@@ -399,11 +418,11 @@
   .lightbox-modal img{ max-width:100%; max-height:70vh; object-fit:contain; border:1px solid rgba(0,0,0,0.1); }
   .lightbox-placeholder{ display:none; width:100%; max-width:520px; aspect-ratio:4/3; background:rgba(0,0,0,0.05);
                           align-items:center; justify-content:center;
-                          font-family:var(--mono); font-size:1.21rem; color:var(--gray); border:1px solid rgba(0,0,0,0.12); }
+                          font-family:var(--sans-display); font-size:1.21rem; color:var(--gray); border:1px solid rgba(0,0,0,0.12); }
   .lightbox-placeholder.show{ display:flex; }
   .lightbox-caption{ max-width:520px; margin-top:1.4rem; text-align:center; }
   .lightbox-caption .lb-name{ font-family:var(--serif); font-size:1.32rem; color:var(--ink); margin:0 0 0.4rem; }
-  .lightbox-caption .lb-room{ font-family:var(--mono); font-size:0.83rem; color:var(--gray); margin-bottom:0.5rem; }
+  .lightbox-caption .lb-room{ font-family:var(--sans-display); font-size:0.83rem; color:var(--gray); margin-bottom:0.5rem; }
   .lightbox-caption .lb-bio{ font-family:var(--sans); font-size:0.97rem; line-height:1.55; color:var(--gray); margin:0.8rem 0 0; }
   /* centralizado em toda a margem vazia do topo — lightbox-head (1.8rem)
      + padding-top do lightbox-body (1.6rem) — até onde a imagem começa,
@@ -432,7 +451,7 @@
 
   .about-grid{ display:grid; grid-template-columns:1fr 320px; gap:2.6rem; align-items:start; }
   .about-main{ max-width:900px; }
-  .about-main p{ font-family:var(--sans); font-size:1.77rem; line-height:1.27; color:#cfcfcf; margin:0 0 0.9rem; }
+  .about-main p{ font-family:var(--sans-display); font-size:1.77rem; line-height:1.27; color:#cfcfcf; margin:0 0 0.9rem; }
   .about-main p:last-child{ margin-bottom:0; }
 
   .about-credits{ font-family:var(--sans-display); }
@@ -1707,7 +1726,7 @@ async function boot(){
     document.getElementById('map').innerHTML =
       '<div class="map-error">Não foi possível carregar os dados da planilha agora.<br>Tente recarregar a página em instantes.</div>';
     document.getElementById('rows').innerHTML =
-      '<p style="font-family:var(--mono);font-size:0.88rem;color:var(--gray);padding:1rem 0.2rem;">Não foi possível carregar os dados agora.</p>';
+      '<p style="font-family:var(--sans-display);font-size:0.88rem;color:var(--gray);padding:1rem 0.2rem;">Não foi possível carregar os dados agora.</p>';
     return;
   }
   computeLocationNumbers();
