@@ -234,8 +234,11 @@
              background:rgba(0,0,0,0.08); color:#111; z-index:2; }
   .list-page .list-close:hover{ background:rgba(0,0,0,0.16); }
 
+  /* padding-bottom generoso pra o último item da lista não ficar embaixo
+     do toggle mapa/lista/sobre + sort-switch (por endereço/por artista),
+     que são fixed e ficam sobrepostos ao final do scroll senão */
   .list-body{ width:100%;
-              padding:calc(4.6rem + env(safe-area-inset-top)) 1.6rem calc(3rem + env(safe-area-inset-bottom)); }
+              padding:calc(4.6rem + env(safe-area-inset-top)) 1.6rem calc(9rem + env(safe-area-inset-bottom)); }
   .list-head{ margin:0 0 2rem; }
   /* mesmo estilo do .about-title (Geist uppercase), só que em tinta escura
      — a página da lista é branca, a do "sobre" é preta */
