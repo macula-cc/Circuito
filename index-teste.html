@@ -322,13 +322,13 @@
     .drawer.open{ transform:translateX(0); }
   }
   @media (max-width:780px){
-    .drawer{ left:0; right:0; bottom:0; max-height:82vh; transform:translateY(100%);
+    .drawer{ left:0; right:0; bottom:0; max-height:70vh; transform:translateY(100%);
              border-bottom-left-radius:0; border-bottom-right-radius:0; }
     .drawer.open{ transform:translateY(0); }
   }
 
   .drawer-head{ padding:1.6rem 1.6rem 1.1rem; border-bottom:1px solid var(--line); flex-shrink:0; position:relative; }
-  .drawer-title{ font-family:var(--sans-display); font-weight:400; font-size:1.77rem; letter-spacing:-0.02em; margin:0 0 0.15rem; line-height:1.2; }
+  .drawer-title{ font-family:var(--sans-display); font-weight:400; font-size:1.57rem; letter-spacing:-0.02em; margin:0 0 0.15rem; line-height:1.2; }
   .drawer-addr{ font-family:var(--sans-display); font-size:0.94rem; color:var(--gray); }
   .drawer-directions{ display:inline-block; font-family:var(--sans-display); font-size:0.94rem; color:var(--gray);
                        text-decoration:underline; text-underline-offset:2px; margin-top:0.4rem; }
@@ -780,7 +780,7 @@ function syncAllMarkers(){
       markers[loc.id].setLngLat(pos);
     } else {
       const el = makePinEl(pinLabel(loc), false);
-      el.addEventListener('click', () => openDrawer(loc.id));
+      el.addEventListener('click', () => { focusMapOnLocation(loc); openDrawer(loc.id); });
       const marker = new maplibregl.Marker({ element: el, anchor:'center' }).setLngLat(pos).addTo(map);
       markers[loc.id] = marker;
     }
@@ -1585,11 +1585,27 @@ lightbox.addEventListener('click', (e) => { if (e.target === lightbox) closeLigh
 
 // ---------------- TESTE: "sobre" descortinado (mapa sobe/desce como cortina) ----------------
 const heroEl = document.querySelector('.hero');
+
+// TESTE: no mobile o drawer (bottom sheet) ocupa até 70vh — sem isso, o
+// pin ficava escondido embaixo dele, já que o flyTo simplesmente
+// centralizava o ponto na tela toda. Usa o "padding" do MapLibre (não
+// afeta o zoom/posição real, só onde o "centro" visual cai dentro da
+// área não coberta) pra empurrar o ponto pros ~30% superiores, que é o
+// único trecho do mapa que continua visível com o drawer aberto.
+function focusMapOnLocation(loc){
+  if (!map || loc.lat == null) return;
+  const isMobile = window.innerWidth <= 780;
+  map.flyTo({
+    center: displayLatLngFor(loc),
+    zoom: 17,
+    duration: 600,
+    padding: isMobile ? { top:0, bottom:window.innerHeight * 0.7, left:0, right:0 } : { top:0, bottom:0, left:0, right:0 }
+  });
+}
+
 function goToLocation(loc){
   applyMode('map');
-  if (map && loc.lat != null){
-    setTimeout(() => map.flyTo({ center: displayLatLngFor(loc), zoom: 17, duration: 600 }), 50);
-  }
+  setTimeout(() => focusMapOnLocation(loc), 50);
   openDrawer(loc.id);
 }
 
