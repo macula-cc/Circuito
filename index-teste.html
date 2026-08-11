@@ -1567,7 +1567,18 @@ lightbox.addEventListener('click', (e) => { if (e.target === lightbox) closeLigh
 // ---------------- TESTE: "sobre" descortinado (mapa sobe/desce como cortina) ----------------
 const heroEl = document.querySelector('.hero');
 let aboutOpen = false;
-function openAbout(){ aboutOpen = true; heroEl.classList.add('lifted'); }
+function openAbout(){
+  aboutOpen = true;
+  heroEl.classList.add('lifted');
+  // a lista (e o sort-switch "por endereço/por artista", que só fica
+  // visível junto dela) é uma camada própria (z-index:400/600)
+  // independente do .hero — sem fechar ela aqui, ficava por cima da
+  // página "sobre" mesmo com o mapa já tendo subido, porque não tem
+  // relação de empilhamento entre os dois (list-overlay não é filho do
+  // .hero). setView('map') já cuida de fechar a lista, tirar o sort-switch
+  // e ajustar o estado ativo do switcher mapa/lista, tudo de uma vez.
+  setView('map');
+}
 function closeAbout(){ aboutOpen = false; heroEl.classList.remove('lifted'); }
 document.getElementById('about-btn').addEventListener('click', openAbout);
 document.getElementById('about-close').addEventListener('click', closeAbout);
