@@ -172,7 +172,14 @@
   .sort-switch button:not(.active):hover{ background:rgba(255,255,255,0.35); }
 
   /* pins: 40px invisible tap target, badge circle with initials centered inside */
-  .pin-hit{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  /* z-index com !important: o MapLibre define um z-index INLINE em cada
+     marcador (baseado na posição na tela, pra simular profundidade —
+     quem está mais "embaixo" visualmente fica por cima), que muda a cada
+     movimento do mapa e sobrescreveria um z-index normal no CSS. Só
+     !important no stylesheet vence um estilo inline sem !important —
+     garante que os pins dos ateliês fiquem sempre acima das estações,
+     não importa o zoom/posição. */
+  .pin-hit{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2 !important; }
   .pin{ width:24px; height:24px; border-radius:50%; background:#ffffff; /* TESTE: branco */
         box-shadow:0 3px 12px rgba(0,0,0,0.22);
         display:flex; align-items:center; justify-content:center;
@@ -187,7 +194,7 @@
      reproduction of the transit agency's own logo artwork) so metro and
      VLT read apart from each other at a glance, echoing each service's
      real-world color without copying the exact mark. */
-  .station-hit{ width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .station-hit{ width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:1 !important; }
   .station-badge{ width:20px; height:20px; border-radius:50%; border:2px solid #fff;
                    box-shadow:0 1px 4px rgba(0,0,0,0.35);
                    display:flex; align-items:center; justify-content:center;
