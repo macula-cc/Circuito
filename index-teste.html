@@ -1482,17 +1482,24 @@ async function geocodeAddress(query){
   return null;
 }
 
+// só nome da rua + primeiro número servem pro Nominatim — ele geocodifica
+// no nível de prédio/rua, nunca sala/andar/bairro/complemento, e esse
+// "resto" às vezes nem é ignorado: ativamente atrapalha e faz a busca
+// falhar em silêncio (endereço fica "pendente" pra sempre, sem erro
+// visível). Corta tudo a partir do primeiro número (inclusive) em diante.
+function simplifyAddressForGeocoding(endereco){
+  const m = endereco.match(/^(.*?\d+)/);
+  return (m ? m[1] : endereco).trim();
+}
+
 async function resolveMissingCoordinates(){
   const pending = LOCATIONS.filter(l =>
     (l.lat == null || l.lng == null) && !/confirmar/i.test(l.endereco)
   );
   for (const loc of pending){
-    // sem ", Centro" fixo aqui: alguns endereços da planilha já vêm com
-    // "- Centro" (ou outro bairro) no próprio texto, e colar mais um
-    // "Centro" na frente do Nominatim faz ele não achar nada — falha
-    // silenciosa (endereço fica "pendente" pra sempre, sem erro visível).
-    // "Rio de Janeiro, Brasil" sozinho já é o bastante pra desambiguar.
-    const query = `${loc.endereco}, Rio de Janeiro, Brasil`;
+    // "Rio de Janeiro, Brasil" no final já desambigua o suficiente — não
+    // precisa (e não deve) levar bairro/complemento do texto original.
+    const query = `${simplifyAddressForGeocoding(loc.endereco)}, Rio de Janeiro, Brasil`;
     const coords = await geocodeAddress(query);
     if (coords){
       loc.lat = coords.lat;
