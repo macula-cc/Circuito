@@ -1469,12 +1469,24 @@ function locateUserAutomatically(){
 // o carregamento rápido para o caso comum e só busca online o que falta.
 async function geocodeAddress(query){
   try{
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+    // limit=1 sozinho é arriscado: várias cidades da Região Metropolitana
+    // do Rio (Belford Roxo, Volta Redonda, Cabo Frio...) têm ruas com o
+    // mesmo nome, e "Rio de Janeiro" no texto da busca pode ser lido como
+    // o ESTADO (que inclui todas elas), não só a cidade — o primeiro
+    // resultado às vezes é dessas outras cidades, não da capital. Pede
+    // mais resultados com endereço detalhado e filtra pelo campo
+    // city/town batendo exatamente com "Rio de Janeiro".
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&q=${encodeURIComponent(query)}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('geocode http error ' + res.status);
     const results = await res.json();
     if (results && results.length){
-      return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
+      const inRioCity = results.find(r => {
+        const city = (r.address && (r.address.city || r.address.town)) || '';
+        return city.toLowerCase() === 'rio de janeiro';
+      });
+      const best = inRioCity || results[0];
+      return { lat: parseFloat(best.lat), lng: parseFloat(best.lon) };
     }
   } catch(err){
     console.warn('Falha ao geocodificar endereço:', query, err);
