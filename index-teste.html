@@ -129,6 +129,59 @@
     .hero-date{ white-space:normal; }
   }
 
+  /* ---------------- TESTE: fita/faixa preta no canto (fluida) ----------------
+     alternativa ao hero-title grande centralizado — o nome do evento vive
+     dentro de uma "fita" preta que embrulha o canto superior esquerdo da
+     tela: um trecho vertical (borda esquerda, sempre "Circuito de", fixo)
+     + um trecho horizontal (borda superior, #ribbon-top) que recebe cada
+     palavra do resto do texto como um <span> próprio.
+     Em vez de só 2 estados fixos por media query, o JS (ver layoutRibbon)
+     MEDE a largura real do texto a cada resize e vai "despejando" palavra
+     por palavra do final de #ribbon-top pro início de #ribbon-right
+     (que desce pela borda direita) assim que o topo não cabe mais na
+     largura da tela — dá pra qualquer largura ficar num ponto de quebra
+     diferente, não só dois estados fixos de mobile/desktop. */
+  :root{ --ribbon-h: 4.6rem; }
+  .hero-ribbon{ position:fixed; inset:0; z-index:210; pointer-events:none; }
+  .ribbon-left, .ribbon-top, .ribbon-right{
+    position:absolute; background:#0a0a0a; color:#fff;
+    display:flex; align-items:center; white-space:nowrap;
+  }
+  /* texto vertical via bloco horizontal normal rotacionado (transform),
+     em vez de writing-mode:vertical-rl (mais simples/previsível entre
+     navegadores). padding-right bem maior que o padding-left: depois da
+     rotação, o lado "direito" deste bloco (antes de girar) é o que fica
+     perto do TOPO da tela — exatamente o canto onde o .ribbon-top (a
+     barra horizontal) also pinta por cima, sobreposto de propósito pro
+     encaixe ficar sem costura. Sem esse respiro extra, a ponta do texto
+     ("de") ficava tapada pelo fundo preto do .ribbon-top. */
+  .ribbon-left{
+    top:0; left:0; width:15rem; height:var(--ribbon-h);
+    transform-origin:top left; transform:rotate(-90deg) translateX(-15rem);
+    justify-content:center; padding:0 1.6rem;
+    border-top-left-radius:999px; border-bottom-left-radius:999px;
+    font-family:var(--sans-display); font-weight:350; text-transform:uppercase;
+    letter-spacing:-0.02em; font-size:2rem;
+  }
+  .ribbon-top{
+    top:0; left:0; height:var(--ribbon-h); max-width:calc(100vw - var(--ribbon-h) - 1rem);
+    padding:0 1.8rem 0 calc(var(--ribbon-h) + 0.4rem);
+    border-top-right-radius:999px; border-bottom-right-radius:999px;
+    overflow:hidden; gap:0.6em;
+  }
+  .ribbon-top span, .ribbon-right span{ display:inline-block; }
+  .w-name{ font-family:var(--sans-display); font-weight:350; text-transform:uppercase;
+           letter-spacing:-0.02em; font-size:2rem; }
+  .w-sub, .w-date{ font-family:var(--serif); font-style:italic; font-size:2.3rem; }
+  .ribbon-right{
+    top:0; right:0; width:var(--ribbon-h); max-height:calc(100vh - var(--ribbon-h) - 1rem);
+    flex-direction:column; writing-mode:vertical-rl;
+    justify-content:flex-start; align-items:center; padding:0.4rem 0 1.6rem;
+    border-bottom-left-radius:999px; border-bottom-right-radius:999px;
+    overflow:hidden; gap:0.6em;
+  }
+  .ribbon-right:empty{ display:none; }
+
   /* ---------------- View switcher (glass pill toggle) + about button ----------------
      centralizados na parte inferior da tela — o sort-switch (por endereço/
      por artista) fica numa linha própria acima deles, mesmo esquema */
@@ -525,6 +578,22 @@
     <span class="hero-edition">Edição 01</span>
   </div>
 
+</div>
+
+<!-- TESTE: fita/faixa preta no canto, alternativa ao título grande centralizado —
+     ver .hero-ribbon no CSS e layoutRibbon() no JS. Fica ao lado do
+     hero-title existente por enquanto, pra comparar os dois, não
+     substitui nada ainda. #ribbon-top começa com todas as palavras; o JS
+     move as que não couberem pra #ribbon-right, recalculando a cada resize. -->
+<div class="hero-ribbon" aria-hidden="true">
+  <div class="ribbon-top" id="ribbon-top"></div>
+  <div class="ribbon-right" id="ribbon-right"></div>
+  <!-- .ribbon-left por último de propósito: no canto onde ela se
+       sobrepõe com .ribbon-top (mesmo fundo preto, encaixe sem costura),
+       quem pinta por último fica por cima — precisa ser o texto do
+       "Circuito de", senão a ponta dele fica tapada pelo fundo do
+       .ribbon-top (era o bug do "de" sumindo). -->
+  <div class="ribbon-left"><span>Circuito de</span></div>
 </div>
 
 <div class="top-actions">
@@ -1410,7 +1479,12 @@ async function resolveMissingCoordinates(){
     (l.lat == null || l.lng == null) && !/confirmar/i.test(l.endereco)
   );
   for (const loc of pending){
-    const query = `${loc.endereco}, Centro, Rio de Janeiro, Brasil`;
+    // sem ", Centro" fixo aqui: alguns endereços da planilha já vêm com
+    // "- Centro" (ou outro bairro) no próprio texto, e colar mais um
+    // "Centro" na frente do Nominatim faz ele não achar nada — falha
+    // silenciosa (endereço fica "pendente" pra sempre, sem erro visível).
+    // "Rio de Janeiro, Brasil" sozinho já é o bastante pra desambiguar.
+    const query = `${loc.endereco}, Rio de Janeiro, Brasil`;
     const coords = await geocodeAddress(query);
     if (coords){
       loc.lat = coords.lat;
@@ -1643,6 +1717,51 @@ function fitHeroText(){
 fitHeroText();
 window.addEventListener('resize', fitHeroText);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHeroText);
+
+// ---------------- TESTE: fita fluida (dobra palavra por palavra) ----------------
+// em vez de 2 estados fixos por media query, mede a largura real do texto
+// e "despeja" palavra por palavra do fim de #ribbon-top pro começo de
+// #ribbon-right assim que o topo não cabe mais — recalculado a cada
+// resize, então qualquer largura de tela encontra seu próprio ponto de
+// quebra, não só um estado "largo" e um "estreito".
+const RIBBON_WORDS = [
+  { text:'ATELIÊS', cls:'w-name' },
+  { text:'DO', cls:'w-name' },
+  { text:'CENTRO', cls:'w-name' },
+  { text:'Ateliês', cls:'w-sub' },
+  { text:'abertos', cls:'w-sub' },
+  { text:'18', cls:'w-date' },
+  { text:'–', cls:'w-date' },
+  { text:'19', cls:'w-date' },
+  { text:'de', cls:'w-date' },
+  { text:'Setembro', cls:'w-date' },
+];
+const ribbonTop = document.getElementById('ribbon-top');
+const ribbonRight = document.getElementById('ribbon-right');
+if (ribbonTop && ribbonRight){
+  RIBBON_WORDS.forEach(w => {
+    const span = document.createElement('span');
+    span.className = w.cls;
+    span.textContent = w.text;
+    ribbonTop.appendChild(span);
+  });
+}
+function layoutRibbon(){
+  if (!ribbonTop || !ribbonRight) return;
+  // volta todas as palavras pro topo antes de recalcular, pra também
+  // "desdobrar" quando a tela cresce de novo, não só dobrar
+  while (ribbonRight.firstChild) ribbonTop.appendChild(ribbonRight.firstChild);
+  const leftWidth = document.querySelector('.ribbon-left').getBoundingClientRect().width;
+  const available = window.innerWidth - leftWidth - 16;
+  let guard = 0;
+  while (ribbonTop.scrollWidth > available && ribbonTop.children.length > 1 && guard < 50){
+    ribbonRight.insertBefore(ribbonTop.lastElementChild, ribbonRight.firstChild);
+    guard++;
+  }
+}
+layoutRibbon();
+window.addEventListener('resize', layoutRibbon);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutRibbon);
 
 function shrinkHero(e){
   if (heroShrunk) return;

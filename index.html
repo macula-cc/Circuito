@@ -1409,7 +1409,12 @@ async function resolveMissingCoordinates(){
     (l.lat == null || l.lng == null) && !/confirmar/i.test(l.endereco)
   );
   for (const loc of pending){
-    const query = `${loc.endereco}, Centro, Rio de Janeiro, Brasil`;
+    // sem ", Centro" fixo aqui: alguns endereços da planilha já vêm com
+    // "- Centro" (ou outro bairro) no próprio texto, e colar mais um
+    // "Centro" na frente do Nominatim faz ele não achar nada — falha
+    // silenciosa (endereço fica "pendente" pra sempre, sem erro visível).
+    // "Rio de Janeiro, Brasil" sozinho já é o bastante pra desambiguar.
+    const query = `${loc.endereco}, Rio de Janeiro, Brasil`;
     const coords = await geocodeAddress(query);
     if (coords){
       loc.lat = coords.lat;
