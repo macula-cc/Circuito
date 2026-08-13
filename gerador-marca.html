@@ -6,7 +6,7 @@
 <title>Gerador de Marca — Circuito de Ateliês do Centro</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@350&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@350&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
@@ -167,11 +167,11 @@
    ============================================================ */
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
 const LOGICAL = 1000;
-const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Geist:wght@350&family=Instrument+Serif:ital@0;1&display=swap";
-const SANS_DISPLAY = "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Inter:wght@350&family=Instrument+Serif:ital@0;1&display=swap";
+const SANS_DISPLAY = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const EVENT_TITLE = 'Circuito de Ateliês do Centro'; // usado só no modo "símbolo" (fita seguindo o traçado)
 // marca completa: núcleo tipográfico novo — label pequeno em caixa alta
-// (Geist) acima de uma linha só combinando o nome do evento (serifado,
+// (Inter) acima de uma linha só combinando o nome do evento (serifado,
 // normal) com a data (serifado, itálico)
 const EVENT_LABEL = 'CIRCUITO DE ATELIÊS DO CENTRO';
 const EVENT_TAGLINE = 'Ateliês abertos';
@@ -416,7 +416,7 @@ function charWidth(ch, fontSize, fontFamily, weight, italic){
 }
 
 // mede a altura real do "x" (aproxima a altura-x) numa fonte/peso/tamanho —
-// usado pra igualar visualmente o tamanho do texto sem serifa (Geist) ao
+// usado pra igualar visualmente o tamanho do texto sem serifa (Inter) ao
 // tamanho do texto serifado (Instrument Serif) quando alternam na fita, já
 // que fontes diferentes têm proporções diferentes entre o tamanho nominal
 // e a altura-x de verdade
@@ -914,7 +914,7 @@ async function boot(){
       document.fonts.load("24px 'Instrument Serif'"),
       document.fonts.load(`${TITLE_SIZE}px 'Instrument Serif'`),
       document.fonts.load(`italic ${TITLE_SIZE}px 'Instrument Serif'`),
-      document.fonts.load(`350 ${LABEL_SIZE}px 'Geist'`)
+      document.fonts.load(`350 ${LABEL_SIZE}px 'Inter'`)
     ]);
   } catch(e){}
   // agora que a fonte de verdade carregou, recalcula a largura do texto

@@ -6,7 +6,7 @@
 <title>Gerador de Vídeo — Circuito de Ateliês do Centro</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 
 <style>
@@ -195,7 +195,7 @@
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
 const LOGICAL_W = 1000;
 let LOGICAL_H = 1000; // 1000 = quadrado (1:1); ~1778 = stories (9:16) — ver applyCanvasFormat()
-const SANS_DISPLAY = "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+const SANS_DISPLAY = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const EVENT_EYEBROW = 'Ateliês abertos';
 const EVENT_DATES = '18 – 19 de Setembro';
 // título grande é o par tagline/data (serifado, 2ª linha em itálico), sempre
@@ -1223,8 +1223,8 @@ async function boot(){
       document.fonts.load(`italic ${EVT_TITLE_SIZE}px 'Instrument Serif'`),
       document.fonts.load(`${STATS_SIZE}px 'Instrument Serif'`),
       document.fonts.load("20px 'Instrument Serif'"),
-      document.fonts.load(`${LABEL_WEIGHT} 100px 'Geist'`),
-      document.fonts.load(`350 20px 'Geist'`)
+      document.fonts.load(`${LABEL_WEIGHT} 100px 'Inter'`),
+      document.fonts.load(`350 20px 'Inter'`)
     ]);
   } catch(e){}
   computeLabelSize();
