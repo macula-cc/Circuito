@@ -623,9 +623,17 @@ function parseCSV(text){
 // tratamos como coordenada ainda não preenchida: some como "pendente" na
 // lista igual a um endereço sem lat/lng, e a geocodificação automática
 // tenta resolver de novo a partir do texto do endereço.
+// valida o FORMATO inteiro (não só o valor numérico) antes de aceitar: sem
+// isso, algo como "-22.917.173" (pontos demais, geralmente formatação de
+// milhar aplicada por engano em cima de uma vírgula decimal original) passa
+// pelo parseFloat, que lê só até o segundo ponto e trunca silenciosamente
+// pra "-22.917" — um valor plausível mas ERRADO, que fica dentro do
+// intervalo válido e por isso não seria pego pelo teste de min/max sozinho.
 function parseCoord(raw, min, max){
   if (!raw) return null;
-  const n = parseFloat(raw.replace(',', '.'));
+  const normalized = raw.trim().replace(',', '.');
+  if (!/^-?\d{1,3}(\.\d+)?$/.test(normalized)) return null;
+  const n = parseFloat(normalized);
   return (isNaN(n) || n < min || n > max) ? null : n;
 }
 
