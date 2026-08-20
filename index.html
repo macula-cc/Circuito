@@ -128,10 +128,18 @@
              -webkit-backdrop-filter:blur(18px) saturate(180%);
              border:1px solid rgba(255,255,255,0.4); border-radius:999px; padding:3px;
              box-shadow:0 3px 12px rgba(0,0,0,0.22); }
+  /* preenchimento ativo com o mesmo blur real usado nos pins (ver .pin::before)
+     em vez de background sólido — ::before fica sempre no DOM (position:relative
+     no botão) mas só aparece (opacity) quando .active; inset:2px + filter:blur
+     dá o núcleo sólido com borda esfumada, igual aos pins. */
   .switcher button{ background:transparent; border:none; cursor:pointer; color:var(--ink);
-                     padding:0.55rem 0.9rem; min-height:38px; border-radius:999px;
-                     transition:background 0.2s ease, color 0.2s ease; }
-  .switcher button.active{ background:#111111; color:#fff; }
+                     padding:0.55rem 0.9rem; min-height:38px; border-radius:999px; position:relative;
+                     transition:color 0.2s ease; }
+  .switcher button::before{ content:''; position:absolute; inset:2px; border-radius:999px;
+                             background:#171717; filter:blur(2px); z-index:-1;
+                             opacity:0; transition:opacity 0.2s ease; }
+  .switcher button.active{ color:#fff; }
+  .switcher button.active::before{ opacity:1; }
   .switcher button:not(.active):hover{ background:rgba(255,255,255,0.35); }
 
   /* botão "sobre": separado do toggle mapa/lista, mas segue o mesmo visual
@@ -155,9 +163,13 @@
                 opacity:0; pointer-events:none; transition:opacity 0.2s ease; }
   .sort-switch.visible{ opacity:1; pointer-events:auto; }
   .sort-switch button{ background:transparent; border:none; cursor:pointer; color:var(--ink);
-                        padding:0.5rem 0.7rem; min-height:38px; border-radius:999px;
-                        transition:background 0.2s ease, color 0.2s ease; }
-  .sort-switch button.active{ background:#111111; color:#fff; }
+                        padding:0.5rem 0.7rem; min-height:38px; border-radius:999px; position:relative;
+                        transition:color 0.2s ease; }
+  .sort-switch button::before{ content:''; position:absolute; inset:2px; border-radius:999px;
+                                background:#171717; filter:blur(2px); z-index:-1;
+                                opacity:0; transition:opacity 0.2s ease; }
+  .sort-switch button.active{ color:#fff; }
+  .sort-switch button.active::before{ opacity:1; }
   .sort-switch button:not(.active):hover{ background:rgba(255,255,255,0.35); }
 
   /* pins: 40px invisible tap target, badge circle with initials centered inside */
