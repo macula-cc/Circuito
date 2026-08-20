@@ -78,33 +78,19 @@
   /* ---------------- Marquee do evento (topo) ----------------
      faixa full-bleed no topo com o nome/data/edição se repetindo em
      scroll horizontal contínuo — substitui as pílulas testadas antes.
-     Fundo em degradê preto->branco FIXO na faixa (não anda junto com o
-     texto). Pra inverter a cor do texto conforme a área do degradê por
-     baixo (branco na parte preta, tinta escura na parte clara) SEM usar
-     mix-blend-mode — que deixa o texto com aliasing pior em telas retina,
-     percebido como "pixelado" — usa duas cópias idênticas do texto
-     empilhadas (mesmo conteúdo, mesma animação, sempre alinhadas), cada
-     uma com um mask-image em degradê que só revela a metade que faz
-     sentido pra cor dela: a cópia branca (.marquee-layer-light) fica
-     opaca sobre o trecho preto do fundo e se apaga sobre o trecho claro;
-     a cópia escura (.marquee-layer-dark) faz o oposto. */
+     Fundo em degradê preto->cinza bem claro (nunca chega no branco puro,
+     senão o texto branco sumiria de vez na ponta clara) FIXO na faixa
+     (não anda junto com o texto). Texto sempre branco sólido, sem
+     mix-blend-mode nem mask-image — as duas técnicas testadas antes pra
+     inverter a cor automaticamente deixavam o texto com aliasing pior
+     (percebido como "pixelado", sobretudo em telas retina); cor sólida
+     lisa garante a mesma qualidade de renderização do resto do site. */
   .event-marquee{ position:absolute; top:0; left:0; right:0; z-index:220;
                    padding:16px 0; overflow:hidden; isolation:isolate;
-                   background:linear-gradient(to right, #050505, #fafafa); }
-  /* altura vem do padding acima (16px) + a altura natural da linha de
-     texto — por isso .marquee-layer-light fica em fluxo normal (é ela
-     quem "empurra" a altura do pai) e .marquee-layer-dark é
-     position:absolute;inset:0 só pra ficar exatamente empilhada por cima,
-     sem mexer na altura de novo. */
+                   background:linear-gradient(to right, #050505, #d8d8d6); }
   .marquee-layer{ display:flex; align-items:center; overflow:hidden; }
-  .marquee-layer-light{ position:relative; color:#fff;
-                         -webkit-mask-image:linear-gradient(to right, #000 0%, #000 20%, transparent 80%);
-                         mask-image:linear-gradient(to right, #000 0%, #000 20%, transparent 80%); }
-  .marquee-layer-dark{ position:absolute; inset:0; color:var(--ink);
-                        -webkit-mask-image:linear-gradient(to right, transparent 20%, #000 80%, #000 100%);
-                        mask-image:linear-gradient(to right, transparent 20%, #000 80%, #000 100%); }
   .marquee-track{ display:flex; align-items:baseline; width:max-content;
-                   white-space:nowrap; will-change:transform;
+                   white-space:nowrap; color:#fff;
                    animation:marquee-scroll 46s linear infinite; }
   .marquee-seg{ display:flex; align-items:baseline; }
   /* mesma tipografia/peso do resto do site pra rótulo em caixa alta (ver
@@ -517,8 +503,7 @@
   <div class="map-dim" id="map-dim"></div>
 
   <div class="event-marquee" aria-hidden="true">
-    <div class="marquee-layer marquee-layer-light"><div class="marquee-track" id="marquee-track-light"></div></div>
-    <div class="marquee-layer marquee-layer-dark"><div class="marquee-track" id="marquee-track-dark"></div></div>
+    <div class="marquee-layer"><div class="marquee-track" id="marquee-track"></div></div>
   </div>
 
 </div>
@@ -573,25 +558,22 @@
 // vez — a animação (ver @keyframes marquee-scroll) desloca a trilha por
 // exatamente -50%, ou seja, a largura de UM segmento; como os dois
 // segmentos são idênticos, o loop fecha sem costura nem precisar medir
-// nada em JS. Preenche as duas trilhas (clara/escura, ver .marquee-layer-*
-// no CSS) com o mesmo HTML pra ficarem sempre alinhadas uma sobre a outra.
+// nada em JS.
 (function setupMarquee(){
+  const track = document.getElementById('marquee-track');
+  if (!track) return;
   const groupHTML = `
     <span class="marquee-item">Circuito de Ateliês do Centro</span>
     <span class="marquee-item marquee-date">Ateliês abertos <em>18 – 19 de Setembro</em></span>
     <span class="marquee-item marquee-edition">Edição 01</span>
   `;
   const segHTML = groupHTML.repeat(6);
-  ['marquee-track-light', 'marquee-track-dark'].forEach(id => {
-    const track = document.getElementById(id);
-    if (!track) return;
-    const seg1 = document.createElement('div');
-    seg1.className = 'marquee-seg';
-    seg1.innerHTML = segHTML;
-    const seg2 = seg1.cloneNode(true);
-    track.appendChild(seg1);
-    track.appendChild(seg2);
-  });
+  const seg1 = document.createElement('div');
+  seg1.className = 'marquee-seg';
+  seg1.innerHTML = segHTML;
+  const seg2 = seg1.cloneNode(true);
+  track.appendChild(seg1);
+  track.appendChild(seg2);
 })();
 
 /* ============================================================
