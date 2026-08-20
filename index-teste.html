@@ -162,12 +162,13 @@
      não importa o zoom/posição. */
   .pin-hit{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2 !important; }
   /* TESTE: preenchimento do próprio disco em degradê radial (preto 100%
-     opaco até 63% do raio, depois esmaecendo pra cinza 0% opaco bem em
-     cima da borda) — CONTIDO dentro da forma (clipada por border-radius,
-     sem estourar a caixa de 24px), não um halo/drop-shadow por fora. */
+     opaco até 30% do raio, depois esmaecendo pra cinza 0% opaco em 90% do
+     raio) — CONTIDO dentro da forma (clipada por border-radius, sem
+     estourar a caixa de 24px). Sem box-shadow no estado de repouso — a
+     sombra confundia com o fade do degradê na borda; a sombra continua só
+     no hover/active (ver abaixo), como feedback de interação. */
   .pin{ width:24px; height:24px; border-radius:50%;
         background:radial-gradient(circle, #171717 0%, #171717 30%, rgba(151,151,151,0) 90%);
-        box-shadow:0 3px 12px rgba(0,0,0,0.22);
         display:flex; align-items:center; justify-content:center;
         font-family:var(--mono); font-size:0.6rem; font-weight:500; color:#fff; letter-spacing:0.01em;
         transition:transform 0.18s cubic-bezier(.4,0,.2,1), box-shadow 0.18s ease;
@@ -569,7 +570,7 @@ let LOCATIONS = [];
 // exatamente -50%, ou seja, a largura de UM segmento; como os dois
 // segmentos são idênticos, o loop fecha sem costura nem precisar medir
 // nada em JS. Chamada de novo em boot() depois que LOCATIONS carrega, pra
-// incluir "N Endereços · M Artistas" — antes disso (ou se a planilha falhar
+// incluir "N Endereços - M Artistas" — antes disso (ou se a planilha falhar
 // ao carregar) monta sem esse último item.
 function setupMarquee(){
   const track = document.getElementById('marquee-track');
@@ -577,7 +578,7 @@ function setupMarquee(){
   const numAddresses = LOCATIONS.length;
   const numArtists = LOCATIONS.reduce((sum, l) => sum + l.artistas.length, 0);
   const countsHTML = numAddresses > 0
-    ? `<span class="marquee-item marquee-date">${numAddresses} Endereços · ${numArtists} Artistas</span>`
+    ? `<span class="marquee-item marquee-date">${numAddresses} Endereços - ${numArtists} Artistas</span>`
     : '';
   const groupHTML = `
     <span class="marquee-item">Circuito de Ateliês do Centro</span>
