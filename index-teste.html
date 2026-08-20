@@ -162,13 +162,14 @@
      não importa o zoom/posição. */
   .pin-hit{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2 !important; }
   /* TESTE: preenchimento do próprio disco em degradê radial (preto 100%
-     opaco até 30% do raio, depois esmaecendo pra cinza 0% opaco em 90% do
-     raio) — CONTIDO dentro da forma (clipada por border-radius, sem
-     estourar a caixa de 24px). Sem box-shadow no estado de repouso — a
-     sombra confundia com o fade do degradê na borda; a sombra continua só
-     no hover/active (ver abaixo), como feedback de interação. */
+     opaco até 71% do raio, depois esmaecendo pra cinza 0% opaco bem na
+     borda, 100% do raio — mesmos stops de referência do Figma) — CONTIDO
+     dentro da forma (clipada por border-radius, sem estourar a caixa de
+     24px). Sem box-shadow no estado de repouso — a sombra confundia com o
+     fade do degradê na borda; a sombra continua só no hover/active (ver
+     abaixo), como feedback de interação. */
   .pin{ width:24px; height:24px; border-radius:50%;
-        background:radial-gradient(circle, #171717 0%, #171717 30%, rgba(151,151,151,0) 90%);
+        background:radial-gradient(circle, #171717 0%, #171717 71%, rgba(151,151,151,0) 100%);
         display:flex; align-items:center; justify-content:center;
         font-family:var(--mono); font-size:0.6rem; font-weight:500; color:#fff; letter-spacing:0.01em;
         transition:transform 0.18s cubic-bezier(.4,0,.2,1), box-shadow 0.18s ease;
