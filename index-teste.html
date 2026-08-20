@@ -1134,7 +1134,9 @@ function heroSnakeAdvanceLegs(dt){
 
 // traço grosso com gradiente escuro->cinza claro por PERNA (não pelo
 // caminho inteiro), pra cada trecho ter sua própria transição — mesmo princípio do
-// gradiente preto->branco do gerador-marca.html, cores diferentes
+// gradiente preto->branco do gerador-marca.html, cores diferentes. Ponta
+// clara (#d8d8d6) é a MESMA cor onde o degradê do header (.event-marquee)
+// termina, pra combinar as duas pontas claras do site.
 function heroStrokeLegsInRange(dStart, dEnd){
   const ctx = heroSnakeCtx;
   let offset = 0;
@@ -1149,7 +1151,7 @@ function heroStrokeLegsInRange(dStart, dEnd){
         const a = leg[0], b = leg[leg.length-1];
         const grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
         grad.addColorStop(0, '#0a0a0a');
-        grad.addColorStop(1, '#9a9a9a');
+        grad.addColorStop(1, '#d8d8d6');
         ctx.lineWidth = heroSnakeWidth;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
