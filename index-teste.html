@@ -880,9 +880,11 @@ function addStationMarkers(){
 }
 
 // TESTE: "planta baixa" — praticamente uma cor só (água, terreno e prédios
-// todos iguais, sem contorno de prédio nenhum) com só as vias PRINCIPAIS
-// aparecendo como linha (ruas locais/de serviço/calçadas escondidas de
-// propósito) — só é possível porque o MapLibre é vetorial (cada feição
+// todos iguais, sem contorno de prédio nenhum). As vias locais voltam a
+// aparecer (é a malha delas que desenha o contorno dos quarteirões — sem
+// elas o mapa perdia estrutura/detalhe demais), só que bem discretas
+// (roadMinor, quase a cor do fundo); as vias PRINCIPAIS continuam brancas,
+// se destacando — só é possível porque o MapLibre é vetorial (cada feição
 // chega com seu próprio tipo/classe, ao contrário do tile raster).
 const MONO_COLORS = {
   background: '#ececec',
@@ -891,15 +893,17 @@ const MONO_COLORS = {
   building: '#ececec',   // preenchimento igual ao resto — sem contorno de prédio
   road: '#ffffff',
   roadCasing: '#ffffff',
+  roadMinor: '#c9c9c9',  // vias locais/secundárias — sutil, só delimita quarteirão
   boundary: '#ececec',   // sem linha de fronteira administrativa (mesma cor)
   text: '#111111',
   textHalo: '#ffffff'
 };
 // classes de via do estilo "liberty" (ver ids tipo road_motorway,
 // road_trunk_primary, road_secondary_tertiary vs. road_minor,
-// road_service_track, road_path_pedestrian, *_link) — mantém só as três
-// classes "principais" (com suas variantes de túnel/ponte/contorno),
-// escondendo ruas locais, vielas, calçadas, ramais e trilhos.
+// road_service_track, road_path_pedestrian, *_link) — só as três classes
+// "principais" (com suas variantes de túnel/ponte/contorno) ficam brancas
+// e destacadas; o resto (ruas locais, vielas, calçadas, ramais, trilhos)
+// continua visível mas discreto (MONO_COLORS.roadMinor).
 const MAIN_ROAD_CLASSES = /(motorway|trunk_primary|secondary_tertiary)/;
 function applyMonochromeStyle(){
   const layers = map.getStyle().layers || [];
@@ -924,14 +928,10 @@ function applyMonochromeStyle(){
         const color = isWater ? MONO_COLORS.water : (isBuilding ? MONO_COLORS.building : MONO_COLORS.landuse);
         map.setPaintProperty(layer.id, 'fill-color', color);
       } else if (layer.type === 'line'){
-        if (isRoad && !isMainRoad){
-          map.setLayoutProperty(layer.id, 'visibility', 'none');
-          return;
-        }
         let color = MONO_COLORS.landuse; // linhas genéricas (contorno de parque etc.)
         if (isWater) color = MONO_COLORS.water;
         else if (isBoundary) color = MONO_COLORS.boundary;
-        else if (isRoad) color = isCasing ? MONO_COLORS.roadCasing : MONO_COLORS.road;
+        else if (isRoad) color = isMainRoad ? (isCasing ? MONO_COLORS.roadCasing : MONO_COLORS.road) : MONO_COLORS.roadMinor;
         map.setPaintProperty(layer.id, 'line-color', color);
       } else if (layer.type === 'symbol'){
         // poi_r1/r7/r20 = POI genérico por ranking (loja, restaurante etc.)
