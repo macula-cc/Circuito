@@ -123,7 +123,7 @@
      por artista) fica numa linha própria acima deles, mesmo esquema */
   .top-actions{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:500;
                 display:flex; align-items:center; gap:0.5rem; }
-  .switcher{ display:flex; gap:2px; font-family:var(--mono); font-size:0.79rem;
+  .switcher{ display:flex; gap:2px; font-family:var(--sans-display); font-weight:400; font-size:0.79rem;
              background:rgba(200,200,200,0.55); backdrop-filter:blur(18px) saturate(180%);
              -webkit-backdrop-filter:blur(18px) saturate(180%);
              border:1px solid rgba(255,255,255,0.4); border-radius:999px; padding:3px;
@@ -136,7 +136,7 @@
 
   /* botão "sobre": separado do toggle mapa/lista, mas segue o mesmo visual
      da parte não-selecionada dele (vidro, sem fundo preto) */
-  .about-btn{ font-family:var(--mono); font-size:0.79rem; color:var(--ink); cursor:pointer;
+  .about-btn{ font-family:var(--sans-display); font-weight:400; font-size:0.79rem; color:var(--ink); cursor:pointer;
               background:rgba(200,200,200,0.55); backdrop-filter:blur(18px) saturate(180%);
               -webkit-backdrop-filter:blur(18px) saturate(180%);
               border:1px solid rgba(255,255,255,0.4); border-radius:999px;
