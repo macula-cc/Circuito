@@ -139,7 +139,7 @@
 
   .sort-switch{ position:absolute; bottom:calc(5rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:600;
                 width:max-content;
-                display:flex; gap:2px; font-family:var(--mono); font-size:0.73rem;
+                display:flex; gap:2px; font-family:var(--sans-display); font-weight:400; font-size:0.73rem;
                 background:rgba(200,200,200,0.55); backdrop-filter:blur(18px) saturate(180%);
                 -webkit-backdrop-filter:blur(18px) saturate(180%);
                 border:1px solid rgba(255,255,255,0.4); border-radius:999px; padding:3px;
@@ -510,15 +510,15 @@
 
 <div class="top-actions">
   <div class="switcher">
-    <button id="switch-map" class="active">mapa</button>
-    <button id="switch-list">lista</button>
+    <button id="switch-map" class="active">Mapa</button>
+    <button id="switch-list">Lista</button>
   </div>
-  <button class="about-btn" id="about-btn">sobre</button>
+  <button class="about-btn" id="about-btn">Sobre</button>
 </div>
 
 <div class="sort-switch" id="sort-switch">
-  <button id="sort-endereco" class="active">por endereço</button>
-  <button id="sort-artista">por artista</button>
+  <button id="sort-endereco" class="active">Por Endereço</button>
+  <button id="sort-artista">Por Artista</button>
 </div>
 
 <div class="overlay" id="overlay"></div>
