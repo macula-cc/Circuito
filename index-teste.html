@@ -59,13 +59,13 @@
 
   /* "cobrona" decorativa: mesmo princípio de animação do "circuito vivo"
      do gerador de vídeo (desenha progressivamente, depois apaga, recomeça
-     de outro ponto), sem os pinos numerados (só a linha), preenchimento
-     chapado preto (ver heroStrokeLegsInRange, JS). Fica ACIMA do
-     .map-dim (150) — não atrás dele — pra não pegar o backdrop-filter:blur(3px)
-     do overlay, que borrava o traço. Some junto com o overlay quando o
-     hero encolhe (ver shrinkHero). O nome/data/edição do evento agora
-     vivem só na marquee do topo (ver .event-marquee), não tem mais texto
-     por cima da marca. */
+     de outro ponto), sem os pinos numerados (só a linha), com o gradiente
+     escuro->cinza claro por perna (ver heroStrokeLegsInRange, JS). Fica
+     ACIMA do .map-dim (150) — não atrás dele — pra não pegar o
+     backdrop-filter:blur(3px) do overlay, que borrava o traço. Some junto
+     com o overlay quando o hero encolhe (ver shrinkHero). O nome/data/edição
+     do evento vivem só na marquee do topo (ver .event-marquee), não tem
+     mais texto por cima da marca. */
   /* width/height:100% explícitos são necessários aqui: canvas é elemento
      "replaced" e, mesmo com inset:0, um replaced element position:absolute
      sem width/height definido usa o tamanho intrínseco (os atributos
@@ -123,7 +123,7 @@
   .switcher button{ background:transparent; border:none; cursor:pointer; color:var(--ink);
                      padding:0.55rem 0.9rem; min-height:38px; border-radius:999px;
                      transition:background 0.2s ease, color 0.2s ease; }
-  .switcher button.active{ background:#ffffff; color:#111; }
+  .switcher button.active{ background:#111111; color:#fff; }
   .switcher button:not(.active):hover{ background:rgba(255,255,255,0.35); }
 
   /* botão "sobre": separado do toggle mapa/lista, mas segue o mesmo visual
@@ -1132,10 +1132,9 @@ function heroSnakeAdvanceLegs(dt){
   return { dist, finished };
 }
 
-// traço grosso chapado preto (sem gradiente) por PERNA — versão "chapada"
-// da marca: preenchimento sólido em vez do degradê escuro->cinza claro
-// usado antes (mesmo princípio de traço grosso do gerador-marca.html, só
-// que numa cor só)
+// traço grosso com gradiente escuro->cinza claro por PERNA (não pelo
+// caminho inteiro), pra cada trecho ter sua própria transição — mesmo princípio do
+// gradiente preto->branco do gerador-marca.html, cores diferentes
 function heroStrokeLegsInRange(dStart, dEnd){
   const ctx = heroSnakeCtx;
   let offset = 0;
@@ -1147,10 +1146,14 @@ function heroStrokeLegsInRange(dStart, dEnd){
     if (localEnd > localStart){
       const sub = heroExtractRange(leg, localStart, localEnd);
       if (sub.length >= 2){
+        const a = leg[0], b = leg[leg.length-1];
+        const grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+        grad.addColorStop(0, '#0a0a0a');
+        grad.addColorStop(1, '#9a9a9a');
         ctx.lineWidth = heroSnakeWidth;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.strokeStyle = '#0a0a0a';
+        ctx.strokeStyle = grad;
         ctx.beginPath();
         sub.forEach((p,i) => { if (i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
         ctx.stroke();
