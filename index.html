@@ -169,12 +169,23 @@
      garante que os pins dos ateliês fiquem sempre acima das estações,
      não importa o zoom/posição. */
   .pin-hit{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2 !important; }
-  .pin{ width:24px; height:24px; border-radius:50%; background:#111111;
-        box-shadow:0 3px 12px rgba(0,0,0,0.22);
+  /* radial-gradient não dá pra ver num disco de 24px — a faixa de
+     transição proporcional a um stop tipo Figma (ex: 71%->100% do raio)
+     vira só uns pixels reais, indistinguível de uma borda dura. Usa um
+     blur de verdade: ::before é um círculo sólido MENOR que o .pin
+     (inset:2px), desfocado com filter:blur — o desfoque espalha a borda
+     dele pra fora até quase a borda do .pin, dando um núcleo sólido com
+     transição realmente esfumada. Número fica no .pin (::before não
+     borra o texto, só o próprio pseudo-elemento). Sem box-shadow no
+     estado de repouso — a sombra confundia com o esfumado; continua só
+     no hover/active. */
+  .pin{ width:24px; height:24px; border-radius:50%; position:relative;
         display:flex; align-items:center; justify-content:center;
         font-family:var(--mono); font-size:0.6rem; font-weight:500; color:#fff; letter-spacing:0.01em;
         transition:transform 0.18s cubic-bezier(.4,0,.2,1), box-shadow 0.18s ease;
         transform:scale(1); }
+  .pin::before{ content:''; position:absolute; inset:2px; border-radius:50%;
+                background:#171717; filter:blur(2px); z-index:-1; }
   .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.18); box-shadow:0 4px 16px rgba(0,0,0,0.35); }
   .pin.active{ transform:scale(1.18); box-shadow:0 0 0 3px rgba(0,0,0,0.18); }
 
@@ -560,36 +571,50 @@
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
-// ---------------- marquee do topo: nome/data/edição em loop ----------------
+// declarado aqui em cima (não só lá embaixo na seção DATA SOURCE) porque
+// setupMarquee() já lê LOCATIONS na primeira chamada, logo abaixo — TDZ do
+// let quebraria se a declaração continuasse depois de onde é usada
+let LOCATIONS = [];
+
+// ---------------- marquee do topo: nome/data/edição/contagem em loop ----------------
 // monta um "segmento" com a sequência repetida algumas vezes (largo o
 // bastante pra cobrir até telas bem largas) e duplica esse segmento uma
 // vez — a animação (ver @keyframes marquee-scroll) desloca a trilha por
 // exatamente -50%, ou seja, a largura de UM segmento; como os dois
 // segmentos são idênticos, o loop fecha sem costura nem precisar medir
-// nada em JS.
-(function setupMarquee(){
+// nada em JS. Chamada de novo em boot() depois que LOCATIONS carrega, pra
+// incluir "N Endereços - M Artistas" — antes disso (ou se a planilha falhar
+// ao carregar) monta sem esse último item.
+function setupMarquee(){
   const track = document.getElementById('marquee-track');
   if (!track) return;
+  const numAddresses = LOCATIONS.length;
+  const numArtists = LOCATIONS.reduce((sum, l) => sum + l.artistas.length, 0);
+  const countsHTML = numAddresses > 0
+    ? `<span class="marquee-item marquee-date">${numAddresses} Endereços - ${numArtists} Artistas</span>`
+    : '';
   const groupHTML = `
     <span class="marquee-item">Circuito de Ateliês do Centro</span>
     <span class="marquee-item marquee-date">Ateliês abertos <em>18 – 19 de Setembro</em></span>
     <span class="marquee-item marquee-edition">Edição 01</span>
+    ${countsHTML}
   `;
   const segHTML = groupHTML.repeat(6);
   const seg1 = document.createElement('div');
   seg1.className = 'marquee-seg';
   seg1.innerHTML = segHTML;
   const seg2 = seg1.cloneNode(true);
+  track.innerHTML = '';
   track.appendChild(seg1);
   track.appendChild(seg2);
-})();
+}
+setupMarquee();
 
 /* ============================================================
    DATA SOURCE
    Hoje: dados embutidos (gerados a partir do documento original).
    Depois: trocar por fetch() da planilha do Google publicada em CSV.
    ============================================================ */
-let LOCATIONS = [];
 
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
 
@@ -1800,6 +1825,7 @@ async function boot(){
     return;
   }
   computeLocationNumbers();
+  setupMarquee();
   initMap();
   resolveMissingCoordinates();
   renderRows();
