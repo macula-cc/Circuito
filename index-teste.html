@@ -886,12 +886,13 @@ function addStationMarkers(){
 // MapLibre é vetorial (cada feição chega com seu próprio tipo/classe,
 // ao contrário do tile raster).
 const MONO_COLORS = {
-  background: '#ececec',
-  water: '#6b6b6b',      // cinza escuro — igual às vias
-  landuse: '#ececec',
-  building: '#ececec',   // preenchimento igual ao resto — sem contorno de prédio
-  road: '#6b6b6b',        // TODAS as vias (principais e locais) na mesma cor —
-  boundary: '#ececec',   // sem linha de fronteira administrativa (mesma cor)
+  background: '#ffffff',
+  water: '#6b6b6b',       // cinza escuro — única coisa que não é "terra"
+  landuse: '#ffffff',
+  building: '#ffffff',    // preenchimento igual ao fundo — sem contorno de prédio
+  road: '#ffffff',        // preenchimento da via = branco, igual ao fundo
+  roadCasing: '#6b6b6b',  // contorno da via (linha mais larga, por baixo) = cinza escuro
+  boundary: '#ffffff',    // sem linha de fronteira administrativa (mesma cor)
   text: '#111111',
   textHalo: '#ffffff'
 };
@@ -903,6 +904,7 @@ function applyMonochromeStyle(){
     const isWater = id.includes('water') || sl.includes('water');
     const isBuilding = sl === 'building' || id.includes('building');
     const isRoad = sl === 'transportation' && layer.type === 'line';
+    const isCasing = id.includes('casing');
     const isBoundary = sl === 'boundary';
     try{
       if (layer.type === 'fill-extrusion'){
@@ -916,10 +918,15 @@ function applyMonochromeStyle(){
         const color = isWater ? MONO_COLORS.water : (isBuilding ? MONO_COLORS.building : MONO_COLORS.landuse);
         map.setPaintProperty(layer.id, 'fill-color', color);
       } else if (layer.type === 'line'){
+        // quarteirões e ruas "desenhados a linha": a via em si fica branca
+        // (mesma cor do fundo/quarteirão) e só o CASING (linha mais larga,
+        // desenhada por baixo — convenção padrão de estilo de mapa) fica
+        // escuro, contornando a via dos dois lados — isso é o que acaba
+        // "desenhando" tanto a rua quanto o quarteirão ao redor dela.
         let color = MONO_COLORS.landuse; // linhas genéricas (contorno de parque etc.)
         if (isWater) color = MONO_COLORS.water;
         else if (isBoundary) color = MONO_COLORS.boundary;
-        else if (isRoad) color = MONO_COLORS.road;
+        else if (isRoad) color = isCasing ? MONO_COLORS.roadCasing : MONO_COLORS.road;
         map.setPaintProperty(layer.id, 'line-color', color);
       } else if (layer.type === 'symbol'){
         // poi_r1/r7/r20 = POI genérico por ranking (loja, restaurante etc.)
