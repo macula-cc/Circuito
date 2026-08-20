@@ -886,13 +886,13 @@ function addStationMarkers(){
 // MapLibre é vetorial (cada feição chega com seu próprio tipo/classe,
 // ao contrário do tile raster).
 const MONO_COLORS = {
-  background: '#999999',  // cinza 40% — água e "terra" (tudo que era branco) na mesma cor agora
-  water: '#999999',
-  landuse: '#999999',
-  building: '#999999',    // preenchimento igual ao fundo — sem contorno de prédio
-  road: '#999999',        // preenchimento da via = igual ao fundo
+  background: '#cccccc',  // cinza 20% — "terra" (era branco antes do teste do cinza 40%)
+  water: '#171717',       // mesma cor dos pins — única coisa que não é "terra"
+  landuse: '#cccccc',
+  building: '#cccccc',    // preenchimento igual ao fundo — sem contorno de prédio
+  road: '#cccccc',        // preenchimento da via = igual ao fundo
   roadCasing: '#171717',  // contorno da via (linha mais larga, por baixo) = mesma cor dos pins
-  boundary: '#999999',    // sem linha de fronteira administrativa (mesma cor)
+  boundary: '#cccccc',    // sem linha de fronteira administrativa (mesma cor)
   text: '#111111',
   textHalo: '#ffffff'
 };
