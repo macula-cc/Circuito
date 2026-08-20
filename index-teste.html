@@ -50,22 +50,22 @@
   .maplibregl-map{ background:#e9e9e9; font-family:var(--sans); }
 
   /* TESTE: véu branco bem sutil (10% de opacidade) + blur em vez do
-     preto/cinza com multiply usado antes — clareia levemente o mapa por
-     baixo do título, sem lavar as cores/pins. Texto grande passou a
-     cinza escuro (ver .hero-label/.hero-title h1/.hero-date) pra manter
-     contraste com esse fundo mais claro. Some no primeiro toque, junto
-     com o encolhimento do título. */
+     preto/cinza com multiply usado antes — clareia levemente o mapa,
+     sem lavar as cores/pins. Some no primeiro toque, junto com a marca. */
   .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(255,255,255,0.1);
             backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
             pointer-events:none; transition:opacity 0.6s ease; }
   .map-dim.hidden{ opacity:0; }
 
-  /* "cobrinha" decorativa: mesmo princípio de animação do "circuito vivo"
+  /* "cobrona" decorativa: mesmo princípio de animação do "circuito vivo"
      do gerador de vídeo (desenha progressivamente, depois apaga, recomeça
-     de outro ponto), sem os pinos numerados (só a linha). Fica ACIMA do
-     .map-dim (150) e ABAIXO do texto (200) — não atrás dele — pra não
-     pegar o backdrop-filter:blur(3px) do overlay, que borrava o traço.
-     Some junto com o overlay quando o hero encolhe (ver shrinkHero). */
+     de outro ponto), sem os pinos numerados (só a linha), preenchimento
+     chapado preto (ver heroStrokeLegsInRange, JS). Fica ACIMA do
+     .map-dim (150) — não atrás dele — pra não pegar o backdrop-filter:blur(3px)
+     do overlay, que borrava o traço. Some junto com o overlay quando o
+     hero encolhe (ver shrinkHero). O nome/data/edição do evento agora
+     vivem só na marquee do topo (ver .event-marquee), não tem mais texto
+     por cima da marca. */
   /* width/height:100% explícitos são necessários aqui: canvas é elemento
      "replaced" e, mesmo com inset:0, um replaced element position:absolute
      sem width/height definido usa o tamanho intrínseco (os atributos
@@ -75,112 +75,54 @@
                        transition:opacity 0.6s ease; }
   .hero-snake-canvas.hidden{ opacity:0; }
 
-  .hero-title{ position:absolute; top:0; left:0; right:0;
-               padding:calc(1.6rem + env(safe-area-inset-top)) calc(1.6rem + env(safe-area-inset-right)) 0 calc(1.6rem + env(safe-area-inset-left));
-               z-index:200; pointer-events:none; text-align:center;
-               font-size:var(--hero-font-size, clamp(3.8rem, 12vw, 9.5rem));
-               transition:padding-top 0.75s cubic-bezier(.16,1,.3,1), font-size 0.75s cubic-bezier(.16,1,.3,1); }
+  /* ---------------- Marquee do evento (topo) ----------------
+     faixa full-bleed no topo com o nome/data/edição se repetindo em
+     scroll horizontal contínuo — substitui as pílulas testadas antes.
+     Fundo em degradê preto->branco FIXO na faixa (não anda junto com o
+     texto). Pra inverter a cor do texto conforme a área do degradê por
+     baixo (branco na parte preta, tinta escura na parte clara) SEM usar
+     mix-blend-mode — que deixa o texto com aliasing pior em telas retina,
+     percebido como "pixelado" — usa duas cópias idênticas do texto
+     empilhadas (mesmo conteúdo, mesma animação, sempre alinhadas), cada
+     uma com um mask-image em degradê que só revela a metade que faz
+     sentido pra cor dela: a cópia branca (.marquee-layer-light) fica
+     opaca sobre o trecho preto do fundo e se apaga sobre o trecho claro;
+     a cópia escura (.marquee-layer-dark) faz o oposto. */
+  .event-marquee{ position:absolute; top:0; left:0; right:0; z-index:220;
+                   padding:16px 0; overflow:hidden; isolation:isolate;
+                   background:linear-gradient(to right, #050505, #fafafa); }
+  /* altura vem do padding acima (16px) + a altura natural da linha de
+     texto — por isso .marquee-layer-light fica em fluxo normal (é ela
+     quem "empurra" a altura do pai) e .marquee-layer-dark é
+     position:absolute;inset:0 só pra ficar exatamente empilhada por cima,
+     sem mexer na altura de novo. */
+  .marquee-layer{ display:flex; align-items:center; overflow:hidden; }
+  .marquee-layer-light{ position:relative; color:#fff;
+                         -webkit-mask-image:linear-gradient(to right, #000 0%, #000 20%, transparent 80%);
+                         mask-image:linear-gradient(to right, #000 0%, #000 20%, transparent 80%); }
+  .marquee-layer-dark{ position:absolute; inset:0; color:var(--ink);
+                        -webkit-mask-image:linear-gradient(to right, transparent 20%, #000 80%, #000 100%);
+                        mask-image:linear-gradient(to right, transparent 20%, #000 80%, #000 100%); }
+  .marquee-track{ display:flex; align-items:baseline; width:max-content;
+                   white-space:nowrap; will-change:transform;
+                   animation:marquee-scroll 46s linear infinite; }
+  .marquee-seg{ display:flex; align-items:baseline; }
+  /* mesma tipografia/peso do resto do site pra rótulo em caixa alta (ver
+     .list-title/.about-title): sans 350, letter-spacing -0.025em */
+  .marquee-item{ font-family:var(--sans-display); font-weight:350; text-transform:uppercase;
+                 letter-spacing:-0.025em; font-size:1.5rem; padding:0 0.3em; }
+  .marquee-item.marquee-date{ font-family:var(--serif); font-weight:400; text-transform:none;
+                               font-size:1.9rem; }
+  .marquee-item.marquee-date em{ font-style:italic; margin-left:0.3em; }
+  /* "Edição 01" em capitulação normal (não uppercase) — mesmo tratamento
+     do .hero-edition original, só sem o selo/pílula */
+  .marquee-item.marquee-edition{ text-transform:none; }
+  @keyframes marquee-scroll{ from{ transform:translateX(0); } to{ transform:translateX(-50%); } }
 
-  /* núcleo tipográfico: label (nome do evento, sans caixa alta, Geist) e o
-     selo de edição são relativos ao tamanho de "Ateliês abertos" (1em, no
-     elemento pai) via font-size em em — crescem e encolhem sempre na mesma
-     proporção. Razões calibradas pelos valores de referência do design:
-     sans 57pt / serifado 212pt ≈ 0,2689; "Edição 01" 24pt / 212pt ≈ 0,1132;
-     entrelinha do título 100% (line-height:1); entrelinha da data
-     195pt / 212pt ≈ 0,9198 */
-  .hero-label{ font-family:var(--sans-display); font-weight:350; color:var(--ink);
-               text-transform:uppercase; letter-spacing:-0.025em;
-               font-size:0.2689em; line-height:1.2; margin:0 0 0.3em;
-               transition:color 0.4s ease; }
-
-  .hero-title h1{ font-family:var(--serif); font-weight:400; color:var(--ink);
-                  font-size:1em;
-                  line-height:1; margin:0; white-space:nowrap; letter-spacing:-0.01em;
-                  transition:line-height 0.75s cubic-bezier(.16,1,.3,1), color 0.4s ease; }
-
-  .hero-date{ font-family:var(--serif); font-weight:400; font-style:italic; color:var(--ink);
-              font-size:1em; margin-top:0.05em; margin-bottom:-0.4em;
-              line-height:0.9198; white-space:nowrap;
-              transition:color 0.4s ease; }
-  /* selo de edição: linha própria, centralizada, colada na data — proporcional
-     ao "Ateliês abertos" gigante (24/212), mas com tamanho fixo e legível no
-     estado encolhido (proporcional ficaria ilegível de tão pequeno) */
-  .hero-edition{ display:inline-block; margin-top:0.3em;
-                 font-family:var(--sans-display); font-size:0.1132em; color:#fff; background:var(--gray);
-                 padding:0.35em 0.85em; border-radius:999px; white-space:nowrap; }
-
-  .hero-title.shrunk{ font-size:clamp(1.43rem, 3.3vw, 2.09rem) !important; }
-  .hero-title.shrunk h1{ line-height:1.25; white-space:normal; color:var(--ink); }
-  .hero-title.shrunk .hero-date{ line-height:0.94; color:var(--ink); }
-  .hero-title.shrunk .hero-label{ color:var(--ink); }
-  .hero-title.shrunk .hero-edition{ font-size:0.6rem; }
-
-  /* --hero-font-size é calculado via JS (fitHeroText) em qualquer largura
-     de tela pra linha mais longa (a data) ocupar ~92vw no estado grande —
-     sem isso (JS desabilitado), cai no clamp(...) fluido acima como
-     fallback. No mobile, white-space:normal continua como rede de
-     segurança (uma pequena diferença de métrica de fonte não estoura a
-     tela). Vertical clearance (padding-top) mantém o bloco abaixo do
-     toggle mapa/lista. */
-  @media (max-width:780px){
-    .hero-title{ padding-top:calc(4.8rem + env(safe-area-inset-top)); }
-    .hero-title.shrunk{ padding-top:calc(1.6rem + env(safe-area-inset-top)); }
-    .hero-title h1{ white-space:normal; }
-    .hero-date{ white-space:normal; }
+  @media (max-width:640px){
+    .marquee-item{ font-size:1.05rem; padding:0 0.25em; }
+    .marquee-item.marquee-date{ font-size:1.3rem; }
   }
-
-  /* ---------------- TESTE: fita/faixa preta no canto (fluida) ----------------
-     alternativa ao hero-title grande centralizado — o nome do evento vive
-     dentro de uma "fita" preta que embrulha o canto superior esquerdo da
-     tela: um trecho vertical (borda esquerda, sempre "Circuito de", fixo)
-     + um trecho horizontal (borda superior, #ribbon-top) que recebe cada
-     palavra do resto do texto como um <span> próprio.
-     Em vez de só 2 estados fixos por media query, o JS (ver layoutRibbon)
-     MEDE a largura real do texto a cada resize e vai "despejando" palavra
-     por palavra do final de #ribbon-top pro início de #ribbon-right
-     (que desce pela borda direita) assim que o topo não cabe mais na
-     largura da tela — dá pra qualquer largura ficar num ponto de quebra
-     diferente, não só dois estados fixos de mobile/desktop. */
-  :root{ --ribbon-h: 4.6rem; }
-  .hero-ribbon{ position:fixed; inset:0; z-index:210; pointer-events:none; }
-  .ribbon-left, .ribbon-top, .ribbon-right{
-    position:absolute; background:#0a0a0a; color:#fff;
-    display:flex; align-items:center; white-space:nowrap;
-  }
-  /* texto vertical via bloco horizontal normal rotacionado (transform),
-     em vez de writing-mode:vertical-rl (mais simples/previsível entre
-     navegadores). padding-right bem maior que o padding-left: depois da
-     rotação, o lado "direito" deste bloco (antes de girar) é o que fica
-     perto do TOPO da tela — exatamente o canto onde o .ribbon-top (a
-     barra horizontal) also pinta por cima, sobreposto de propósito pro
-     encaixe ficar sem costura. Sem esse respiro extra, a ponta do texto
-     ("de") ficava tapada pelo fundo preto do .ribbon-top. */
-  .ribbon-left{
-    top:0; left:0; width:15rem; height:var(--ribbon-h);
-    transform-origin:top left; transform:rotate(-90deg) translateX(-15rem);
-    justify-content:center; padding:0 1.6rem;
-    border-top-left-radius:999px; border-bottom-left-radius:999px;
-    font-family:var(--sans-display); font-weight:350; text-transform:uppercase;
-    letter-spacing:-0.02em; font-size:2rem;
-  }
-  .ribbon-top{
-    top:0; left:0; height:var(--ribbon-h); max-width:calc(100vw - var(--ribbon-h) - 1rem);
-    padding:0 1.8rem 0 calc(var(--ribbon-h) + 0.4rem);
-    border-top-right-radius:999px; border-bottom-right-radius:999px;
-    overflow:hidden; gap:0.6em;
-  }
-  .ribbon-top span, .ribbon-right span{ display:inline-block; }
-  .w-name{ font-family:var(--sans-display); font-weight:350; text-transform:uppercase;
-           letter-spacing:-0.02em; font-size:2rem; }
-  .w-sub, .w-date{ font-family:var(--serif); font-style:italic; font-size:2.3rem; }
-  .ribbon-right{
-    top:0; right:0; width:var(--ribbon-h); max-height:calc(100vh - var(--ribbon-h) - 1rem);
-    flex-direction:column; writing-mode:vertical-rl;
-    justify-content:flex-start; align-items:center; padding:0.4rem 0 1.6rem;
-    border-bottom-left-radius:999px; border-bottom-right-radius:999px;
-    overflow:hidden; gap:0.6em;
-  }
-  .ribbon-right:empty{ display:none; }
 
   /* ---------------- View switcher (glass pill toggle) + about button ----------------
      centralizados na parte inferior da tela — o sort-switch (por endereço/
@@ -573,29 +515,12 @@
   <div id="map"></div>
   <canvas class="hero-snake-canvas" id="hero-snake-canvas"></canvas>
   <div class="map-dim" id="map-dim"></div>
-  <div class="hero-title" id="hero-title">
-    <div class="hero-label">Circuito de Ateliês do Centro</div>
-    <h1>Ateliês abertos</h1>
-    <div class="hero-date" id="hero-date">18 – 19 de Setembro</div>
-    <span class="hero-edition">Edição 01</span>
+
+  <div class="event-marquee" aria-hidden="true">
+    <div class="marquee-layer marquee-layer-light"><div class="marquee-track" id="marquee-track-light"></div></div>
+    <div class="marquee-layer marquee-layer-dark"><div class="marquee-track" id="marquee-track-dark"></div></div>
   </div>
 
-</div>
-
-<!-- TESTE: fita/faixa preta no canto, alternativa ao título grande centralizado —
-     ver .hero-ribbon no CSS e layoutRibbon() no JS. Fica ao lado do
-     hero-title existente por enquanto, pra comparar os dois, não
-     substitui nada ainda. #ribbon-top começa com todas as palavras; o JS
-     move as que não couberem pra #ribbon-right, recalculando a cada resize. -->
-<div class="hero-ribbon" aria-hidden="true">
-  <div class="ribbon-top" id="ribbon-top"></div>
-  <div class="ribbon-right" id="ribbon-right"></div>
-  <!-- .ribbon-left por último de propósito: no canto onde ela se
-       sobrepõe com .ribbon-top (mesmo fundo preto, encaixe sem costura),
-       quem pinta por último fica por cima — precisa ser o texto do
-       "Circuito de", senão a ponta dele fica tapada pelo fundo do
-       .ribbon-top (era o bug do "de" sumindo). -->
-  <div class="ribbon-left"><span>Circuito de</span></div>
 </div>
 
 <div class="top-actions">
@@ -642,6 +567,33 @@
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
+// ---------------- marquee do topo: nome/data/edição em loop ----------------
+// monta um "segmento" com a sequência repetida algumas vezes (largo o
+// bastante pra cobrir até telas bem largas) e duplica esse segmento uma
+// vez — a animação (ver @keyframes marquee-scroll) desloca a trilha por
+// exatamente -50%, ou seja, a largura de UM segmento; como os dois
+// segmentos são idênticos, o loop fecha sem costura nem precisar medir
+// nada em JS. Preenche as duas trilhas (clara/escura, ver .marquee-layer-*
+// no CSS) com o mesmo HTML pra ficarem sempre alinhadas uma sobre a outra.
+(function setupMarquee(){
+  const groupHTML = `
+    <span class="marquee-item">Circuito de Ateliês do Centro</span>
+    <span class="marquee-item marquee-date">Ateliês abertos <em>18 – 19 de Setembro</em></span>
+    <span class="marquee-item marquee-edition">Edição 01</span>
+  `;
+  const segHTML = groupHTML.repeat(6);
+  ['marquee-track-light', 'marquee-track-dark'].forEach(id => {
+    const track = document.getElementById(id);
+    if (!track) return;
+    const seg1 = document.createElement('div');
+    seg1.className = 'marquee-seg';
+    seg1.innerHTML = segHTML;
+    const seg2 = seg1.cloneNode(true);
+    track.appendChild(seg1);
+    track.appendChild(seg2);
+  });
+})();
+
 /* ============================================================
    DATA SOURCE
    Hoje: dados embutidos (gerados a partir do documento original).
@@ -1198,9 +1150,10 @@ function heroSnakeAdvanceLegs(dt){
   return { dist, finished };
 }
 
-// traço grosso com gradiente escuro->cinza claro por PERNA (não pelo
-// caminho inteiro), pra cada trecho ter sua própria transição — mesmo princípio do
-// gradiente preto->branco do gerador-marca.html, cores diferentes
+// traço grosso chapado preto (sem gradiente) por PERNA — versão "chapada"
+// da marca: preenchimento sólido em vez do degradê escuro->cinza claro
+// usado antes (mesmo princípio de traço grosso do gerador-marca.html, só
+// que numa cor só)
 function heroStrokeLegsInRange(dStart, dEnd){
   const ctx = heroSnakeCtx;
   let offset = 0;
@@ -1212,14 +1165,10 @@ function heroStrokeLegsInRange(dStart, dEnd){
     if (localEnd > localStart){
       const sub = heroExtractRange(leg, localStart, localEnd);
       if (sub.length >= 2){
-        const a = leg[0], b = leg[leg.length-1];
-        const grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-        grad.addColorStop(0, '#0a0a0a');
-        grad.addColorStop(1, '#9a9a9a');
         ctx.lineWidth = heroSnakeWidth;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.strokeStyle = grad;
+        ctx.strokeStyle = '#0a0a0a';
         ctx.beginPath();
         sub.forEach((p,i) => { if (i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
         ctx.stroke();
@@ -1722,75 +1671,8 @@ function goToLocation(loc){
   openDrawer(loc.id);
 }
 
-// ---------------- hero title: starts large, shrinks to the corner on first interaction ----------------
-const heroTitle = document.getElementById('hero-title');
+// ---------------- hero: marca (cobrona) some no primeiro toque, marquee do topo fica ----------------
 let heroShrunk = false;
-
-// calcula o font-size do título/data pra a linha mais longa entre as duas
-// (título ou data — normalmente a data, "18 – 19 de Setembro", que é mais
-// larga por causa do itálico) ocupar ~92vw — em toda largura de tela, não
-// só no mobile como antes (lá o clamp(...) fluido do CSS cobria o desktop).
-const heroFitCanvas = document.createElement('canvas');
-const heroFitCtx = heroFitCanvas.getContext('2d');
-const HERO_FIT_LINES = ['Ateliês abertos', '18 – 19 de Setembro'];
-const HERO_FIT_TARGET_VW = 0.75;
-function fitHeroText(){
-  const available = window.innerWidth * HERO_FIT_TARGET_VW;
-  if (available <= 0) return;
-  const ref = 100;
-  heroFitCtx.font = `${ref}px 'Instrument Serif', Georgia, serif`;
-  const maxLineWidth = Math.max(...HERO_FIT_LINES.map(l => heroFitCtx.measureText(l).width));
-  const fontSize = (available / maxLineWidth) * ref;
-  document.documentElement.style.setProperty('--hero-font-size', fontSize + 'px');
-}
-fitHeroText();
-window.addEventListener('resize', fitHeroText);
-if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHeroText);
-
-// ---------------- TESTE: fita fluida (dobra palavra por palavra) ----------------
-// em vez de 2 estados fixos por media query, mede a largura real do texto
-// e "despeja" palavra por palavra do fim de #ribbon-top pro começo de
-// #ribbon-right assim que o topo não cabe mais — recalculado a cada
-// resize, então qualquer largura de tela encontra seu próprio ponto de
-// quebra, não só um estado "largo" e um "estreito".
-const RIBBON_WORDS = [
-  { text:'ATELIÊS', cls:'w-name' },
-  { text:'DO', cls:'w-name' },
-  { text:'CENTRO', cls:'w-name' },
-  { text:'Ateliês', cls:'w-sub' },
-  { text:'abertos', cls:'w-sub' },
-  { text:'18', cls:'w-date' },
-  { text:'–', cls:'w-date' },
-  { text:'19', cls:'w-date' },
-  { text:'de', cls:'w-date' },
-  { text:'Setembro', cls:'w-date' },
-];
-const ribbonTop = document.getElementById('ribbon-top');
-const ribbonRight = document.getElementById('ribbon-right');
-if (ribbonTop && ribbonRight){
-  RIBBON_WORDS.forEach(w => {
-    const span = document.createElement('span');
-    span.className = w.cls;
-    span.textContent = w.text;
-    ribbonTop.appendChild(span);
-  });
-}
-function layoutRibbon(){
-  if (!ribbonTop || !ribbonRight) return;
-  // volta todas as palavras pro topo antes de recalcular, pra também
-  // "desdobrar" quando a tela cresce de novo, não só dobrar
-  while (ribbonRight.firstChild) ribbonTop.appendChild(ribbonRight.firstChild);
-  const leftWidth = document.querySelector('.ribbon-left').getBoundingClientRect().width;
-  const available = window.innerWidth - leftWidth - 16;
-  let guard = 0;
-  while (ribbonTop.scrollWidth > available && ribbonTop.children.length > 1 && guard < 50){
-    ribbonRight.insertBefore(ribbonTop.lastElementChild, ribbonRight.firstChild);
-    guard++;
-  }
-}
-layoutRibbon();
-window.addEventListener('resize', layoutRibbon);
-if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutRibbon);
 
 function shrinkHero(e){
   if (heroShrunk) return;
@@ -1799,10 +1681,10 @@ function shrinkHero(e){
   // na página, e isso não deve contar como "o usuário interagiu".
   if (e && e.isTrusted === false) return;
   heroShrunk = true;
-  heroTitle.classList.add('shrunk');
   document.getElementById('map-dim').classList.add('hidden');
-  // TESTE: cobrinha some junto com o overlay vermelho, e para de animar
-  // (sem gasto de CPU desenhando algo que não aparece mais)
+  // a marca (cobrona) some, e para de animar (sem gasto de CPU desenhando
+  // algo que não aparece mais) — a marquee do topo (.event-marquee)
+  // continua visível/rodando normalmente
   const snakeCanvas = document.getElementById('hero-snake-canvas');
   if (snakeCanvas) snakeCanvas.classList.add('hidden');
   stopHeroSnake();
