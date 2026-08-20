@@ -86,7 +86,7 @@
      (percebido como "pixelado", sobretudo em telas retina); cor sólida
      lisa garante a mesma qualidade de renderização do resto do site. */
   .event-marquee{ position:absolute; top:0; left:0; right:0; z-index:220;
-                   padding:16px 0; overflow:hidden; isolation:isolate;
+                   padding:10px 0; overflow:hidden; isolation:isolate;
                    background:linear-gradient(to right, #050505, #d8d8d6); }
   .marquee-layer{ display:flex; align-items:center; overflow:hidden; }
   .marquee-track{ display:flex; align-items:baseline; width:max-content;
@@ -96,9 +96,9 @@
   /* mesma tipografia/peso do resto do site pra rótulo em caixa alta (ver
      .list-title/.about-title): sans 350, letter-spacing -0.025em */
   .marquee-item{ font-family:var(--sans-display); font-weight:350; text-transform:uppercase;
-                 letter-spacing:-0.025em; font-size:1.5rem; padding:0 0.3em; }
+                 letter-spacing:-0.025em; font-size:1.75rem; padding:0 0.3em; }
   .marquee-item.marquee-date{ font-family:var(--serif); font-weight:400; text-transform:none;
-                               font-size:1.9rem; }
+                               font-size:2.2rem; }
   .marquee-item.marquee-date em{ font-style:italic; margin-left:0.3em; }
   /* "Edição 01" em capitulação normal (não uppercase) — mesmo tratamento
      do .hero-edition original, só sem o selo/pílula */
@@ -106,8 +106,8 @@
   @keyframes marquee-scroll{ from{ transform:translateX(0); } to{ transform:translateX(-50%); } }
 
   @media (max-width:640px){
-    .marquee-item{ font-size:1.05rem; padding:0 0.25em; }
-    .marquee-item.marquee-date{ font-size:1.3rem; }
+    .marquee-item{ font-size:1.25rem; padding:0 0.25em; }
+    .marquee-item.marquee-date{ font-size:1.55rem; }
   }
 
   /* ---------------- View switcher (glass pill toggle) + about button ----------------
