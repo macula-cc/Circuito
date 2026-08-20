@@ -879,31 +879,30 @@ function addStationMarkers(){
   });
 }
 
-// customiza cores camada por camada — água quase branca, resto em tons de
-// cinza — só é possível porque o MapLibre é vetorial (cada feição chega
-// com seu próprio tipo/nome, ao contrário do tile raster, que a gente só
-// via como pixels prontos e tinha que filtrar por aproximação). Estética
-// "xerox de linha": preenchimentos claros/quase brancos, ruas brancas se
-// destacando do cinza dos quarteirões, contorno de prédio invisível.
-// TESTE: paleta azul/laranja, aproximada de um mapa turístico de referência
-// (fundo azul-acinzentado bem claro, ruas/contornos em azul-marinho escuro,
-// pontos em laranja — ver .pin no CSS)
+// TESTE: "planta baixa" — praticamente uma cor só (água, terreno e prédios
+// todos iguais, sem contorno de prédio nenhum) com só as vias PRINCIPAIS
+// aparecendo como linha (ruas locais/de serviço/calçadas escondidas de
+// propósito) — só é possível porque o MapLibre é vetorial (cada feição
+// chega com seu próprio tipo/classe, ao contrário do tile raster).
 const MONO_COLORS = {
-  background: '#ececec',    // cinza claro dos quarteirões
-  water: '#f8f8f8',         // quase branco, só pra diferenciar da terra
-  landuse: '#ececec',       // mesmo cinza dos quarteirões
-  building: '#ececec',      // preenchimento igual ao quarteirão — prédio não se destaca
-  buildingOutline: '#ececec', // igual ao preenchimento — contorno some de vez
-  road: '#ffffff',          // ruas brancas, se destacando do cinza dos quarteirões
+  background: '#ececec',
+  water: '#ececec',      // mesma cor de tudo — sem diferenciar água de terra
+  landuse: '#ececec',
+  building: '#ececec',   // preenchimento igual ao resto — sem contorno de prédio
+  road: '#ffffff',
   roadCasing: '#ffffff',
-  boundary: '#cccccc',
+  boundary: '#ececec',   // sem linha de fronteira administrativa (mesma cor)
   text: '#111111',
   textHalo: '#ffffff'
 };
+// classes de via do estilo "liberty" (ver ids tipo road_motorway,
+// road_trunk_primary, road_secondary_tertiary vs. road_minor,
+// road_service_track, road_path_pedestrian, *_link) — mantém só as três
+// classes "principais" (com suas variantes de túnel/ponte/contorno),
+// escondendo ruas locais, vielas, calçadas, ramais e trilhos.
+const MAIN_ROAD_CLASSES = /(motorway|trunk_primary|secondary_tertiary)/;
 function applyMonochromeStyle(){
   const layers = map.getStyle().layers || [];
-  let buildingSource = null, buildingSourceLayer = null;
-  let firstSymbolId = null;
   layers.forEach(layer => {
     const id = layer.id.toLowerCase();
     const sl = (layer['source-layer'] || '').toLowerCase();
@@ -912,8 +911,7 @@ function applyMonochromeStyle(){
     const isRoad = sl === 'transportation' && layer.type === 'line';
     const isCasing = id.includes('casing');
     const isBoundary = sl === 'boundary';
-    if (isBuilding && layer.type === 'fill'){ buildingSource = layer.source; buildingSourceLayer = layer['source-layer']; }
-    if (layer.type === 'symbol' && firstSymbolId === null){ firstSymbolId = layer.id; }
+    const isMainRoad = isRoad && MAIN_ROAD_CLASSES.test(id) && !id.includes('link');
     try{
       if (layer.type === 'fill-extrusion'){
         // "building-3d" do estilo "liberty" — prédios com altura/sombra.
@@ -926,6 +924,10 @@ function applyMonochromeStyle(){
         const color = isWater ? MONO_COLORS.water : (isBuilding ? MONO_COLORS.building : MONO_COLORS.landuse);
         map.setPaintProperty(layer.id, 'fill-color', color);
       } else if (layer.type === 'line'){
+        if (isRoad && !isMainRoad){
+          map.setLayoutProperty(layer.id, 'visibility', 'none');
+          return;
+        }
         let color = MONO_COLORS.landuse; // linhas genéricas (contorno de parque etc.)
         if (isWater) color = MONO_COLORS.water;
         else if (isBoundary) color = MONO_COLORS.boundary;
@@ -952,21 +954,6 @@ function applyMonochromeStyle(){
       }
     } catch(e){ /* propriedade pode não existir nessa camada específica — ignora */ }
   });
-  // o estilo "liberty" não vem com um contorno de prédio separado — cria
-  // uma camada de linha nova em cima da mesma fonte/source-layer da
-  // camada de preenchimento (que ficou branca/invisível logo acima).
-  // Insere ANTES da primeira camada de texto/símbolo — sem isso o
-  // addLayer joga a linha pro topo absoluto da pilha e ela passa por
-  // cima de nomes de rua/bairro em alguns zooms, apagando um pouco o texto.
-  if (buildingSource && !map.getLayer('building_outline_xerox')){
-    map.addLayer({
-      id: 'building_outline_xerox',
-      type: 'line',
-      source: buildingSource,
-      'source-layer': buildingSourceLayer,
-      paint: { 'line-color': MONO_COLORS.buildingOutline, 'line-width': 1 }
-    }, firstSymbolId || undefined);
-  }
 }
 
 // enquadramento inicial do mapa: calcula a partir dos pontos reais, com
