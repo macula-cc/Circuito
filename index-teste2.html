@@ -1035,11 +1035,11 @@ function frameMapToPoints(){
   }
   const lats = withCoords.map(l => l.lat), lngs = withCoords.map(l => l.lng);
   const bounds = [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]];
-  map.fitBounds(bounds, { padding: { top:90, left:30, right:30, bottom:50 }, duration:0 });
+  map.fitBounds(bounds, { padding: { top:90, left:30, right:30, bottom:100 }, duration:0 });
   // TESTE2: zoom extra depois do fitBounds — espalha mais os pontos na tela,
   // deixando a cobrinha (que usa a posição real desses pontos) maior, e
   // como a espessura do traço é proporcional ao todo, cresce junto
-  map.setZoom(map.getZoom() + 0.6);
+  map.setZoom(map.getZoom() + 0.25);
 }
 
 /* ============================================================
@@ -1069,7 +1069,7 @@ const HERO_SNAKE_ERASE_DURATION = 3;  // s pra apagar tudo de uma vez
 // espessura do traço como fração do menor lado da tela — TESTE2: não
 // estoura mais (ver buildHeroSnakeLegs), então esse fator é bem menor que
 // o da versão full-bleed original
-const HERO_SNAKE_WIDTH_RATIO = 28/1000;
+const HERO_SNAKE_WIDTH_RATIO = 29/1000;
 let heroSnakeWidth = 20; // recalculado em buildHeroSnakeLegs() a cada ciclo
 
 function heroEaseOutSnap(t){ return t >= 1 ? 1 : 1 - Math.pow(2, -10*t); }
