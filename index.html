@@ -995,7 +995,10 @@ function frameMapToPoints(){
   }
   const lats = withCoords.map(l => l.lat), lngs = withCoords.map(l => l.lng);
   const bounds = [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]];
-  map.fitBounds(bounds, { padding: { top:220, left:30, right:30, bottom:50 }, duration:0 });
+  // top:220 era pra não cobrir o hero-title grande de antes, que ocupava o
+  // topo da tela — foi substituído pela marquee, bem mais baixa (~58px),
+  // então não precisa mais de tanto respiro ali
+  map.fitBounds(bounds, { padding: { top:90, left:30, right:30, bottom:50 }, duration:0 });
 }
 
 /* ============================================================
