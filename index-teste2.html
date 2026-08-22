@@ -814,6 +814,10 @@ function pinLabel(loc){
 
 // ---------------- map (isolated in try/catch so a load failure doesn't break the rest) ----------------
 let map = null;
+// true assim que o usuário arrasta/dá zoom de verdade no mapa — usado pra
+// saber se ainda é seguro reenquadrar sozinho quando coordenadas chegam
+// atrasadas (ver resolveMissingCoordinates)
+let userMovedMap = false;
 const markers = {};
 function makePinEl(label, active){
   const el = document.createElement('div');
@@ -1035,11 +1039,12 @@ function frameMapToPoints(){
   }
   const lats = withCoords.map(l => l.lat), lngs = withCoords.map(l => l.lng);
   const bounds = [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]];
-  map.fitBounds(bounds, { padding: { top:90, left:30, right:30, bottom:100 }, duration:0 });
-  // TESTE2: zoom extra depois do fitBounds — espalha mais os pontos na tela,
-  // deixando a cobrinha (que usa a posição real desses pontos) maior, e
-  // como a espessura do traço é proporcional ao todo, cresce junto
-  map.setZoom(map.getZoom() + 0.25);
+  // TESTE2: padding pequeno de propósito — fitBounds já garante que todos
+  // os pontos ficam DENTRO dessa margem (nunca corta ninguém), e quanto
+  // menor a margem, mais zoom ele usa pra preencher a tela. Tentar dar
+  // zoom DEPOIS do fitBounds (map.setZoom) não funciona: zoom em torno do
+  // centro empurra os pontos das bordas pra fora da tela, cortando pins.
+  map.fitBounds(bounds, { padding: { top:60, left:20, right:20, bottom:70 }, duration:0 });
 }
 
 /* ============================================================
@@ -1361,6 +1366,11 @@ function initMap(){
     });
     map.touchZoomRotate.disableRotation();
     map.on('zoom', repositionClusteredMarkers);
+    // marca só como "usuário mexeu no mapa" quando o evento tem originalEvent
+    // (gesto real) — fitBounds/setCenter/setZoom programáticos não disparam
+    // isso, então dá pra saber quando é seguro reenquadrar sozinho depois
+    map.on('dragstart', (e) => { if (e.originalEvent) userMovedMap = true; });
+    map.on('zoomstart', (e) => { if (e.originalEvent) userMovedMap = true; });
 
     // pilha de controles no canto empilha em ordem INVERSA à que são
     // adicionados (o último addControl fica visualmente no topo) — pra
@@ -1594,6 +1604,9 @@ async function resolveMissingCoordinates(){
       loc.lng = coords.lng;
       syncAllMarkers(); // recalcula sobreposições — um novo ponto pode colidir com um já existente
       renderRows(); // atualiza a lista, tirando o endereço do estado "pendente"
+      // reenquadra só se o usuário ainda não mexeu no mapa por conta própria —
+      // senão puxaria a câmera de volta no meio de uma exploração dele
+      if (!userMovedMap) frameMapToPoints();
     }
     // pequena pausa entre chamadas por educação com o serviço gratuito
     await new Promise(r => setTimeout(r, 1100));
