@@ -1191,9 +1191,14 @@ function flattenHeroSnakeLegs(legs){
 }
 function applyHeroTitleNegativeMask(visiblePoints){
   if (!visiblePoints || visiblePoints.length < 2) return;
+  // canvas auxiliar precisa da mesma resolução (dpr) do canvas principal —
+  // senão o drawImage no final estica um bitmap de baixa resolução, deixando
+  // o texto "negativo" borrado em telas retina
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const off = document.createElement('canvas');
-  off.width = window.innerWidth; off.height = window.innerHeight;
+  off.width = window.innerWidth * dpr; off.height = window.innerHeight * dpr;
   const octx = off.getContext('2d');
+  octx.setTransform(dpr, 0, 0, dpr, 0, 0);
   octx.fillStyle = HERO_TITLE_BG;
   octx.textAlign = 'center'; octx.textBaseline = 'alphabetic';
   octx.font = `${heroTitleFontSize}px 'Instrument Serif', Georgia, serif`;
@@ -1208,7 +1213,7 @@ function applyHeroTitleNegativeMask(visiblePoints){
   octx.beginPath();
   visiblePoints.forEach((p,i) => { if (i===0) octx.moveTo(p.x,p.y); else octx.lineTo(p.x,p.y); });
   octx.stroke();
-  heroSnakeCtx.drawImage(off, 0, 0);
+  heroSnakeCtx.drawImage(off, 0, 0, window.innerWidth, window.innerHeight);
 }
 
 // TESTE2: usa a posição de tela REAL de cada endereço (projetando pela
