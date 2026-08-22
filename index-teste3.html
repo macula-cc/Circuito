@@ -1,0 +1,1993 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no, address=no, email=no, date=no">
+<title>Circuito de Ateliês do Centro</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --serif: 'Instrument Serif', Georgia, 'Iowan Old Style', 'Times New Roman', ui-serif, serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --sans-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --ink:#111;
+    --line: rgba(0,0,0,0.15);
+    --gray: #6b6b6b;
+    --hover: #f0f0f0;
+    --paper:#fff;
+  }
+  *{ box-sizing:border-box; }
+  html, body{ height:100%; overflow:hidden; }
+  body{ margin:0; color:var(--ink); font-family:var(--sans); background:var(--paper); }
+  a{ color:inherit; }
+  /* Safari envolve endereço/telefone/data detectados automaticamente num
+     <a x-apple-data-detectors>; sem isso ele reaplica azul/sublinhado por
+     cima do nosso CSS mesmo com format-detection setado */
+  a[x-apple-data-detectors]{ color:inherit !important; text-decoration:inherit !important; }
+  button{ font:inherit; touch-action:manipulation; }
+  .row, .drawer-close, .switcher button, .sort-switch button{ -webkit-tap-highlight-color:transparent; }
+
+  /* ---------------- Hero: full-bleed map (always mounted) ---------------- */
+  /* isolation:isolate contém o mix-blend-mode:multiply do .map-dim (TESTE)
+     dentro do .hero — sem isso o navegador pode misturar o vermelho com
+     elementos fora daqui, dependendo da árvore de empilhamento */
+  .hero{ position:fixed; inset:0; isolation:isolate;
+         transition:transform 0.9s cubic-bezier(.16,1,.3,1); }
+  /* TESTE: "sobre" descortinado — em vez de modal, o mapa inteiro sobe como
+     uma cortina revelando a página preta que já está por baixo o tempo
+     todo (ver .about-page), em vez de um overlay que aparece por cima */
+  .hero.lifted{ transform:translateY(-100%); }
+  #map{ position:absolute; inset:0; width:100%; height:100%; background:#e9e9e9; z-index:1; isolation:isolate; }
+  /* MapLibre é vetorial — não tem mais tile-pane pra filtrar via CSS; as
+     cores de água/terra são definidas direto no estilo (ver applyMonochromeStyle,
+     JS), camada por camada, em vez de um filtro aproximado por cima do raster */
+  .maplibregl-map{ background:#e9e9e9; font-family:var(--sans); }
+
+  /* TESTE: véu branco bem sutil (10% de opacidade) + blur em vez do
+     preto/cinza com multiply usado antes — clareia levemente o mapa,
+     sem lavar as cores/pins. Some no primeiro toque, junto com a marca. */
+  .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(255,255,255,0.1);
+            backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+            pointer-events:none; transition:opacity 0.6s ease; }
+  .map-dim.hidden{ opacity:0; }
+
+  /* "cobrona" decorativa: mesmo princípio de animação do "circuito vivo"
+     do gerador de vídeo (desenha progressivamente, depois apaga, recomeça
+     de outro ponto), sem os pinos numerados (só a linha), com o gradiente
+     escuro->cinza claro por perna (ver heroStrokeLegsInRange, JS). Fica
+     ACIMA do .map-dim (150) — não atrás dele — pra não pegar o
+     backdrop-filter:blur(3px) do overlay, que borrava o traço. Some junto
+     com o overlay quando o hero encolhe (ver shrinkHero). O nome/data/edição
+     do evento vivem só na marquee do topo (ver .event-marquee), não tem
+     mais texto por cima da marca. */
+  /* width/height:100% explícitos são necessários aqui: canvas é elemento
+     "replaced" e, mesmo com inset:0, um replaced element position:absolute
+     sem width/height definido usa o tamanho intrínseco (os atributos
+     width/height em pixels físicos setados via JS) em vez de esticar pro
+     viewport — mesmo problema já resolvido antes no cursor customizado. */
+  .hero-snake-canvas{ position:absolute; inset:0; width:100%; height:100%; z-index:160; pointer-events:none;
+                       transition:opacity 0.6s ease; }
+  .hero-snake-canvas.hidden{ opacity:0; }
+
+  /* ---------------- TESTE2: "poster" (estágio inicial) ----------------
+     em vez de desenhar uma marca própria reenquadrada (que não batia com
+     a posição real dos pins quando o fundo cinza sumisse), reaproveita a
+     PRÓPRIA cobrona que já roda por baixo (.hero-snake-canvas, mesma
+     animação/posição de sempre) — só entra um fundo cinza opaco ATRÁS
+     dela (escondendo mapa/pins reais) e o título/estatísticas por CIMA.
+     Como é o mesmo canvas o tempo todo (nunca troca de marca), quando o
+     fundo cinza some no primeiro toque a marca já está exatamente onde
+     vai continuar, sem nenhum salto visual. */
+  .hero-splash-bg{ position:absolute; inset:0; z-index:155; background:rgba(216,216,214,0.90);
+                    transition:opacity 0.6s ease; }
+  .hero-splash-bg.hidden{ opacity:0; pointer-events:none; }
+  /* TESTE3: em vez do título de 2 linhas do teste2, o fundo inteiro vira uma
+     "parede" de 4 faixas de marquee (texto corrido, alternando direção),
+     desenhadas direto no canvas (ver drawMarqueeWallRows/updateMarqueeWallLayout,
+     JS) — mesma técnica de negativo por cima (destination-in com o traço da
+     cobrinha) só que agora contra texto em movimento em vez de estático. */
+
+  /* ---------------- Marquee do evento (topo) ----------------
+     faixa full-bleed no topo com o nome/data/edição se repetindo em
+     scroll horizontal contínuo — substitui as pílulas testadas antes.
+     Fundo em degradê preto->cinza bem claro (nunca chega no branco puro,
+     senão o texto branco sumiria de vez na ponta clara) FIXO na faixa
+     (não anda junto com o texto). Texto sempre branco sólido, sem
+     mix-blend-mode nem mask-image — as duas técnicas testadas antes pra
+     inverter a cor automaticamente deixavam o texto com aliasing pior
+     (percebido como "pixelado", sobretudo em telas retina); cor sólida
+     lisa garante a mesma qualidade de renderização do resto do site. */
+  /* TESTE2: fica escondida atrás do "poster" (opacity:0) até o primeiro
+     toque — ver .revealed, adicionada em shrinkHero. Sem isso ela ficava
+     visível por cima do fundo cinza do poster, competindo com o título
+     dele (as duas mostravam "Ateliês abertos" ao mesmo tempo). */
+  .event-marquee{ position:absolute; top:0; left:0; right:0; z-index:220;
+                   padding:6px 0; overflow:hidden; isolation:isolate;
+                   background:linear-gradient(to right, #050505, #d8d8d6);
+                   opacity:0; pointer-events:none; transition:opacity 0.6s ease; }
+  .event-marquee.revealed{ opacity:1; pointer-events:auto; }
+  .marquee-layer{ display:flex; align-items:center; overflow:hidden; }
+  .marquee-track{ display:flex; align-items:baseline; width:max-content;
+                   white-space:nowrap; color:#fff;
+                   animation:marquee-scroll 180s linear infinite; }
+  .marquee-seg{ display:flex; align-items:baseline; }
+  /* mesma tipografia/peso do resto do site pra rótulo em caixa alta (ver
+     .list-title/.about-title): sans 350, letter-spacing -0.025em */
+  .marquee-item{ font-family:var(--sans-display); font-weight:350; text-transform:uppercase;
+                 letter-spacing:-0.025em; font-size:1.75rem; padding:0 0.3em; }
+  .marquee-item.marquee-date{ font-family:var(--serif); font-weight:400; text-transform:none; letter-spacing:0;
+                               font-size:2.2rem; }
+  .marquee-item.marquee-date em{ font-style:italic; margin-left:0.3em; }
+  /* "Edição 01" em capitulação normal (não uppercase) — mesmo tratamento
+     do .hero-edition original, só sem o selo/pílula */
+  .marquee-item.marquee-edition{ text-transform:none; }
+  @keyframes marquee-scroll{ from{ transform:translateX(0); } to{ transform:translateX(-50%); } }
+
+  @media (max-width:640px){
+    .marquee-item{ font-size:1.25rem; padding:0 0.25em; }
+    .marquee-item.marquee-date{ font-size:1.55rem; }
+  }
+
+  /* ---------------- View switcher (glass pill toggle) + about button ----------------
+     centralizados na parte inferior da tela — o sort-switch (por endereço/
+     por artista) fica numa linha própria acima deles, mesmo esquema */
+  /* TESTE2: escondido atrás do "poster" até o primeiro toque, mesmo
+     esquema do .event-marquee acima (ver .revealed, shrinkHero) */
+  .top-actions{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:500;
+                display:flex; align-items:center; gap:0.5rem;
+                opacity:0; pointer-events:none; transition:opacity 0.6s ease; }
+  .top-actions.revealed{ opacity:1; pointer-events:auto; }
+  .switcher{ display:flex; gap:2px; font-family:var(--sans-display); font-weight:400; font-size:0.79rem;
+             background:rgba(200,200,200,0.55); backdrop-filter:blur(18px) saturate(180%);
+             -webkit-backdrop-filter:blur(18px) saturate(180%);
+             border:1px solid rgba(255,255,255,0.4); border-radius:999px; padding:3px;
+             box-shadow:0 3px 12px rgba(0,0,0,0.22); }
+  /* preenchimento ativo com o mesmo blur real usado nos pins (ver .pin::before)
+     em vez de background sólido — ::before fica sempre no DOM (position:relative
+     no botão) mas só aparece (opacity) quando .active; inset:2px + filter:blur
+     dá o núcleo sólido com borda esfumada, igual aos pins. */
+  .switcher button{ background:transparent; border:none; cursor:pointer; color:var(--ink);
+                     padding:0.55rem 0.9rem; min-height:38px; border-radius:999px; position:relative;
+                     transition:color 0.2s ease; }
+  .switcher button::before{ content:''; position:absolute; inset:2px; border-radius:999px;
+                             background:#171717; filter:blur(2px); z-index:-1;
+                             opacity:0; transition:opacity 0.2s ease; }
+  .switcher button.active{ color:#fff; }
+  .switcher button.active::before{ opacity:1; }
+  .switcher button:not(.active):hover{ background:rgba(255,255,255,0.35); }
+
+  /* botão "sobre": separado do toggle mapa/lista, mas segue o mesmo visual
+     da parte não-selecionada dele (vidro, sem fundo preto) */
+  .about-btn{ font-family:var(--sans-display); font-weight:400; font-size:0.79rem; color:var(--ink); cursor:pointer;
+              background:rgba(200,200,200,0.55); backdrop-filter:blur(18px) saturate(180%);
+              -webkit-backdrop-filter:blur(18px) saturate(180%);
+              border:1px solid rgba(255,255,255,0.4); border-radius:999px;
+              padding:0.55rem 0.9rem; min-height:46px;
+              box-shadow:0 2px 10px rgba(0,0,0,0.08);
+              transition:background 0.2s ease; }
+  .about-btn:hover{ background:rgba(255,255,255,0.35); }
+
+  .sort-switch{ position:absolute; bottom:calc(5rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:600;
+                width:max-content;
+                display:flex; gap:2px; font-family:var(--sans-display); font-weight:400; font-size:0.73rem;
+                background:rgba(200,200,200,0.55); backdrop-filter:blur(18px) saturate(180%);
+                -webkit-backdrop-filter:blur(18px) saturate(180%);
+                border:1px solid rgba(255,255,255,0.4); border-radius:999px; padding:3px;
+                box-shadow:0 2px 10px rgba(0,0,0,0.08);
+                opacity:0; pointer-events:none; transition:opacity 0.2s ease; }
+  .sort-switch.visible{ opacity:1; pointer-events:auto; }
+  .sort-switch button{ background:transparent; border:none; cursor:pointer; color:var(--ink);
+                        padding:0.5rem 0.7rem; min-height:38px; border-radius:999px; position:relative;
+                        transition:color 0.2s ease; }
+  .sort-switch button::before{ content:''; position:absolute; inset:2px; border-radius:999px;
+                                background:#171717; filter:blur(2px); z-index:-1;
+                                opacity:0; transition:opacity 0.2s ease; }
+  .sort-switch button.active{ color:#fff; }
+  .sort-switch button.active::before{ opacity:1; }
+  .sort-switch button:not(.active):hover{ background:rgba(255,255,255,0.35); }
+
+  /* pins: 40px invisible tap target, badge circle with initials centered inside */
+  /* z-index com !important: o MapLibre define um z-index INLINE em cada
+     marcador (baseado na posição na tela, pra simular profundidade —
+     quem está mais "embaixo" visualmente fica por cima), que muda a cada
+     movimento do mapa e sobrescreveria um z-index normal no CSS. Só
+     !important no stylesheet vence um estilo inline sem !important —
+     garante que os pins dos ateliês fiquem sempre acima das estações,
+     não importa o zoom/posição. */
+  .pin-hit{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2 !important; }
+  /* TESTE: radial-gradient não dá pra ver num disco de 24px — a faixa de
+     transição proporcional ao stop do Figma (71%->100% do raio) vira só
+     ~3.5px reais, indistinguível de uma borda dura. Troca pra um blur de
+     verdade: ::before é um círculo sólido MENOR que o .pin (inset:4px),
+     desfocado com filter:blur — o desfoque espalha a borda dele pra fora
+     até quase a borda do .pin, dando um núcleo sólido com transição
+     realmente esfumada. Número fica no .pin (::before não borra o texto,
+     só o próprio pseudo-elemento). Sem box-shadow no estado de repouso —
+     a sombra confundia com o esfumado; continua só no hover/active. */
+  .pin{ width:29px; height:29px; border-radius:50%; position:relative;
+        display:flex; align-items:center; justify-content:center;
+        font-family:var(--mono); font-size:0.65rem; font-weight:500; color:#fff; letter-spacing:0.01em;
+        transition:transform 0.18s cubic-bezier(.4,0,.2,1), box-shadow 0.18s ease;
+        transform:scale(1); }
+  .pin::before{ content:''; position:absolute; inset:2px; border-radius:50%;
+                background:#171717; filter:blur(2.4px); z-index:-1; }
+  .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.18); box-shadow:0 4px 16px rgba(0,0,0,0.35); }
+  .pin.active{ transform:scale(1.18); box-shadow:0 0 0 3px rgba(0,0,0,0.18); }
+
+  /* transit stations (metrô/VLT): blue circular badge with letter — click
+     to see the name and type in a popup. Two distinct blue tones (not a
+     reproduction of the transit agency's own logo artwork) so metro and
+     VLT read apart from each other at a glance, echoing each service's
+     real-world color without copying the exact mark. */
+  .station-hit{ width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:1 !important; }
+  .station-badge{ width:20px; height:20px; border-radius:50%; border:2px solid #fff;
+                   box-shadow:0 1px 4px rgba(0,0,0,0.35);
+                   display:flex; align-items:center; justify-content:center;
+                   transition:transform 0.18s cubic-bezier(.4,0,.2,1); }
+  .station-badge.metro{ background:#1565C0; }
+  .station-badge.vlt{ background:#0F3D7A; }
+  .station-badge span{ font-family:var(--sans); font-weight:700; font-size:0.62rem; color:#fff; }
+  .station-hit:hover .station-badge{ transform:scale(1.15); }
+
+  .maplibregl-popup-content{ border-radius:2px !important; box-shadow:0 8px 24px rgba(0,0,0,0.18) !important;
+                              font-family:var(--sans-display); font-size:0.79rem; color:var(--ink); padding:0.7rem 0.9rem !important; }
+  .maplibregl-popup-tip{ box-shadow:0 8px 24px rgba(0,0,0,0.1) !important; }
+
+  /* crédito de OSM/OpenFreeMap discreto (mas sempre visível — é exigência de
+     licença, não só estética) — texto/fundo mais fracos que o padrão do
+     MapLibre, e a versão completa também aparece no "Sobre" */
+  .maplibregl-ctrl-group{ border-radius:0 !important; box-shadow:none !important; border:1px solid var(--line) !important; }
+  .maplibregl-ctrl-group button{ background:#fff !important; color:#111 !important; font-family:var(--sans-display) !important; }
+  .maplibregl-ctrl-attrib{ font-family:var(--sans-display); font-size:0.68rem !important; background:rgba(255,255,255,0.75) !important; }
+  .locate-control-btn{ width:29px; height:29px; display:flex; align-items:center; justify-content:center;
+                        background:#fff; border:1px solid var(--line); border-top:none; cursor:pointer;
+                        font-size:1rem; color:#111; }
+
+  .user-dot{ position:relative; width:14px; height:14px; border-radius:50%; background:#3B82F6; border:2px solid #fff;
+             box-shadow:0 0 0 4px rgba(59,130,246,0.28); }
+  .user-dot::after{ content:''; position:absolute; inset:-8px; border-radius:50%;
+                     background:rgba(59,130,246,0.28); animation:user-dot-pulse 2.2s ease-out infinite; }
+  @keyframes user-dot-pulse{
+    0%{ transform:scale(0.4); opacity:0.8; }
+    100%{ transform:scale(1.6); opacity:0; }
+  }
+
+  /* ---------------- Lista descortinada (mesmo princípio do "Sobre") ----------------
+     página branca sempre presente atrás do .hero, na posição de repouso
+     (translateY:0) — é a camada de base. O "sobre" (ver .about-page) fica
+     por cima dela (z-index maior) e desliza de baixo pra cima quando
+     abre, e de volta pra baixo quando fecha, cobrindo/revelando a lista
+     sem precisar trocar de display — dá pra ir de lista pra sobre e
+     voltar com uma transição suave em vez de um corte seco. */
+  .list-page{ position:fixed; inset:0; background:#ffffff;
+              overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .list-page .list-close{ position:fixed;
+             top:calc(1.6rem + env(safe-area-inset-top)); right:calc(1.6rem + env(safe-area-inset-right));
+             background:rgba(0,0,0,0.08); color:#111; z-index:2; }
+  .list-page .list-close:hover{ background:rgba(0,0,0,0.16); }
+
+  /* padding-bottom generoso pra o último item da lista não ficar embaixo
+     do toggle mapa/lista/sobre + sort-switch (por endereço/por artista),
+     que são fixed e ficam sobrepostos ao final do scroll senão */
+  .list-body{ width:100%;
+              padding:calc(4.6rem + env(safe-area-inset-top)) 1.6rem calc(9rem + env(safe-area-inset-bottom)); }
+  .list-head{ margin:0 0 2rem; }
+  /* mesmo estilo do .about-title (Geist uppercase), só que em tinta escura
+     — a página da lista é branca, a do "sobre" é preta */
+  .list-title{ font-family:var(--sans-display); font-weight:350; text-transform:uppercase; letter-spacing:-0.025em;
+               color:var(--ink); font-size:2rem; margin:0; }
+
+  .row{ display:flex; align-items:baseline; gap:0.5rem; padding:1.1rem 0.2rem; border-bottom:1px solid var(--line);
+        cursor:pointer; background:none; border-left:none; border-right:none; border-top:none; width:100%;
+        text-align:left; font-family:inherit; color:var(--ink); transition:background 0.15s ease, padding-left 0.15s ease; }
+  .row:hover{ background:var(--hover); padding-left:0.6rem; }
+  .row.pending{ color:var(--gray); font-style:italic; }
+  .row-num{ font-family:var(--mono); font-size:0.83rem; color:var(--gray); width:1.6rem; flex-shrink:0; }
+  .row-main{ flex-grow:1; min-width:0; }
+  /* mesmo estilo do corpo de texto grande do "Sobre" (.about-main p) —
+     breakpoint próprio no mobile (ver abaixo) pra não ficar gigante numa
+     tela pequena */
+  .row-title{ font-family:var(--sans-display); font-size:1.77rem; line-height:1.27; }
+  .row-sub{ font-family:var(--sans-display); font-size:0.79rem; color:var(--gray); display:block; margin-top:0.15rem; }
+  .row-count{ font-family:var(--sans-display); font-size:0.79rem; color:var(--gray); white-space:nowrap; }
+
+  @media (max-width:640px){
+    .row-title{ font-size:1.3rem; }
+  }
+
+  /* miniatura da foto na lista "por artista" (não existe na "por
+     endereço" — um espaço pode ter vários artistas, não faz sentido
+     mostrar uma foto só) */
+  /* mesma proporção 4:3 da foto do drawer (.artist-photo) */
+  .row-photo{ width:72px; aspect-ratio:4/3; border-radius:4px; background:#e4e4e4; flex-shrink:0;
+              background-size:cover; background-position:center; }
+
+  /* lista "por artista": só no celular (max-width:640px, mesmo corte já
+     usado na página Sobre pra separar celular de tablet/desktop — mais
+     permissivo que o breakpoint geral do site em 780px, que trataria até
+     um iPad em retrato como "mobile") fica empilhada (foto à esquerda,
+     nome/instagram/endereço em coluna à direita). A partir daí (tablet
+     inclusive), 4 colunas lado a lado: foto | nome | instagram | espaço,
+     com a coluna do nome bem mais larga que as outras duas. */
+  .row-artista{ display:grid; grid-template-columns:72px 2fr 1fr 1fr; grid-template-areas:"photo title insta sub";
+                align-items:center; column-gap:1.2rem; row-gap:0.15rem; }
+  .row-artista .row-photo{ grid-area:photo; }
+  .row-artista .row-title{ grid-area:title; }
+  .row-artista .row-sub{ grid-area:sub; margin-top:0; }
+  .row-artista .row-instagram{ grid-area:insta; font-family:var(--sans-display); font-size:0.79rem; color:var(--gray);
+                                white-space:nowrap; align-self:center; }
+
+  /* colunas a partir do tablet — só o celular (≤640px) mantém a
+     diagramação empilhada de sempre. .row-main vira display:contents pra
+     "num"/"título"/"endereço" disputarem as colunas do grid do .row
+     diretamente, sem precisar tocar no HTML gerado por JS (que continua o
+     mesmo pros dois breakpoints). A coluna do nome (2fr) fica bem mais
+     larga que a do endereço (1fr), pra combinar com o mockup. */
+  .row:not(.row-artista){ display:grid; grid-template-columns:1.6rem 2fr 1fr; align-items:baseline; }
+  .row:not(.row-artista) .row-main{ display:contents; }
+  .row:not(.row-artista) .row-sub{ margin-top:0; margin-left:0.5rem; }
+
+  @media (max-width:640px){
+    .row:not(.row-artista){ display:flex; align-items:baseline; }
+    .row:not(.row-artista) .row-main{ display:block; }
+    .row:not(.row-artista) .row-sub{ margin-top:0.15rem; margin-left:0; }
+
+    .row-artista{ grid-template-columns:72px 1fr; grid-template-areas:"photo title" "photo insta" "photo sub";
+                  column-gap:1rem; row-gap:0.15rem; align-items:start; }
+    .row-artista .row-instagram{ align-self:center; }
+  }
+
+  /* ---------------- Drawer ---------------- */
+  .overlay{ position:fixed; inset:0; background:rgba(0,0,0,0.15); opacity:0; pointer-events:none;
+            transition:opacity 0.25s ease; z-index:900; }
+  .overlay.open{ opacity:1; pointer-events:auto; }
+
+  .drawer{ position:fixed; z-index:950; display:flex; flex-direction:column;
+           transition:transform 0.35s cubic-bezier(.4,0,.2,1);
+           background:rgba(255,255,255,0.35);
+           backdrop-filter:blur(32px) saturate(180%);
+           -webkit-backdrop-filter:blur(32px) saturate(180%);
+           border:1px solid rgba(255,255,255,0.6);
+           border-radius:10px;
+           box-shadow:0 24px 70px rgba(0,0,0,0.25); }
+  @media (min-width:781px){
+    .drawer{ top:calc(1rem + env(safe-area-inset-top)); right:calc(1rem + env(safe-area-inset-right));
+             bottom:calc(1rem + env(safe-area-inset-bottom)); width:440px;
+             transform:translateX(calc(100% + 2rem)); }
+    .drawer.open{ transform:translateX(0); }
+  }
+  @media (max-width:780px){
+    .drawer{ left:0; right:0; bottom:0; max-height:70vh; transform:translateY(100%);
+             border-bottom-left-radius:0; border-bottom-right-radius:0; }
+    .drawer.open{ transform:translateY(0); }
+  }
+
+  .drawer-head{ padding:1.6rem 1.6rem 1.1rem; border-bottom:1px solid var(--line); flex-shrink:0; position:relative; }
+  .drawer-title{ font-family:var(--sans-display); font-weight:400; font-size:1.57rem; letter-spacing:-0.02em; margin:0 0 0.15rem; line-height:1.2; }
+  .drawer-addr{ font-family:var(--sans-display); font-size:0.94rem; color:var(--gray); }
+  .drawer-directions{ display:inline-block; font-family:var(--sans-display); font-size:0.94rem; color:var(--gray);
+                       text-decoration:underline; text-underline-offset:2px; margin-top:0.4rem; }
+  .drawer-directions:hover{ opacity:0.6; }
+  .drawer-directions.hidden{ display:none; }
+
+  /* botão fechar em círculo — mesmo visual no drawer, no lightbox e no
+     "sobre"; só a posição (pra alinhar com o título de cada um) muda */
+  .icon-close{ width:26px; height:26px; border-radius:50%; background:rgba(0,0,0,0.3); color:#333;
+               backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+               border:none; cursor:pointer; padding:0;
+               display:flex; align-items:center; justify-content:center;
+               transition:background 0.15s ease; }
+  .icon-close svg{ display:block; }
+  .icon-close:hover{ background:rgba(0,0,0,0.44); }
+
+  /* alinhado verticalmente com a primeira linha do drawer-title */
+  .drawer-close{ position:absolute; top:27px; right:1rem; }
+
+  .drawer-list{ overflow-y:auto; -webkit-overflow-scrolling:touch; padding:1rem 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); }
+  /* minmax(0,1fr) em vez de 1fr: sem isso, uma coluna com texto mais longo
+     (nome, @instagram, sala) força a própria track do grid a crescer além
+     da metade, e a foto — que é width:100% da track — fica maior numa
+     coluna que na outra. Trava as duas colunas exatamente do mesmo tamanho. */
+  .artist-grid{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:1.1rem 0.9rem; }
+
+  .artist-card{ display:flex; flex-direction:column; min-width:0; }
+  .artist-photo{ width:100%; aspect-ratio:4/3; background:#e4e4e4; border:1px solid var(--line); border-radius:6px;
+                 background-size:cover; background-position:center;
+                 display:flex; align-items:center; justify-content:center;
+                 font-family:var(--sans-display); font-size:0.94rem; color:var(--gray);
+                 cursor:zoom-in; transition:opacity 0.15s ease; }
+  .artist-photo:hover{ opacity:0.85; }
+
+  /* fixed min-height reserved for the whole text block, so cards line up
+     whether or not the 'sala' line exists — the room element is fully
+     removed from the DOM when empty rather than leaving a blank line. */
+  .artist-body{ display:flex; flex-direction:column; min-height:6.1rem; min-width:0; }
+
+  .artist-name{ font-family:var(--sans-display); font-weight:450; font-size:0.9rem; margin:0.55rem 0 0.1rem; line-height:1.2; overflow-wrap:break-word; }
+  .artist-meta{ font-family:var(--sans-display); font-size:0.83rem; line-height:1.4; color:var(--gray); margin-bottom:0.3rem; display:flex; flex-wrap:wrap; gap:0.4rem; align-items:center; min-width:0; overflow-wrap:break-word; }
+  .artist-meta a{ color:var(--ink); text-decoration:underline; text-underline-offset:2px; }
+  .artist-meta a:hover{ opacity:0.6; }
+  .artist-room{ font-family:var(--sans-display); font-size:0.75rem; color:var(--gray); margin-top:0.3rem; }
+  .artist-room .artist-obs{ border:1px solid var(--line); padding:0.05rem 0.3rem; }
+  .day-badges{ display:flex; gap:0.35rem; margin-top:0.45rem; flex-wrap:wrap; }
+  .day-pill{ font-family:var(--sans-display); font-size:0.68rem; padding:0.15rem 0.45rem; border-radius:3px; border:1px solid transparent; }
+  .day-pill.present{ background:#DFF3E3; color:#1F6B33; border-color:#B9E0C2; }
+  .day-pill.absent{ background:#FBE2E0; color:#9A3324; border-color:#F0C4C0; }
+  .photo-note{ font-family:var(--sans-display); font-size:0.75rem; color:var(--gray); font-style:italic; margin-top:0.9rem; grid-column:1 / -1; }
+
+  .map-error{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+              font-family:var(--sans-display); font-size:0.88rem; color:var(--gray); text-align:center; padding:2rem; }
+
+  /* ---------------- Lightbox (modal, glassmorphism) ---------------- */
+  .lightbox{ position:fixed; inset:0; z-index:1000;
+             background:transparent;
+             display:flex; align-items:center; justify-content:center;
+             opacity:0; pointer-events:none; transition:opacity 0.25s ease;
+             padding:calc(1rem + env(safe-area-inset-top)) calc(1rem + env(safe-area-inset-right))
+                     calc(1rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left)); }
+  .lightbox.open{ opacity:1; pointer-events:auto; }
+
+  .lightbox-modal{ position:relative; width:100%; height:100%;
+                    background:rgba(255,255,255,0.35);
+                    backdrop-filter:blur(32px) saturate(180%);
+                    -webkit-backdrop-filter:blur(32px) saturate(180%);
+                    border:1px solid rgba(255,255,255,0.6);
+                    border-radius:10px;
+                    box-shadow:0 24px 70px rgba(0,0,0,0.25);
+                    display:flex; flex-direction:column;
+                    transform:scale(0.97); transition:transform 0.25s ease; }
+  .lightbox.open .lightbox-modal{ transform:scale(1); }
+
+  /* linha dedicada só pro botão "fechar", mesmo esquema do drawer-head:
+     o conteúdo (imagem/legenda) fica num bloco separado que começa
+     sempre abaixo dela, então nunca disputa o mesmo espaço — mesmo se a
+     imagem+legenda for alta o bastante pra rolar */
+  .lightbox-head{ flex-shrink:0; height:1.8rem; position:relative; }
+
+  /* justify-content:flex-start (não center) é essencial aqui: com o conteúdo
+     centralizado, quando a imagem+legenda é mais alta que o espaço visível
+     o scroll nasce parado no meio do conteúdo (a parte de cima fica
+     "escondida" acima do topo do scroll) — parece foto cortada, mas na
+     real é só posição inicial de rolagem errada. Com flex-start o topo
+     real do conteúdo sempre coincide com scrollTop:0. */
+  .lightbox-body{ flex-grow:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
+                   display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+                   padding:1.6rem 1.8rem 2.2rem; }
+
+  .lightbox-modal img{ max-width:100%; max-height:70vh; object-fit:contain; border:1px solid rgba(0,0,0,0.1); }
+  .lightbox-placeholder{ display:none; width:100%; max-width:520px; aspect-ratio:4/3; background:rgba(0,0,0,0.05);
+                          align-items:center; justify-content:center;
+                          font-family:var(--sans-display); font-size:1.21rem; color:var(--gray); border:1px solid rgba(0,0,0,0.12); }
+  .lightbox-placeholder.show{ display:flex; }
+  .lightbox-caption{ max-width:520px; margin-top:1.4rem; text-align:center; }
+  .lightbox-caption .lb-name{ font-family:var(--serif); font-size:1.32rem; color:var(--ink); margin:0 0 0.4rem; }
+  .lightbox-caption .lb-room{ font-family:var(--sans-display); font-size:0.83rem; color:var(--gray); margin-bottom:0.5rem; }
+  .lightbox-caption .lb-bio{ font-family:var(--sans); font-size:0.97rem; line-height:1.55; color:var(--gray); margin:0.8rem 0 0; }
+  /* centralizado em toda a margem vazia do topo — lightbox-head (1.8rem)
+     + padding-top do lightbox-body (1.6rem) — até onde a imagem começa,
+     não só na faixa estreita do lightbox-head */
+  .lightbox-close{ position:absolute; top:14.2px; right:1rem; }
+
+  /* ---------------- "Sobre" descortinado ----------------
+     página preta que fica sempre presente, por baixo do .hero (que vem
+     depois dela no DOM — em stacking context z-index:auto, ordem no DOM
+     decide, então o .hero sempre cobre essa página por padrão). Diferente
+     da .list-page (que fica parada, é a camada de base), o "sobre" tem
+     z-index próprio (acima da lista) e um transform:translateY — parado
+     fora da tela por baixo (100%) quando não é o modo ativo, deslizando
+     pra cima (0) quando abre e de volta pra baixo quando fecha. Isso dá
+     a transição suave entre lista ↔ sobre sem precisar trocar de display
+     (o .hero ainda cuida de cobrir tudo quando o modo é "map"). */
+  .about-page{ position:fixed; inset:0; z-index:2; background:#0a0a0a;
+               overflow-y:auto; -webkit-overflow-scrolling:touch;
+               transform:translateY(100%);
+               transition:transform 0.5s cubic-bezier(.16,1,.3,1); }
+  .about-page.active{ transform:translateY(0); }
+  .about-page .about-close{ position:fixed;
+             top:calc(1.6rem + env(safe-area-inset-top)); right:calc(1.6rem + env(safe-area-inset-right));
+             background:rgba(255,255,255,0.12); color:#fff; z-index:2; }
+  .about-page .about-close:hover{ background:rgba(255,255,255,0.22); }
+
+  .about-body{ width:100%;
+               padding:calc(4.6rem + env(safe-area-inset-top)) 1.6rem calc(3rem + env(safe-area-inset-bottom)); }
+
+  .about-head{ margin:0 0 2rem; }
+  .about-title{ font-family:var(--sans-display); font-weight:350; text-transform:uppercase; letter-spacing:-0.025em;
+                color:#fff; font-size:2rem; margin:0; }
+
+  .about-grid{ display:grid; grid-template-columns:1fr 320px; gap:2.6rem; align-items:start; }
+  .about-main{ max-width:900px; }
+  .about-main p{ font-family:var(--sans-display); font-size:1.77rem; line-height:1.27; color:#cfcfcf; margin:0 0 0.9rem; }
+  .about-main p:last-child{ margin-bottom:0; }
+
+  .about-credits{ font-family:var(--sans-display); }
+  .about-credits p{ font-size:0.95rem; line-height:1.5; color:#cfcfcf; margin:0 0 0.9rem; }
+  .about-credits a{ color:#fff; }
+
+  @media (max-width:640px){
+    .about-grid{ grid-template-columns:1fr; gap:1.8rem; }
+  }
+</style>
+
+</head>
+<body>
+
+<div class="list-page" id="list-page">
+  <button class="list-close icon-close" id="list-close" aria-label="Fechar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6L18 18M18 6L6 18"/></svg></button>
+  <div class="list-body">
+    <div class="list-head"><h2 class="list-title">Índice do circuito</h2></div>
+    <div class="rows" id="rows"></div>
+  </div>
+</div>
+
+<div class="about-page" id="about-page">
+  <button class="about-close icon-close" id="about-close" aria-label="Fechar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6L18 18M18 6L6 18"/></svg></button>
+  <div class="about-body">
+    <div class="about-head"><h2 class="about-title">Circuito de Ateliês do Centro</h2></div>
+    <div class="about-grid">
+      <div class="about-main">
+        <p>O Circuito de Ateliês do Centro nasce da articulação de uma rede de artistas que compartilham o desejo de fortalecer a cena artística contemporânea do Centro do Rio de Janeiro e ampliar as possibilidades de encontro entre arte, cidade e público. Em uma região historicamente marcada pela diversidade cultural e pela efervescência de sua produção artística, o projeto volta o olhar para os lugares onde a arte acontece antes de chegar às exposições: os ateliês, como espaços de pesquisa, experimentação e criação, onde obras, ideias e processos ganham forma.</p>
+        <p>Mais do que apresentar trabalhos, o Circuito propõe abrir as portas dos ateliês e aproximar o público do fazer artístico, possibilitando o contato direto com artistas, suas pesquisas e os contextos em que suas práticas se desenvolvem. A iniciativa valoriza, assim, a dimensão experimental da arte e revela os caminhos que antecedem a obra finalizada.</p>
+        <p>Ao fortalecer conexões entre artistas e público, o Circuito de Ateliês do Centro reafirma a região como um importante polo de criação contemporânea e propõe uma experiência de arte baseada no encontro, na descoberta e na proximidade. Um convite para conhecer não apenas onde a arte é apresentada, mas onde ela nasce.</p>
+      </div>
+      <div class="about-credits">
+        <p>Idealização e Produção Executiva:<br>Fernanda Sattamini<br><a href="https://instagram.com/fernandasattamini" target="_blank" rel="noopener">@fernandasattamini</a></p>
+        <p>Identidade visual e site:<br>Eduardo Mattos<br><a href="https://instagram.com/macula.cc" target="_blank" rel="noopener">@macula.cc</a></p>
+        <p>Colaborações:<br>Nuno Quinhões · <a href="https://instagram.com/nunoquinhoes" target="_blank" rel="noopener">@nunoquinhoes</a><br>Alessandra Sposetti · <a href="https://instagram.com/alessandrasposetti" target="_blank" rel="noopener">@alessandrasposetti</a><br>Adriana Macedo · <a href="https://instagram.com/adrianamacedo_artist" target="_blank" rel="noopener">@adrianamacedo_artist</a></p>
+        <p>Apoio institucional:<br>Secretaria da Cultura e Economia Criativa<br>Casa Proeza</p>
+        <p>Mapa:<br><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a> contributors, tiles por <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, biblioteca <a href="https://maplibre.org" target="_blank" rel="noopener">MapLibre GL JS</a>.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="hero">
+  <div id="map"></div>
+  <!-- TESTE2: fundo cinza opaco atrás da cobrona (esconde mapa/pins reais);
+       a cobrona (.hero-snake-canvas logo abaixo) é a MESMA de sempre, sem
+       reenquadrar — por isso bate exatamente com o mapa real quando esse
+       fundo some no primeiro toque (ver shrinkHero). -->
+  <div class="hero-splash-bg" id="hero-splash-bg"></div>
+  <canvas class="hero-snake-canvas" id="hero-snake-canvas"></canvas>
+  <div class="map-dim" id="map-dim"></div>
+
+  <div class="event-marquee" aria-hidden="true">
+    <div class="marquee-layer"><div class="marquee-track" id="marquee-track"></div></div>
+  </div>
+
+</div>
+
+<div class="top-actions">
+  <div class="switcher">
+    <button id="switch-map" class="active">Mapa</button>
+    <button id="switch-list">Lista</button>
+  </div>
+  <button class="about-btn" id="about-btn">Sobre</button>
+</div>
+
+<div class="sort-switch" id="sort-switch">
+  <button id="sort-endereco" class="active">Por Endereço</button>
+  <button id="sort-artista">Por Artista</button>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <button class="drawer-close icon-close" id="drawer-close" aria-label="Fechar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6L18 18M18 6L6 18"/></svg></button>
+    <div class="drawer-title" id="drawer-local">—</div>
+    <div class="drawer-addr" id="drawer-endereco">—</div>
+    <a class="drawer-directions" id="drawer-directions" href="#" target="_blank" rel="noopener">Como chegar →</a>
+  </div>
+  <div class="drawer-list" id="drawer-list"></div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <div class="lightbox-modal">
+    <div class="lightbox-head">
+      <button class="lightbox-close icon-close" id="lightbox-close" aria-label="Fechar imagem"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6L18 18M18 6L6 18"/></svg></button>
+    </div>
+    <div class="lightbox-body">
+      <img id="lightbox-img" src="" alt="">
+      <div class="lightbox-placeholder" id="lightbox-placeholder"></div>
+      <div class="lightbox-caption" id="lightbox-caption">
+        <p class="lb-name" id="lightbox-name"></p>
+        <div class="lb-room" id="lightbox-room"></div>
+        <div class="day-badges" id="lightbox-days" style="justify-content:center;"></div>
+        <p class="lb-bio" id="lightbox-bio"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+// declarado aqui em cima (não só lá embaixo na seção DATA SOURCE) porque
+// setupMarquee() já lê LOCATIONS na primeira chamada, logo abaixo — TDZ do
+// let quebraria se a declaração continuasse depois de onde é usada
+let LOCATIONS = [];
+
+// ---------------- marquee do topo: nome/data/edição/contagem em loop ----------------
+// monta um "segmento" com a sequência repetida algumas vezes (largo o
+// bastante pra cobrir até telas bem largas) e duplica esse segmento uma
+// vez — a animação (ver @keyframes marquee-scroll) desloca a trilha por
+// exatamente -50%, ou seja, a largura de UM segmento; como os dois
+// segmentos são idênticos, o loop fecha sem costura nem precisar medir
+// nada em JS. Chamada de novo em boot() depois que LOCATIONS carrega, pra
+// incluir "N Endereços - M Artistas" — antes disso (ou se a planilha falhar
+// ao carregar) monta sem esse último item.
+function setupMarquee(){
+  const track = document.getElementById('marquee-track');
+  if (!track) return;
+  const numAddresses = LOCATIONS.length;
+  const numArtists = LOCATIONS.reduce((sum, l) => sum + l.artistas.length, 0);
+  const countsHTML = numAddresses > 0
+    ? `<span class="marquee-item marquee-date">${numAddresses} Endereços - ${numArtists} Artistas</span>`
+    : '';
+  const groupHTML = `
+    <span class="marquee-item">Circuito de Ateliês do Centro</span>
+    <span class="marquee-item marquee-date">Ateliês abertos <em>18 – 19 de Setembro</em></span>
+    <span class="marquee-item marquee-edition">Edição 01</span>
+    ${countsHTML}
+  `;
+  const segHTML = groupHTML.repeat(6);
+  const seg1 = document.createElement('div');
+  seg1.className = 'marquee-seg';
+  seg1.innerHTML = segHTML;
+  const seg2 = seg1.cloneNode(true);
+  track.innerHTML = '';
+  track.appendChild(seg1);
+  track.appendChild(seg2);
+}
+setupMarquee();
+
+/* ============================================================
+   DATA SOURCE
+   Hoje: dados embutidos (gerados a partir do documento original).
+   Depois: trocar por fetch() da planilha do Google publicada em CSV.
+   ============================================================ */
+
+const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
+
+// simple RFC4180-ish CSV parser: handles quoted fields, embedded commas, escaped quotes ("")
+function parseCSV(text){
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (inQuotes){
+      if (c === '"'){
+        if (text[i+1] === '"'){ field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += c;
+      }
+    } else {
+      if (c === '"'){ inQuotes = true; }
+      else if (c === ','){ row.push(field); field = ''; }
+      else if (c === '\r'){ /* ignore */ }
+      else if (c === '\n'){ row.push(field); field = ''; rows.push(row); row = []; }
+      else { field += c; }
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+// alguns endereços chegam da planilha com coordenada mal digitada (ex:
+// sem separador decimal, tipo "-229115" em vez de "-22,9115") — passar
+// isso direto pro MapLibre derruba o mapa inteiro (ele lança exceção e
+// nenhum pino aparece, nem os de outros endereços válidos). Em vez disso,
+// tratamos como coordenada ainda não preenchida: some como "pendente" na
+// lista igual a um endereço sem lat/lng, e a geocodificação automática
+// tenta resolver de novo a partir do texto do endereço.
+// valida o FORMATO inteiro (não só o valor numérico) antes de aceitar: sem
+// isso, algo como "-22.917.173" (pontos demais, geralmente formatação de
+// milhar aplicada por engano em cima de uma vírgula decimal original) passa
+// pelo parseFloat, que lê só até o segundo ponto e trunca silenciosamente
+// pra "-22.917" — um valor plausível mas ERRADO, que fica dentro do
+// intervalo válido e por isso não seria pego pelo teste de min/max sozinho.
+function parseCoord(raw, min, max){
+  if (!raw) return null;
+  const normalized = raw.trim().replace(',', '.');
+  if (!/^-?\d{1,3}(\.\d+)?$/.test(normalized)) return null;
+  const n = parseFloat(normalized);
+  return (isNaN(n) || n < min || n > max) ? null : n;
+}
+
+// artistas colando o link de "visualizar" do Google Drive (drive.google.com/
+// file/d/ID/view) em vez de um link de imagem direto — isso não é uma
+// imagem, é uma página HTML, então <img>/background-image nunca carrega.
+// Convertemos pro endpoint de thumbnail do próprio Drive, que serve a
+// imagem de verdade (o arquivo ainda precisa estar compartilhado como
+// "qualquer pessoa com o link"). Link de pasta do Drive não dá pra
+// converter — não há como saber qual arquivo dentro dela é a foto.
+function resolveDrivePhotoURL(url){
+  const m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1000` : url;
+}
+
+async function loadLocationsFromSheet(){
+  const res = await fetch(`${SHEET_CSV_URL}&_=${Date.now()}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error('Falha ao buscar a planilha: HTTP ' + res.status);
+  const text = await res.text();
+  const table = parseCSV(text).filter(r => r.some(c => c !== undefined && c.trim() !== ''));
+  if (table.length < 2) throw new Error('Planilha vazia ou em formato inesperado');
+
+  const headers = table[0].map(h => h.trim());
+  const hIdx = {};
+  headers.forEach((h, i) => { hIdx[h] = i; });
+  const get = (row, name) => {
+    const i = hIdx[name];
+    return (i != null && row[i] != null) ? row[i].trim() : '';
+  };
+
+  const locMap = {};
+  const order = [];
+
+  table.slice(1).forEach(row => {
+    const local = get(row, 'Local / Coletivo');
+    const endereco = get(row, 'Endereço');
+    const nome = get(row, 'Nome do Artista');
+    if (!endereco && !nome) return; // linha em branco
+
+    const instagram = get(row, 'Instagram').replace(/^@/, '');
+    const foto = resolveDrivePhotoURL(get(row, 'Foto do trabalho (URL)'));
+    const bio = get(row, 'Mini bio (1 parágrafo curto)');
+    const obs = get(row, 'Observações');
+    const latRaw = get(row, 'Latitude');
+    const lngRaw = get(row, 'Longitude');
+    const d18Raw = get(row, 'Presente dia 18/09 (X)');
+    const d19Raw = get(row, 'Presente dia 19/09 (X)');
+
+    const key = endereco;
+    if (!locMap[key]){
+      locMap[key] = {
+        id: 'loc' + order.length,
+        local, endereco,
+        lat: parseCoord(latRaw, -90, 90),
+        lng: parseCoord(lngRaw, -180, 180),
+        artistas: []
+      };
+      order.push(key);
+    }
+    locMap[key].artistas.push({
+      nome, instagram, obs, foto, bio,
+      dia18: d18Raw.trim() !== '',
+      dia19: d19Raw.trim() !== ''
+    });
+  });
+
+  return order.map(k => locMap[k]);
+}
+
+function initials(name){
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0,2).toUpperCase();
+  return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
+}
+
+// Numbering shown on map pins: assigned once, in alphabetical order of the
+// space/collective name (falling back to the address when there's no name).
+// This is the exact same order used by the "por endereço" list, and the map
+// is populated once after data loads so every part of the UI agrees on the
+// same number for the same location.
+let locationNumberMap = {};
+function computeLocationNumbers(){
+  const sorted = LOCATIONS.slice()
+    .sort((a,b) => (a.local || a.endereco).localeCompare(b.local || b.endereco, 'pt-BR', { sensitivity:'base' }));
+  locationNumberMap = {};
+  sorted.forEach((loc, i) => { locationNumberMap[loc.id] = i + 1; });
+}
+function pinLabel(loc){
+  const n = locationNumberMap[loc.id];
+  return n ? String(n).padStart(2, '0') : '?';
+}
+
+// ---------------- map (isolated in try/catch so a load failure doesn't break the rest) ----------------
+let map = null;
+// true assim que o usuário arrasta/dá zoom de verdade no mapa — usado pra
+// saber se ainda é seguro reenquadrar sozinho quando coordenadas chegam
+// atrasadas (ver resolveMissingCoordinates)
+let userMovedMap = false;
+const markers = {};
+function makePinEl(label, active){
+  const el = document.createElement('div');
+  el.className = 'pin-hit';
+  el.innerHTML = `<div class="pin${active?' active':''}">${label}</div>`;
+  return el;
+}
+
+// Alguns endereços ficam a poucos metros um do outro (mesmo prédio, entradas
+// diferentes) e os pins acabam se sobrepondo no mapa. Agrupamos esses casos
+// pela coordenada REAL (loc.lat/loc.lng nunca é alterada — o botão "Como
+// chegar" continua levando pro endereço de verdade) e espalhamos os pins do
+// grupo numa roda ao redor do centro. O afastamento é calculado em PIXELS de
+// tela, não em metros, e recalculado a cada zoom — em metros fixos, os pins
+// voltavam a se sobrepor visualmente assim que o mapa afastava.
+const PIN_OVERLAP_THRESHOLD_M = 8;
+const PIN_OVERLAP_SPREAD_PX = 13;
+function metersBetween(lat1, lng1, lat2, lng2){
+  const R = 6371000;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLng = (lng2-lng1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+// agrupa por proximidade real e anota em cada loc a que grupo pertence —
+// não calcula posição nenhuma ainda, isso é feito à parte (displayLatLngFor)
+// porque depende do zoom atual do mapa
+function groupOverlappingLocations(locations){
+  const withCoords = locations.filter(l => l.lat != null && l.lng != null);
+  withCoords.forEach(loc => { loc._cluster = null; });
+  const visited = new Set();
+  withCoords.forEach(loc => {
+    if (visited.has(loc.id)) return;
+    const cluster = withCoords.filter(other =>
+      !visited.has(other.id) && metersBetween(loc.lat, loc.lng, other.lat, other.lng) < PIN_OVERLAP_THRESHOLD_M
+    );
+    cluster.forEach(l => visited.add(l.id));
+    if (cluster.length < 2) return;
+    const centerLat = cluster.reduce((s,l)=>s+l.lat,0) / cluster.length;
+    const centerLng = cluster.reduce((s,l)=>s+l.lng,0) / cluster.length;
+    cluster.forEach((l, i) => { l._cluster = { centerLat, centerLng, index: i, size: cluster.length }; });
+  });
+}
+// posição de exibição de um pin: a coordenada real, ou — se ele faz parte de
+// um grupo sobreposto — um ponto a PIN_OVERLAP_SPREAD_PX pixels do centro do
+// grupo, convertido de volta pra lng/lat na projeção atual do mapa
+function displayLatLngFor(loc){
+  if (!loc._cluster || !map) return [loc.lng, loc.lat];
+  const { centerLat, centerLng, index, size } = loc._cluster;
+  const centerPt = map.project([centerLng, centerLat]);
+  const angle = (2*Math.PI*index) / size;
+  const pt = { x: centerPt.x + PIN_OVERLAP_SPREAD_PX*Math.cos(angle), y: centerPt.y + PIN_OVERLAP_SPREAD_PX*Math.sin(angle) };
+  const ll = map.unproject([pt.x, pt.y]);
+  return [ll.lng, ll.lat];
+}
+// reposiciona só os pins que fazem parte de algum grupo — chamado a cada
+// zoom, já que o afastamento em pixels muda de lat/lng conforme o nível
+function repositionClusteredMarkers(){
+  if (!map) return;
+  LOCATIONS.forEach(loc => {
+    if (!loc._cluster) return;
+    const m = markers[loc.id];
+    if (m) m.setLngLat(displayLatLngFor(loc));
+  });
+}
+
+// recalcula os grupos (novos endereços podem ter chegado via geocodificação)
+// e cria ou reposiciona cada marcador conforme necessário
+function syncAllMarkers(){
+  if (!map) return;
+  groupOverlappingLocations(LOCATIONS);
+  LOCATIONS.forEach(loc => {
+    if (loc.lat == null || loc.lng == null) return;
+    const pos = displayLatLngFor(loc);
+    if (markers[loc.id]){
+      markers[loc.id].setLngLat(pos);
+    } else {
+      const el = makePinEl(pinLabel(loc), false);
+      el.addEventListener('click', () => { focusMapOnLocation(loc); openDrawer(loc.id); });
+      const marker = new maplibregl.Marker({ element: el, anchor:'center' }).setLngLat(pos).addTo(map);
+      markers[loc.id] = marker;
+    }
+  });
+}
+
+// ---------------- estações de metrô e VLT (curadas manualmente) ----------------
+// Poucas estações fixas no Centro — mais simples e confiável curar à mão do
+// que depender de mais uma API externa em tempo real no dia do evento.
+const STATIONS = [
+  { nome: 'Central',            tipo: 'metro', lat: -22.9049227, lng: -43.1908422 },
+  { nome: 'Presidente Vargas',   tipo: 'metro', lat: -22.9033525, lng: -43.186042  },
+  { nome: 'Uruguaiana',          tipo: 'metro', lat: -22.9029900, lng: -43.1817000 },
+  { nome: 'Carioca',             tipo: 'metro', lat: -22.9081555, lng: -43.1784408 },
+  { nome: 'Cinelândia',          tipo: 'metro', lat: -22.9111200, lng: -43.1756600 },
+  { nome: 'Gamboa',              tipo: 'vlt',   lat: -22.8979897, lng: -43.1993772 },
+  { nome: 'Candelária',          tipo: 'vlt',   lat: -22.9016863, lng: -43.1788611 },
+  { nome: 'Sete de Setembro',    tipo: 'vlt',   lat: -22.9052875, lng: -43.1775573 },
+  { nome: 'Carioca',             tipo: 'vlt',   lat: -22.9079900, lng: -43.1765500 },
+  { nome: 'Cinelândia',          tipo: 'vlt',   lat: -22.9105900, lng: -43.1755931 },
+  { nome: 'Praça XV',            tipo: 'vlt',   lat: -22.9021792, lng: -43.1730718 },
+];
+
+function addStationMarkers(){
+  STATIONS.forEach(st => {
+    const label = st.tipo === 'metro' ? 'M' : 'V';
+    const el = document.createElement('div');
+    el.className = 'station-hit';
+    el.innerHTML = `<div class="station-badge ${st.tipo}"><span>${label}</span></div>`;
+    el.style.zIndex = '0'; // fica atrás dos pins de ateliê (sem zIndexOffset no MapLibre)
+    const marker = new maplibregl.Marker({ element: el, anchor:'center' })
+      .setLngLat([st.lng, st.lat]).addTo(map);
+    const tipoLabel = st.tipo === 'metro' ? 'Estação de Metrô' : 'Parada de VLT';
+    const popup = new maplibregl.Popup({ closeButton:true, offset:16 })
+      .setHTML(`<strong>${st.nome}</strong><br>${tipoLabel}`);
+    marker.setPopup(popup);
+  });
+}
+
+// customiza cores camada por camada — água quase branca, resto em tons de
+// cinza — só é possível porque o MapLibre é vetorial (cada feição chega
+// com seu próprio tipo/nome, ao contrário do tile raster, que a gente só
+// via como pixels prontos e tinha que filtrar por aproximação). Estética
+// "xerox de linha": preenchimentos claros/quase brancos, ruas brancas se
+// destacando do cinza dos quarteirões, contorno de prédio invisível.
+const MONO_COLORS = {
+  background: '#d4d4d4',    // cinza claro dos quarteirões (um pouco mais escuro)
+  water: '#e8e8e8',         // quase branco, só pra diferenciar da terra (um pouco mais escuro)
+  landuse: '#d4d4d4',       // mesmo cinza dos quarteirões
+  building: '#d4d4d4',      // preenchimento igual ao quarteirão — prédio não se destaca
+  buildingOutline: '#d4d4d4', // igual ao preenchimento — contorno some de vez
+  road: '#e6e6e6',          // cinza claro (não mais branco), se destacando do cinza dos quarteirões
+  roadCasing: '#e6e6e6',
+  boundary: '#cccccc',
+  text: '#111111',
+  textHalo: '#ffffff'
+};
+function applyMonochromeStyle(){
+  const layers = map.getStyle().layers || [];
+  let buildingSource = null, buildingSourceLayer = null;
+  let firstSymbolId = null;
+  layers.forEach(layer => {
+    const id = layer.id.toLowerCase();
+    const sl = (layer['source-layer'] || '').toLowerCase();
+    const isWater = id.includes('water') || sl.includes('water');
+    const isBuilding = sl === 'building' || id.includes('building');
+    const isRoad = sl === 'transportation' && layer.type === 'line';
+    const isCasing = id.includes('casing');
+    const isBoundary = sl === 'boundary';
+    if (isBuilding && layer.type === 'fill'){ buildingSource = layer.source; buildingSourceLayer = layer['source-layer']; }
+    if (layer.type === 'symbol' && firstSymbolId === null){ firstSymbolId = layer.id; }
+    try{
+      if (layer.type === 'fill-extrusion'){
+        // "building-3d" do estilo "liberty" — prédios com altura/sombra.
+        // A gente já tem os prédios "achatados" na camada fill comum
+        // (building), então só esconde a versão 3D em vez de recolorir
+        map.setLayoutProperty(layer.id, 'visibility', 'none');
+      } else if (layer.type === 'background'){
+        map.setPaintProperty(layer.id, 'background-color', MONO_COLORS.background);
+      } else if (layer.type === 'fill'){
+        const color = isWater ? MONO_COLORS.water : (isBuilding ? MONO_COLORS.building : MONO_COLORS.landuse);
+        map.setPaintProperty(layer.id, 'fill-color', color);
+      } else if (layer.type === 'line'){
+        let color = MONO_COLORS.landuse; // linhas genéricas (contorno de parque etc.)
+        if (isWater) color = MONO_COLORS.water;
+        else if (isBoundary) color = MONO_COLORS.boundary;
+        else if (isRoad) color = isCasing ? MONO_COLORS.roadCasing : MONO_COLORS.road;
+        map.setPaintProperty(layer.id, 'line-color', color);
+      } else if (layer.type === 'symbol'){
+        // poi_r1/r7/r20 = POI genérico por ranking (loja, restaurante etc.)
+        // poi_transit = pontos de ônibus/trem/aeroporto (linha, terminal,
+        // ponto final) — informação de transporte que a gente não quer
+        // exibir. Nenhum dos dois esconde a camada "airport" (nome do
+        // aeroporto), que é separada e continua normalmente.
+        const isGenericPoi = sl === 'poi' && /^poi_r\d+$/.test(id);
+        const isTransitPoi = id === 'poi_transit';
+        if (isGenericPoi || isTransitPoi){
+          map.setLayoutProperty(layer.id, 'visibility', 'none');
+          return;
+        }
+        map.setPaintProperty(layer.id, 'text-color', MONO_COLORS.text);
+        map.setPaintProperty(layer.id, 'text-halo-color', MONO_COLORS.textHalo);
+        // o estilo "liberty" traz ícones de POI (ônibus, bancos, etc.) que a
+        // gente nunca teve no tile raster do CARTO — escondidos aqui,
+        // mantendo só os rótulos de texto (nomes de rua/bairro)
+        map.setPaintProperty(layer.id, 'icon-opacity', 0);
+      }
+    } catch(e){ /* propriedade pode não existir nessa camada específica — ignora */ }
+  });
+  // o estilo "liberty" não vem com um contorno de prédio separado — cria
+  // uma camada de linha nova em cima da mesma fonte/source-layer da
+  // camada de preenchimento (que ficou branca/invisível logo acima).
+  // Insere ANTES da primeira camada de texto/símbolo — sem isso o
+  // addLayer joga a linha pro topo absoluto da pilha e ela passa por
+  // cima de nomes de rua/bairro em alguns zooms, apagando um pouco o texto.
+  if (buildingSource && !map.getLayer('building_outline_xerox')){
+    map.addLayer({
+      id: 'building_outline_xerox',
+      type: 'line',
+      source: buildingSource,
+      'source-layer': buildingSourceLayer,
+      paint: { 'line-color': MONO_COLORS.buildingOutline, 'line-width': 1 }
+    }, firstSymbolId || undefined);
+  }
+}
+
+// enquadramento inicial do mapa: calcula a partir dos pontos reais. TESTE2:
+// padding de cima reduzido de 220 pra 90 — o valor antigo reservava
+// "campo livre" pro hero-title grande que existia no topo da página; isso
+// foi substituído pela marquee, bem mais baixa, então não precisa mais de
+// tanto espaço — libera a área de cima, trazendo o enquadramento (e a
+// cobrinha nova, que usa a posição real desses mesmos pontos) mais pra
+// cima da tela.
+function frameMapToPoints(){
+  const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
+  if (withCoords.length < 2){
+    map.setCenter([-43.1795, -22.9065]);
+    map.setZoom(15);
+    return;
+  }
+  const lats = withCoords.map(l => l.lat), lngs = withCoords.map(l => l.lng);
+  const bounds = [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]];
+  // TESTE2: padding pequeno de propósito — fitBounds já garante que todos
+  // os pontos ficam DENTRO dessa margem (nunca corta ninguém), e quanto
+  // menor a margem, mais zoom ele usa pra preencher a tela. Tentar dar
+  // zoom DEPOIS do fitBounds (map.setZoom) não funciona: zoom em torno do
+  // centro empurra os pontos das bordas pra fora da tela, cortando pins.
+  map.fitBounds(bounds, { padding: { top:60, left:20, right:20, bottom:70 }, duration:0 });
+}
+
+/* ============================================================
+   TESTE: "cobrinha" decorativa no hero, atrás do tingimento vermelho
+   (mix-blend-mode:multiply). Mesmo princípio de animação do "circuito
+   vivo" do gerador-video.html (desenha progressivamente ponto a ponto,
+   depois apaga tudo de uma vez, recomeça de outro ponto aleatório) —
+   adaptado pra usar as coordenadas REAIS do mapa (map.project) e, a
+   pedido, SEM os pinos numerados: só a linha/traço, nada de círculos.
+   Some junto com o overlay quando o hero encolhe (ver shrinkHero).
+   ============================================================ */
+let heroSnakeCanvas = null, heroSnakeCtx = null;
+let heroSnakeLegs = [];
+let heroSnakeTotal = 0;
+let heroSnakeLegOffsets = [];
+let heroSnakeLegIndex = 0;
+let heroSnakeLegElapsed = 0;
+let heroSnakeEraseElapsed = 0;
+let heroSnakeProgress = 0;
+let heroSnakeErase = 0;
+let heroSnakePhase = 'drawing';
+let heroSnakeRafId = null;
+let heroSnakeLastTs = null;
+let heroSnakeActive = false;
+const HERO_SNAKE_LEG_DURATION = 0.32; // s por trecho, igual ao circuito vivo
+const HERO_SNAKE_ERASE_DURATION = 3;  // s pra apagar tudo de uma vez
+// espessura do traço como fração do menor lado da tela — TESTE2: não
+// estoura mais (ver buildHeroSnakeLegs), então esse fator é bem menor que
+// o da versão full-bleed original
+const HERO_SNAKE_WIDTH_RATIO = 29/1000;
+let heroSnakeWidth = 20; // recalculado em buildHeroSnakeLegs() a cada ciclo
+
+function heroEaseOutSnap(t){ return t >= 1 ? 1 : 1 - Math.pow(2, -10*t); }
+
+function heroPathLength(points){
+  let len = 0;
+  for (let i=1;i<points.length;i++) len += Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+  return len;
+}
+function heroBuildLegPath(a, b){
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  if (Math.random() < 0.3 || len < 60){
+    return [ { x:a.x, y:a.y }, { x:b.x, y:b.y } ];
+  }
+  const nx = -dy/len, ny = dx/len;
+  const side = Math.random() < 0.5 ? 1 : -1;
+  const offset = len * (0.14 + Math.random()*0.26) * side;
+  const mx = (a.x+b.x)/2 + nx*offset;
+  const my = (a.y+b.y)/2 + ny*offset;
+  const N = Math.max(18, Math.round(len/16));
+  const pts = [];
+  for (let i=0;i<=N;i++){
+    const t = i/N;
+    const it = 1-t;
+    pts.push({ x: it*it*a.x + 2*it*t*mx + t*t*b.x, y: it*it*a.y + 2*it*t*my + t*t*b.y });
+  }
+  return pts;
+}
+function heroSubPathUpTo(points, dist){
+  const out = [points[0]];
+  let d = 0;
+  for (let i = 1; i < points.length; i++){
+    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+    if (d + seg >= dist){
+      const t = seg === 0 ? 0 : (dist-d)/seg;
+      out.push({ x: points[i-1].x + (points[i].x-points[i-1].x)*t, y: points[i-1].y + (points[i].y-points[i-1].y)*t });
+      return out;
+    }
+    out.push(points[i]);
+    d += seg;
+  }
+  return out;
+}
+function heroSubPathFrom(points, dist){
+  if (dist <= 0) return points;
+  let d = 0;
+  for (let i = 1; i < points.length; i++){
+    const seg = Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+    if (d + seg >= dist){
+      const t = seg === 0 ? 0 : (dist-d)/seg;
+      const cut = { x: points[i-1].x + (points[i].x-points[i-1].x)*t, y: points[i-1].y + (points[i].y-points[i-1].y)*t };
+      return [cut, ...points.slice(i)];
+    }
+    d += seg;
+  }
+  return [points[points.length-1]];
+}
+function heroExtractRange(points, dStart, dEnd){
+  return heroSubPathFrom(heroSubPathUpTo(points, dEnd), dStart);
+}
+
+function resizeHeroSnakeCanvas(){
+  if (!heroSnakeCanvas) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  heroSnakeCanvas.width = window.innerWidth * dpr;
+  heroSnakeCanvas.height = window.innerHeight * dpr;
+  heroSnakeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  updateMarqueeWallLayout();
+}
+
+// ---------------- TESTE3: parede de marquees desenhada no canvas ----------------
+// mix-blend-mode:difference não funciona de forma confiável nesse contexto
+// (canvas WebGL do mapa por baixo quebra a composição) — então o "negativo"
+// onde a cobrinha cruza o texto usa a técnica de verdade do
+// gerador-video.html: um canvas auxiliar recebe o texto preenchido na cor
+// do fundo do poster, depois um destination-in com o próprio traço (só a
+// parte JÁ VISÍVEL da cobrinha nesse instante) apaga tudo, exceto onde o
+// traço passa — o resultado (só as letras "sob" o traço, na cor do fundo)
+// é desenhado por cima de tudo, criando o efeito de recorte/negativo.
+// Em vez de um título estático de 2 linhas (teste2), o fundo inteiro vira
+// N faixas de texto corrido, cada uma ocupando 1/N da altura da tela (soma
+// das faixas = altura total), alternando direção esquerda/direita por linha.
+const HERO_TITLE_BG = '#d8d8d6'; // mesma cor do .hero-splash-bg
+const HERO_MARQUEE_ROWS = 4;
+const HERO_MARQUEE_SPEED = 70; // px/s
+const HERO_MARQUEE_FONT_SANS = `'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`;
+const HERO_MARQUEE_FONT_SERIF = `'Instrument Serif', Georgia, 'Iowan Old Style', 'Times New Roman', ui-serif, serif`;
+let heroMarqueeRowHeight = 0;
+let heroMarqueeBaseSize = 0; // tamanho dos itens sans (mesma escala do .marquee-item real)
+let heroMarqueeDateSize = 0; // itens serifados (data/contagem) — 2.2/1.75 maior, igual ao .marquee-date real
+let heroMarqueeGap = 0;
+let heroMarqueeSegments = [];
+let heroMarqueeUnitWidth = 0;
+let heroMarqueeElapsed = 0;
+
+// mesmos pedaços/estilos do .event-marquee real (setupMarquee) — só maiores:
+// rótulo sans maiúsculo, "Ateliês abertos" + data serifada em itálico,
+// "Edição 01" sans em caixa normal, contagem serifada em caixa normal
+function heroMarqueeBuildSegments(){
+  const numAddresses = LOCATIONS.length;
+  const numArtists = LOCATIONS.reduce((sum, l) => sum + l.artistas.length, 0);
+  const segs = [
+    { text: 'CIRCUITO DE ATELIÊS DO CENTRO', font: HERO_MARQUEE_FONT_SANS, size: heroMarqueeBaseSize, weight: 350, italic: false },
+    { text: 'Ateliês abertos ', font: HERO_MARQUEE_FONT_SERIF, size: heroMarqueeDateSize, weight: 400, italic: false },
+    { text: '18 – 19 de Setembro', font: HERO_MARQUEE_FONT_SERIF, size: heroMarqueeDateSize, weight: 400, italic: true },
+    { text: 'Edição 01', font: HERO_MARQUEE_FONT_SANS, size: heroMarqueeBaseSize, weight: 400, italic: false },
+  ];
+  if (numAddresses > 0){
+    segs.push({ text: `${numAddresses} Endereços - ${numArtists} Artistas`, font: HERO_MARQUEE_FONT_SERIF, size: heroMarqueeDateSize, weight: 400, italic: false });
+  }
+  return segs;
+}
+function heroMarqueeFontString(seg){
+  return `${seg.italic ? 'italic ' : ''}${seg.weight} ${seg.size}px ${seg.font}`;
+}
+function updateMarqueeWallLayout(){
+  if (!heroSnakeCtx) return;
+  heroMarqueeRowHeight = window.innerHeight / HERO_MARQUEE_ROWS;
+  heroMarqueeBaseSize = heroMarqueeRowHeight * 0.98;
+  heroMarqueeDateSize = heroMarqueeBaseSize * (2.2/1.75); // mesma proporção do CSS real
+  heroMarqueeGap = heroMarqueeBaseSize * 0.5; // equivalente ao padding:0 0.3em de cada .marquee-item
+  heroMarqueeSegments = heroMarqueeBuildSegments();
+  let w = 0;
+  heroMarqueeSegments.forEach(seg => {
+    heroSnakeCtx.font = heroMarqueeFontString(seg);
+    w += heroSnakeCtx.measureText(seg.text).width + heroMarqueeGap;
+  });
+  heroMarqueeUnitWidth = w || 1;
+}
+// desenha as N faixas tiladas horizontalmente (uma repetição dos segmentos
+// atrás da outra, com wraparound contínuo pra cobrir a tela inteira) — usada
+// tanto pra camada visível (ink) quanto pro canvas auxiliar do negativo,
+// garantindo que as duas fiquem sempre alinhadas pixel a pixel
+function drawMarqueeWallRows(ctx){
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  const vw = window.innerWidth;
+  for (let row = 0; row < HERO_MARQUEE_ROWS; row++){
+    const dir = row % 2 === 0 ? -1 : 1; // linhas pares correm pra esquerda, ímpares pra direita
+    const y = heroMarqueeRowHeight * row + heroMarqueeRowHeight / 2;
+    const rawOffset = (heroMarqueeElapsed * HERO_MARQUEE_SPEED * dir) % heroMarqueeUnitWidth;
+    const baseOffset = rawOffset > 0 ? rawOffset - heroMarqueeUnitWidth : rawOffset;
+    for (let tileStart = baseOffset; tileStart < vw; tileStart += heroMarqueeUnitWidth){
+      let x = tileStart;
+      heroMarqueeSegments.forEach(seg => {
+        ctx.font = heroMarqueeFontString(seg);
+        ctx.fillText(seg.text, x, y);
+        x += ctx.measureText(seg.text).width + heroMarqueeGap;
+      });
+    }
+  }
+}
+function drawHeroTitleLayer(){
+  const ctx = heroSnakeCtx;
+  ctx.fillStyle = '#111111';
+  drawMarqueeWallRows(ctx);
+}
+function flattenHeroSnakeLegs(legs){
+  const out = [];
+  legs.forEach(leg => { if (leg.length) out.push(...(out.length ? leg.slice(1) : leg)); });
+  return out;
+}
+function applyHeroTitleNegativeMask(visiblePoints){
+  if (!visiblePoints || visiblePoints.length < 2) return;
+  // canvas auxiliar precisa da mesma resolução (dpr) do canvas principal —
+  // senão o drawImage no final estica um bitmap de baixa resolução, deixando
+  // o texto "negativo" borrado em telas retina
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const off = document.createElement('canvas');
+  off.width = window.innerWidth * dpr; off.height = window.innerHeight * dpr;
+  const octx = off.getContext('2d');
+  octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  octx.fillStyle = HERO_TITLE_BG;
+  drawMarqueeWallRows(octx);
+  octx.globalCompositeOperation = 'destination-in';
+  octx.lineWidth = heroSnakeWidth;
+  octx.lineCap = 'round';
+  octx.lineJoin = 'round';
+  octx.strokeStyle = '#000';
+  octx.beginPath();
+  visiblePoints.forEach((p,i) => { if (i===0) octx.moveTo(p.x,p.y); else octx.lineTo(p.x,p.y); });
+  octx.stroke();
+  heroSnakeCtx.drawImage(off, 0, 0, window.innerWidth, window.innerHeight);
+}
+
+// TESTE2: usa a posição de tela REAL de cada endereço (projetando pela
+// mesma instância do mapa exibida) SEM reenquadrar/escalar pra nenhuma
+// caixa artificial — nem centralizar, nem ampliar. É a mesma projeção que
+// o mapa real usa (map.project), no zoom/posição em que ele já está
+// enquadrado (ver frameMapToPoints, que dá fitBounds em todos os pontos
+// com padding — por isso a marca já sai inteira dentro da tela, sem
+// precisar forçar). Assim, quando o fundo cinza do "poster" some, a marca
+// já está exatamente onde os pins reais estão — dá pra "entender de onde
+// veio o desenho" ao interagir com o site.
+function buildHeroSnakeLegs(){
+  if (!map) return false;
+  const pts = LOCATIONS
+    .filter(l => l.lat != null && l.lng != null)
+    .map(l => map.project([l.lng, l.lat]));
+  if (pts.length < 2) return false;
+  heroSnakeWidth = Math.min(window.innerWidth, window.innerHeight) * HERO_SNAKE_WIDTH_RATIO;
+  const order = [...pts].sort(() => Math.random()-0.5);
+  heroSnakeLegs = [];
+  for (let i = 1; i < order.length; i++) heroSnakeLegs.push(heroBuildLegPath(order[i-1], order[i]));
+  heroSnakeTotal = 0;
+  heroSnakeLegOffsets = [];
+  heroSnakeLegs.forEach(leg => { heroSnakeLegOffsets.push(heroSnakeTotal); heroSnakeTotal += heroPathLength(leg); });
+  return true;
+}
+
+function startHeroSnakeCycle(){
+  if (!buildHeroSnakeLegs()) return;
+  heroSnakeLegIndex = 0;
+  heroSnakeLegElapsed = 0;
+  heroSnakeEraseElapsed = 0;
+  heroSnakeProgress = 0;
+  heroSnakeErase = 0;
+  heroSnakePhase = 'drawing';
+  heroSnakeLastTs = null;
+}
+
+function heroSnakeAdvanceLegs(dt){
+  heroSnakeLegElapsed += dt;
+  let t = Math.min(1, heroSnakeLegElapsed / HERO_SNAKE_LEG_DURATION);
+  while (t >= 1 && heroSnakeLegIndex < heroSnakeLegs.length - 1){
+    heroSnakeLegIndex++;
+    heroSnakeLegElapsed -= HERO_SNAKE_LEG_DURATION;
+    t = Math.min(1, Math.max(0, heroSnakeLegElapsed) / HERO_SNAKE_LEG_DURATION);
+  }
+  const legLen = heroPathLength(heroSnakeLegs[heroSnakeLegIndex]);
+  const dist = heroSnakeLegOffsets[heroSnakeLegIndex] + heroEaseOutSnap(t) * legLen;
+  const finished = t >= 1 && heroSnakeLegIndex === heroSnakeLegs.length - 1;
+  return { dist, finished };
+}
+
+// traço grosso com gradiente escuro->cinza claro por PERNA (não pelo
+// caminho inteiro), pra cada trecho ter sua própria transição — mesmo princípio do
+// gradiente preto->branco do gerador-marca.html, cores diferentes. Ponta
+// clara (#d8d8d6) é a MESMA cor onde o degradê do header (.event-marquee)
+// termina, pra combinar as duas pontas claras do site.
+function heroStrokeLegsInRange(dStart, dEnd){
+  const ctx = heroSnakeCtx;
+  let offset = 0;
+  heroSnakeLegs.forEach(leg => {
+    if (leg.length < 2){ return; }
+    const legLen = heroPathLength(leg);
+    const localStart = Math.max(0, dStart - offset);
+    const localEnd = Math.min(legLen, dEnd - offset);
+    if (localEnd > localStart){
+      const sub = heroExtractRange(leg, localStart, localEnd);
+      if (sub.length >= 2){
+        const a = leg[0], b = leg[leg.length-1];
+        const grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+        grad.addColorStop(0, '#0a0a0a');
+        grad.addColorStop(1, '#d8d8d6');
+        ctx.lineWidth = heroSnakeWidth;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = grad;
+        ctx.beginPath();
+        sub.forEach((p,i) => { if (i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+        ctx.stroke();
+      }
+    }
+    offset += legLen;
+  });
+}
+
+function drawHeroSnakeFrame(){
+  heroSnakeCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  const dStart = heroSnakePhase === 'erasing' ? heroSnakeErase : 0;
+  const dEnd = heroSnakePhase === 'erasing' ? heroSnakeTotal : heroSnakeProgress;
+  heroStrokeLegsInRange(dStart, dEnd);
+  // TESTE2: título só desenhado enquanto o "poster" ainda tá de pé —
+  // depois do shrink a marca some (stopHeroSnake), então isso nem chega a
+  // rodar de novo
+  if (!heroShrunk){
+    drawHeroTitleLayer();
+    const flat = flattenHeroSnakeLegs(heroSnakeLegs);
+    const visible = heroExtractRange(flat, dStart, dEnd);
+    applyHeroTitleNegativeMask(visible);
+  }
+}
+
+function heroSnakeLoop(ts){
+  if (!heroSnakeActive) { heroSnakeRafId = null; return; }
+  heroSnakeRafId = requestAnimationFrame(heroSnakeLoop);
+  if (heroSnakeLastTs == null) heroSnakeLastTs = ts;
+  const dt = Math.min(0.1, (ts - heroSnakeLastTs) / 1000);
+  heroSnakeLastTs = ts;
+  if (!heroShrunk) heroMarqueeElapsed += dt;
+
+  if (heroSnakePhase === 'drawing'){
+    const { dist, finished } = heroSnakeAdvanceLegs(dt);
+    heroSnakeProgress = dist;
+    if (finished){ heroSnakePhase = 'erasing'; heroSnakeEraseElapsed = 0; }
+  } else {
+    heroSnakeEraseElapsed += dt;
+    const t = Math.min(1, heroSnakeEraseElapsed / HERO_SNAKE_ERASE_DURATION);
+    heroSnakeErase = heroEaseOutSnap(t) * heroSnakeTotal;
+    if (t >= 1){ startHeroSnakeCycle(); return; }
+  }
+  drawHeroSnakeFrame();
+}
+
+function startHeroSnake(){
+  heroSnakeCanvas = document.getElementById('hero-snake-canvas');
+  if (!heroSnakeCanvas) return;
+  heroSnakeCtx = heroSnakeCanvas.getContext('2d');
+  resizeHeroSnakeCanvas();
+  window.addEventListener('resize', resizeHeroSnakeCanvas);
+  startHeroSnakeCycle();
+  heroSnakeActive = true;
+  if (!heroSnakeRafId) heroSnakeRafId = requestAnimationFrame(heroSnakeLoop);
+}
+function stopHeroSnake(){
+  heroSnakeActive = false;
+  if (heroSnakeRafId){ cancelAnimationFrame(heroSnakeRafId); heroSnakeRafId = null; }
+}
+
+// TESTE2: a marca do "poster" (estágio inicial) não é mais desenhada
+// separadamente — é a própria .hero-snake-canvas de sempre (mesma
+// posição/animação), só com um fundo cinza opaco atrás dela
+// (.hero-splash-bg) escondendo o mapa/pins reais.
+
+function initMap(){
+  try{
+    if (typeof maplibregl === 'undefined') throw new Error('MapLibre não carregou');
+    map = new maplibregl.Map({
+      container: 'map',
+      style: 'https://tiles.openfreemap.org/styles/liberty',
+      center: [-43.1795, -22.9065],
+      zoom: 15,
+      pitch: 0,
+      maxPitch: 0, // trava a vista sempre "de cima", sem inclinação 3D possível
+      attributionControl: false,
+      dragRotate: false,
+      touchPitch: false
+    });
+    map.touchZoomRotate.disableRotation();
+    map.on('zoom', repositionClusteredMarkers);
+    // marca só como "usuário mexeu no mapa" quando o evento tem originalEvent
+    // (gesto real) — fitBounds/setCenter/setZoom programáticos não disparam
+    // isso, então dá pra saber quando é seguro reenquadrar sozinho depois
+    map.on('dragstart', (e) => { if (e.originalEvent) userMovedMap = true; });
+    map.on('zoomstart', (e) => { if (e.originalEvent) userMovedMap = true; });
+
+    // pilha de controles no canto empilha em ordem INVERSA à que são
+    // adicionados (o último addControl fica visualmente no topo) — pra
+    // ficar Locate / Zoom (+/-) / Info (créditos) de cima pra baixo, a
+    // ordem de adição precisa ser o inverso disso
+    map.addControl(new maplibregl.AttributionControl({ compact:true }), 'bottom-right');
+    map.addControl(new maplibregl.NavigationControl({ showCompass:false }), 'bottom-right');
+
+    // botão "minha localização" — controle customizado (onAdd devolve um
+    // elemento DOM), API própria do MapLibre
+    class LocateControl{
+      onAdd(mapInstance){
+        this._map = mapInstance;
+        this._container = document.createElement('div');
+        this._container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+        const btn = document.createElement('button');
+        btn.className = 'locate-control-btn';
+        btn.type = 'button';
+        btn.title = 'Minha localização';
+        btn.setAttribute('aria-label', 'Centralizar o mapa na minha localização');
+        btn.innerHTML = '◎';
+        btn.addEventListener('click', () => goToUserLocation(btn));
+        this._container.appendChild(btn);
+        return this._container;
+      }
+      onRemove(){ this._container.remove(); this._map = undefined; }
+    }
+    map.addControl(new LocateControl(), 'bottom-right');
+
+    // o estilo carrega de forma assíncrona — só dá pra customizar cores,
+    // enquadrar nos pontos e colocar marcadores depois do 'load'
+    map.on('load', () => {
+      applyMonochromeStyle();
+      frameMapToPoints();
+      syncAllMarkers();
+      addStationMarkers();
+      locateUserAutomatically();
+      if (!heroShrunk) startHeroSnake();
+    });
+
+    // Duplo-toque pra dar zoom: escuta touchstart/touchend crus, direto no
+    // elemento do mapa — o MapLibre não expõe isso pronto, e o dblclick
+    // nativo não é sintetizado de forma confiável a partir de um toque
+    // duplo em alguns navegadores/dispositivos. Cuidados: ignora gestos com
+    // mais de um dedo (pinça) e ignora toques que se moveram (arrastar).
+    const mapContainer = map.getContainer();
+    let tapStartPoint = null;
+    let lastTapTime = 0;
+    let lastTapPoint = null;
+
+    mapContainer.addEventListener('touchstart', (e) => {
+      tapStartPoint = e.touches.length === 1
+        ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+        : null;
+    }, { passive: true });
+
+    mapContainer.addEventListener('touchend', (e) => {
+      if (!tapStartPoint || e.changedTouches.length !== 1 || e.touches.length !== 0){
+        tapStartPoint = null;
+        return;
+      }
+      const touch = e.changedTouches[0];
+      const moved = Math.hypot(touch.clientX - tapStartPoint.x, touch.clientY - tapStartPoint.y);
+      tapStartPoint = null;
+      if (moved > 12) return; // foi um arrastar, não um toque
+
+      const now = Date.now();
+      const point = { x: touch.clientX, y: touch.clientY };
+      const isDoubleTap = lastTapPoint &&
+        (now - lastTapTime) < 350 &&
+        Math.hypot(point.x - lastTapPoint.x, point.y - lastTapPoint.y) < 40;
+
+      if (isDoubleTap){
+        e.preventDefault();
+        const rect = mapContainer.getBoundingClientRect();
+        const lngLat = map.unproject([touch.clientX - rect.left, touch.clientY - rect.top]);
+        map.zoomTo(map.getZoom() + 1, { around: lngLat, duration: 250 });
+        lastTapTime = 0;
+        lastTapPoint = null;
+      } else {
+        lastTapTime = now;
+        lastTapPoint = point;
+      }
+    }, { passive: false });
+  } catch(err){
+    console.error('Mapa indisponível:', err);
+    const mapEl = document.getElementById('map');
+    mapEl.innerHTML = '<div class="map-error">Não foi possível carregar o mapa agora.<br>A lista de endereços continua disponível.</div>';
+  }
+}
+
+// ---------------- localização do visitante ----------------
+// Automática ao carregar (sem botão) — o navegador exibe seu próprio prompt
+// nativo de permissão. Se a pessoa negar, ou o navegador não suportar, falha
+// em silêncio. Além disso, um botão no mapa permite centralizar nela quando
+// quiser, sem precisar pedir localização de novo se já a tivermos.
+let userMarker = null;
+let userLngLat = null;
+
+function placeUserMarker(latitude, longitude){
+  userLngLat = [longitude, latitude];
+  if (userMarker){
+    userMarker.setLngLat(userLngLat);
+  } else {
+    const el = document.createElement('div');
+    el.className = 'user-dot';
+    el.style.zIndex = '1000';
+    userMarker = new maplibregl.Marker({ element: el, anchor:'center' }).setLngLat(userLngLat).addTo(map);
+  }
+}
+
+// Botão "minha localização": se já sabemos onde a pessoa está (localização
+// automática já resolvida), só centraliza — rápido, sem pedir de novo. Caso
+// contrário (ainda carregando, ou falhou antes), tenta obter na hora.
+function goToUserLocation(triggerEl){
+  if (!map) return;
+
+  if (userLngLat){
+    map.flyTo({ center: userLngLat, zoom: Math.max(map.getZoom(), 16), duration: 600 });
+    return;
+  }
+
+  if (!navigator.geolocation){
+    alert('Este navegador não suporta geolocalização.');
+    return;
+  }
+
+  const originalText = triggerEl ? triggerEl.innerHTML : null;
+  if (triggerEl) triggerEl.innerHTML = '···';
+
+  try{
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (triggerEl) triggerEl.innerHTML = originalText;
+        placeUserMarker(pos.coords.latitude, pos.coords.longitude);
+        map.flyTo({ center: userLngLat, zoom: Math.max(map.getZoom(), 16), duration: 600 });
+      },
+      (err) => {
+        if (triggerEl) triggerEl.innerHTML = originalText;
+        console.warn('Falha ao obter localização:', err);
+        if (err.code === err.PERMISSION_DENIED){
+          alert('Permissão de localização negada. Libere o acesso à localização para este site nas configurações do navegador.');
+        } else {
+          alert('Não foi possível obter sua localização agora. Tente novamente em instantes.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  } catch(err){
+    if (triggerEl) triggerEl.innerHTML = originalText;
+    console.warn('Geolocalização indisponível neste contexto:', err);
+  }
+}
+
+function locateUserAutomatically(){
+  if (!map || !navigator.geolocation) return;
+
+  try{
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        placeUserMarker(pos.coords.latitude, pos.coords.longitude);
+        // não move a câmera automaticamente — só mostra o ponto, sem tirar
+        // o usuário do centro do mapa que ele já está vendo
+      },
+      (err) => {
+        console.warn('Localização não disponível:', err);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  } catch(err){
+    // getCurrentPosition pode lançar de forma síncrona em contextos restritos
+    // (ex: iframe sem permissão de geolocalização) — isso não deve afetar o
+    // resto do mapa, que já está funcionando nesse ponto.
+    console.warn('Geolocalização indisponível neste contexto:', err);
+  }
+}
+
+// ---------------- geocodificação automática (fallback) ----------------
+// Para endereços novos que ainda não têm latitude/longitude preenchidas na
+// planilha, calculamos automaticamente via Nominatim (OpenStreetMap, gratuito).
+// Endereços com coordenadas já preenchidas nunca passam por aqui — isso mantém
+// o carregamento rápido para o caso comum e só busca online o que falta.
+async function geocodeAddress(query){
+  try{
+    // limit=1 sozinho é arriscado: várias cidades da Região Metropolitana
+    // do Rio (Belford Roxo, Volta Redonda, Cabo Frio...) têm ruas com o
+    // mesmo nome, e "Rio de Janeiro" no texto da busca pode ser lido como
+    // o ESTADO (que inclui todas elas), não só a cidade — o primeiro
+    // resultado às vezes é dessas outras cidades, não da capital. Pede
+    // mais resultados com endereço detalhado e filtra pelo campo
+    // city/town batendo exatamente com "Rio de Janeiro".
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&q=${encodeURIComponent(query)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('geocode http error ' + res.status);
+    const results = await res.json();
+    if (results && results.length){
+      const inRioCity = results.find(r => {
+        const city = (r.address && (r.address.city || r.address.town)) || '';
+        return city.toLowerCase() === 'rio de janeiro';
+      });
+      const best = inRioCity || results[0];
+      return { lat: parseFloat(best.lat), lng: parseFloat(best.lon) };
+    }
+  } catch(err){
+    console.warn('Falha ao geocodificar endereço:', query, err);
+  }
+  return null;
+}
+
+// só nome da rua + primeiro número servem pro Nominatim — ele geocodifica
+// no nível de prédio/rua, nunca sala/andar/bairro/complemento, e esse
+// "resto" às vezes nem é ignorado: ativamente atrapalha e faz a busca
+// falhar em silêncio (endereço fica "pendente" pra sempre, sem erro
+// visível). Corta tudo a partir do primeiro número (inclusive) em diante.
+function simplifyAddressForGeocoding(endereco){
+  const m = endereco.match(/^(.*?\d+)/);
+  return (m ? m[1] : endereco).trim();
+}
+
+async function resolveMissingCoordinates(){
+  const pending = LOCATIONS.filter(l =>
+    (l.lat == null || l.lng == null) && !/confirmar/i.test(l.endereco)
+  );
+  for (const loc of pending){
+    // "Rio de Janeiro, Brasil" no final já desambigua o suficiente — não
+    // precisa (e não deve) levar bairro/complemento do texto original.
+    const query = `${simplifyAddressForGeocoding(loc.endereco)}, Rio de Janeiro, Brasil`;
+    const coords = await geocodeAddress(query);
+    if (coords){
+      loc.lat = coords.lat;
+      loc.lng = coords.lng;
+      syncAllMarkers(); // recalcula sobreposições — um novo ponto pode colidir com um já existente
+      renderRows(); // atualiza a lista, tirando o endereço do estado "pendente"
+      // reenquadra só se o usuário ainda não mexeu no mapa por conta própria —
+      // senão puxaria a câmera de volta no meio de uma exploração dele
+      if (!userMovedMap) frameMapToPoints();
+    }
+    // pequena pausa entre chamadas por educação com o serviço gratuito
+    await new Promise(r => setTimeout(r, 1100));
+  }
+}
+
+
+function setActivePin(activeId){
+  // sem setIcon() no MapLibre — o marcador já É o elemento DOM, então troca
+  // a classe direto nele em vez de trocar o ícone inteiro
+  LOCATIONS.forEach((loc) => {
+    const m = markers[loc.id];
+    if (!m) return;
+    const pinDiv = m.getElement().querySelector('.pin');
+    if (pinDiv) pinDiv.classList.toggle('active', loc.id === activeId);
+  });
+}
+
+// ---------------- drawer ----------------
+const overlay = document.getElementById('overlay');
+const drawer = document.getElementById('drawer');
+
+function openDrawer(locId){
+  const loc = LOCATIONS.find(l => l.id === locId);
+  if (!loc) return;
+
+  document.getElementById('drawer-local').textContent = loc.local || loc.endereco;
+  document.getElementById('drawer-endereco').textContent = loc.local ? loc.endereco : '';
+
+  const directionsLink = document.getElementById('drawer-directions');
+  if (loc.lat != null && loc.lng != null){
+    directionsLink.href = `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`;
+    directionsLink.classList.remove('hidden');
+  } else {
+    directionsLink.classList.add('hidden');
+  }
+
+  const list = document.getElementById('drawer-list');
+  list.innerHTML = '';
+
+  const grid = document.createElement('div');
+  grid.className = 'artist-grid';
+
+  loc.artistas.forEach(art => {
+    const card = document.createElement('div');
+    card.className = 'artist-card';
+
+    const photo = document.createElement('div');
+    photo.className = 'artist-photo';
+    if (art.foto){ photo.style.backgroundImage = `url('${art.foto}')`; }
+    else { photo.textContent = initials(art.nome); }
+    photo.addEventListener('click', () => openLightbox(art));
+
+    const body = document.createElement('div');
+    body.className = 'artist-body';
+
+    const name = document.createElement('p');
+    name.className = 'artist-name';
+    name.textContent = art.nome;
+
+    const meta = document.createElement('div');
+    meta.className = 'artist-meta';
+    if (art.instagram){
+      const a = document.createElement('a');
+      a.href = `https://instagram.com/${art.instagram}`;
+      a.target = '_blank'; a.rel = 'noopener';
+      a.textContent = '@' + art.instagram;
+      meta.appendChild(a);
+    }
+
+    body.appendChild(name);
+    body.appendChild(meta);
+
+    // sala/ateliê: only added to the DOM when it actually exists (no blank line otherwise)
+    if (art.obs){
+      const room = document.createElement('div');
+      room.className = 'artist-room';
+      const tag = document.createElement('span');
+      tag.className = 'artist-obs';
+      tag.textContent = art.obs;
+      room.appendChild(tag);
+      body.appendChild(room);
+    }
+
+    // dias de presença: always shown once informed
+    const badges = document.createElement('div');
+    badges.className = 'day-badges';
+    if (art.dia18 != null){
+      const b = document.createElement('span');
+      b.className = 'day-pill ' + (art.dia18 ? 'present' : 'absent');
+      b.textContent = '18/09';
+      badges.appendChild(b);
+    }
+    if (art.dia19 != null){
+      const b = document.createElement('span');
+      b.className = 'day-pill ' + (art.dia19 ? 'present' : 'absent');
+      b.textContent = '19/09';
+      badges.appendChild(b);
+    }
+    body.appendChild(badges);
+
+    card.appendChild(photo);
+    card.appendChild(body);
+
+    grid.appendChild(card);
+  });
+
+  list.appendChild(grid);
+
+  if (loc.artistas.every(a => !a.foto)){
+    const note = document.createElement('p');
+    note.className = 'photo-note';
+    note.textContent = 'Fotos dos trabalhos em breve.';
+    list.appendChild(note);
+  }
+
+  setActivePin(locId);
+  overlay.classList.add('open');
+  drawer.classList.add('open');
+}
+function closeDrawer(){
+  overlay.classList.remove('open');
+  drawer.classList.remove('open');
+  setActivePin(null);
+}
+document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+overlay.addEventListener('click', closeDrawer);
+
+// ---------------- lightbox ----------------
+const lightbox = document.getElementById('lightbox');
+const lightboxImg = document.getElementById('lightbox-img');
+const lightboxPlaceholder = document.getElementById('lightbox-placeholder');
+const lightboxName = document.getElementById('lightbox-name');
+const lightboxRoom = document.getElementById('lightbox-room');
+const lightboxDays = document.getElementById('lightbox-days');
+const lightboxBio = document.getElementById('lightbox-bio');
+function openLightbox(art){
+  if (art.foto){
+    lightboxImg.src = art.foto;
+    lightboxImg.alt = art.nome || '';
+    lightboxImg.style.display = 'block';
+    lightboxPlaceholder.classList.remove('show');
+  } else {
+    lightboxImg.style.display = 'none';
+    lightboxImg.src = '';
+    lightboxPlaceholder.textContent = initials(art.nome) + ' — sem foto ainda';
+    lightboxPlaceholder.classList.add('show');
+  }
+  lightboxName.textContent = art.nome || '';
+
+  lightboxRoom.textContent = art.obs || '';
+
+  lightboxDays.innerHTML = '';
+  if (art.dia18 != null){
+    const b = document.createElement('span');
+    b.className = 'day-pill ' + (art.dia18 ? 'present' : 'absent');
+    b.textContent = '18/09';
+    lightboxDays.appendChild(b);
+  }
+  if (art.dia19 != null){
+    const b = document.createElement('span');
+    b.className = 'day-pill ' + (art.dia19 ? 'present' : 'absent');
+    b.textContent = '19/09';
+    lightboxDays.appendChild(b);
+  }
+
+  lightboxBio.textContent = (art.bio && art.bio.trim()) ? art.bio : 'Mini bio em breve.';
+  lightbox.classList.add('open');
+}
+function closeLightbox(){
+  lightbox.classList.remove('open');
+  lightboxImg.src = '';
+}
+document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
+lightbox.addEventListener('click', (e) => { if (e.target === lightbox) closeLightbox(); });
+
+// ---------------- TESTE: "sobre" descortinado (mapa sobe/desce como cortina) ----------------
+const heroEl = document.querySelector('.hero');
+
+// TESTE: no mobile o drawer (bottom sheet) ocupa até 70vh — sem isso, o
+// pin ficava escondido embaixo dele, já que o flyTo simplesmente
+// centralizava o ponto na tela toda. Usa o "padding" do MapLibre (não
+// afeta o zoom/posição real, só onde o "centro" visual cai dentro da
+// área não coberta) pra empurrar o ponto pros ~30% superiores, que é o
+// único trecho do mapa que continua visível com o drawer aberto.
+function focusMapOnLocation(loc){
+  if (!map || loc.lat == null) return;
+  const isMobile = window.innerWidth <= 780;
+  map.flyTo({
+    center: displayLatLngFor(loc),
+    zoom: 17,
+    duration: 600,
+    padding: isMobile ? { top:0, bottom:window.innerHeight * 0.7, left:0, right:0 } : { top:0, bottom:0, left:0, right:0 }
+  });
+}
+
+function goToLocation(loc){
+  applyMode('map');
+  setTimeout(() => focusMapOnLocation(loc), 50);
+  openDrawer(loc.id);
+}
+
+// ---------------- hero: marca (cobrona) some no primeiro toque, marquee do topo fica ----------------
+let heroShrunk = false;
+
+function shrinkHero(e){
+  if (heroShrunk) return;
+  // ignora eventos sintéticos (disparados por script, não por uma ação real
+  // da pessoa) — algumas extensões de navegador injetam eventos de teclado
+  // na página, e isso não deve contar como "o usuário interagiu".
+  if (e && e.isTrusted === false) return;
+  heroShrunk = true;
+  document.getElementById('map-dim').classList.add('hidden');
+  // a marca (cobrona) some, e para de animar (sem gasto de CPU desenhando
+  // algo que não aparece mais)
+  const snakeCanvas = document.getElementById('hero-snake-canvas');
+  if (snakeCanvas) snakeCanvas.classList.add('hidden');
+  stopHeroSnake();
+  // TESTE3: fundo cinza (e a parede de marquees desenhada nele) some junto
+  // com a marca — como ela nunca foi reenquadrada, o que se via atrás do
+  // cinza já batia com o mapa real; some tudo junto, sem salto
+  const splashBg = document.getElementById('hero-splash-bg');
+  if (splashBg) splashBg.classList.add('hidden');
+  // TESTE2: marquee do topo e toggle mapa/lista/sobre ficavam escondidos
+  // atrás do poster (ver .revealed no CSS) — só aparecem agora, junto com
+  // o resto do mapa
+  document.querySelector('.event-marquee').classList.add('revealed');
+  document.querySelector('.top-actions').classList.add('revealed');
+  document.removeEventListener('pointerdown', shrinkHero);
+  document.removeEventListener('wheel', shrinkHero);
+  document.removeEventListener('keydown', shrinkHero);
+}
+document.addEventListener('pointerdown', shrinkHero, { passive:true });
+document.addEventListener('wheel', shrinkHero, { passive:true });
+document.addEventListener('keydown', shrinkHero);
+
+// ---------------- troca de modo (mapa / lista / sobre) ----------------
+// o .hero (mapa) sobe como cortina revelando a .list-page (branca, fica
+// parada, é a camada de base) por baixo. O "sobre" (.about-page) desliza
+// por cima dela — sobe pra entrar, desce pra sair — em vez de trocar de
+// display, dando uma transição suave entre lista e sobre também.
+const aboutPage = document.getElementById('about-page');
+const switchMapBtn = document.getElementById('switch-map');
+const switchListBtn = document.getElementById('switch-list');
+const sortSwitch = document.getElementById('sort-switch');
+const sortEnderecoBtn = document.getElementById('sort-endereco');
+const sortArtistaBtn = document.getElementById('sort-artista');
+
+let currentMode = 'map'; // 'map' | 'list' | 'about'
+let currentSort = 'endereco';
+
+function applyMode(mode){
+  currentMode = mode;
+  heroEl.classList.toggle('lifted', mode !== 'map');
+  // a .list-page fica parada (é a camada de base); o "sobre" desliza por
+  // cima dela — .active controla o translateY, não display, pra dar a
+  // transição suave entre lista e sobre
+  aboutPage.classList.toggle('active', mode === 'about');
+  switchMapBtn.classList.toggle('active', mode === 'map');
+  switchListBtn.classList.toggle('active', mode === 'list');
+  sortSwitch.classList.toggle('visible', mode === 'list');
+}
+function setSort(s){
+  currentSort = s;
+  sortEnderecoBtn.classList.toggle('active', s === 'endereco');
+  sortArtistaBtn.classList.toggle('active', s === 'artista');
+  renderRows();
+}
+
+switchMapBtn.addEventListener('click', () => applyMode('map'));
+switchListBtn.addEventListener('click', () => applyMode('list'));
+document.getElementById('about-btn').addEventListener('click', () => applyMode('about'));
+document.getElementById('about-close').addEventListener('click', () => applyMode('map'));
+document.getElementById('list-close').addEventListener('click', () => applyMode('map'));
+sortEnderecoBtn.addEventListener('click', () => setSort('endereco'));
+sortArtistaBtn.addEventListener('click', () => setSort('artista'));
+
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ closeLightbox(); applyMode('map'); } });
+
+// ---------------- rows rendering ----------------
+const rowsEl = document.getElementById('rows');
+
+function renderRowsByEndereco(){
+  rowsEl.innerHTML = '';
+  const sorted = LOCATIONS
+    .map((loc) => loc)
+    .sort((a,b) => (a.local || a.endereco).localeCompare(b.local || b.endereco, 'pt-BR', { sensitivity:'base' }));
+
+  sorted.forEach((loc) => {
+    const btn = document.createElement('button');
+    btn.className = 'row' + (loc.lat == null ? ' pending' : '');
+    btn.innerHTML = `
+      <span class="row-num">${pinLabel(loc)}</span>
+      <span class="row-main">
+        <span class="row-title">${loc.local || loc.endereco}</span>
+        ${loc.local ? `<span class="row-sub">${loc.endereco}</span>` : ''}
+      </span>
+    `;
+    btn.addEventListener('click', () => goToLocation(loc));
+    rowsEl.appendChild(btn);
+  });
+}
+
+function renderRowsByArtista(){
+  rowsEl.innerHTML = '';
+  let flat = [];
+  LOCATIONS.forEach((loc) => {
+    loc.artistas.forEach(art => {
+      flat.push({ nome: art.nome, instagram: art.instagram, foto: art.foto, loc });
+    });
+  });
+  flat.sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity:'base' }));
+
+  flat.forEach((entry) => {
+    const btn = document.createElement('button');
+    btn.className = 'row row-artista' + (entry.loc.lat == null ? ' pending' : '');
+    btn.innerHTML = `
+      <span class="row-photo"></span>
+      <span class="row-title">${entry.nome}</span>
+      <span class="row-instagram">${entry.instagram ? '@'+entry.instagram : ''}</span>
+      <span class="row-sub">${entry.loc.local || entry.loc.endereco}</span>
+    `;
+    if (entry.foto) btn.querySelector('.row-photo').style.backgroundImage = `url('${entry.foto}')`;
+    btn.addEventListener('click', () => goToLocation(entry.loc));
+    rowsEl.appendChild(btn);
+  });
+}
+
+function renderRows(){
+  if (currentSort === 'endereco') renderRowsByEndereco();
+  else renderRowsByArtista();
+}
+
+async function boot(){
+  try{
+    LOCATIONS = await loadLocationsFromSheet();
+  } catch(err){
+    console.error('Falha ao carregar a planilha:', err);
+    document.getElementById('map').innerHTML =
+      '<div class="map-error">Não foi possível carregar os dados da planilha agora.<br>Tente recarregar a página em instantes.</div>';
+    document.getElementById('rows').innerHTML =
+      '<p style="font-family:var(--sans-display);font-size:0.88rem;color:var(--gray);padding:1rem 0.2rem;">Não foi possível carregar os dados agora.</p>';
+    return;
+  }
+  computeLocationNumbers();
+  setupMarquee();
+  initMap();
+  resolveMissingCoordinates();
+  renderRows();
+}
+boot();
+</script>
+</body>
+</html>
