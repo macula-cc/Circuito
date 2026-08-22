@@ -49,11 +49,11 @@
      JS), camada por camada, em vez de um filtro aproximado por cima do raster */
   .maplibregl-map{ background:#e9e9e9; font-family:var(--sans); }
 
-  /* TESTE: véu branco bem sutil (10% de opacidade) + blur em vez do
-     preto/cinza com multiply usado antes — clareia levemente o mapa,
-     sem lavar as cores/pins. Some no primeiro toque, junto com a marca. */
-  .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(255,255,255,0.1);
-            backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+  /* TESTE: mesmo cinza do "poster" (index-teste2), levemente transparente
+     (10%) — dá pra ver o mapa de leve por baixo (ruas, quarteirões, pontos)
+     em vez de esconder tudo. Sem blur: o mapa aparece nítido, só suave.
+     Some no primeiro toque, junto com a marca. */
+  .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(216,216,214,0.90);
             pointer-events:none; transition:opacity 0.6s ease; }
   .map-dim.hidden{ opacity:0; }
 
@@ -61,11 +61,10 @@
      do gerador de vídeo (desenha progressivamente, depois apaga, recomeça
      de outro ponto), sem os pinos numerados (só a linha), com o gradiente
      escuro->cinza claro por perna (ver heroStrokeLegsInRange, JS). Fica
-     ACIMA do .map-dim (150) — não atrás dele — pra não pegar o
-     backdrop-filter:blur(3px) do overlay, que borrava o traço. Some junto
-     com o overlay quando o hero encolhe (ver shrinkHero). O nome/data/edição
-     do evento vivem só na marquee do topo (ver .event-marquee), não tem
-     mais texto por cima da marca. */
+     ACIMA do .map-dim (150) pra ficar visível por cima do véu cinza. Some
+     junto com o overlay quando o hero encolhe (ver shrinkHero). O
+     nome/data/edição do evento vivem só na marquee do topo (ver
+     .event-marquee), não tem mais texto por cima da marca. */
   /* width/height:100% explícitos são necessários aqui: canvas é elemento
      "replaced" e, mesmo com inset:0, um replaced element position:absolute
      sem width/height definido usa o tamanho intrínseco (os atributos
@@ -84,14 +83,20 @@
      mix-blend-mode nem mask-image — as duas técnicas testadas antes pra
      inverter a cor automaticamente deixavam o texto com aliasing pior
      (percebido como "pixelado", sobretudo em telas retina); cor sólida
-     lisa garante a mesma qualidade de renderização do resto do site. */
+     lisa garante a mesma qualidade de renderização do resto do site.
+     TESTE: antes da 1ª interação, fundo cinza chapado (mesmo tom do
+     .map-dim, sem transparência) com texto preto, combinando com o overlay
+     por baixo da marca; depois que a marca some (shrinkHero), volta pro
+     degradê preto->cinza com texto branco de sempre (.interacted). */
   .event-marquee{ position:absolute; top:0; left:0; right:0; z-index:220;
                    padding:6px 0; overflow:hidden; isolation:isolate;
-                   background:linear-gradient(to right, #050505, #d8d8d6); }
+                   background:#d8d8d6; }
+  .event-marquee.interacted{ background:linear-gradient(to right, #050505, #d8d8d6); }
   .marquee-layer{ display:flex; align-items:center; overflow:hidden; }
   .marquee-track{ display:flex; align-items:baseline; width:max-content;
-                   white-space:nowrap; color:#fff;
+                   white-space:nowrap; color:#111111; transition:color 0.6s ease;
                    animation:marquee-scroll 180s linear infinite; }
+  .event-marquee.interacted .marquee-track{ color:#fff; }
   .marquee-seg{ display:flex; align-items:baseline; }
   /* mesma tipografia/peso do resto do site pra rótulo em caixa alta (ver
      .list-title/.about-title): sans 350, letter-spacing -0.025em */
@@ -1704,9 +1709,11 @@ function shrinkHero(e){
   document.getElementById('map-dim').classList.add('hidden');
   // a marca (cobrona) some, e para de animar (sem gasto de CPU desenhando
   // algo que não aparece mais) — a marquee do topo (.event-marquee)
-  // continua visível/rodando normalmente
+  // continua visível/rodando normalmente, só troca de cinza chapado+preto
+  // pro degradê+branco de sempre (ver .interacted no CSS)
   const snakeCanvas = document.getElementById('hero-snake-canvas');
   if (snakeCanvas) snakeCanvas.classList.add('hidden');
+  document.querySelector('.event-marquee').classList.add('interacted');
   stopHeroSnake();
   document.removeEventListener('pointerdown', shrinkHero);
   document.removeEventListener('wheel', shrinkHero);
