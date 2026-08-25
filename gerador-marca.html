@@ -537,9 +537,9 @@ function buildRibbonAndTextSVG(runs, legs, ribbonWidth, ribbonColor, textColor){
    temas de cor
    ============================================================ */
 const THEMES = {
-  claro: { bg:'#ffffff', pin:'#111111', pinRing:'#ffffff', pinText:'#ffffff', ribbon:'#111111', text:'rgba(255,255,255,0.95)' },
-  escuro:{ bg:'#111111', pin:'#ffffff', pinRing:'#111111', pinText:'#111111', ribbon:'#ffffff', text:'rgba(17,17,17,0.95)' },
-  degrade:{ bg:'#ffffff', pin:'#111111', pinRing:'#ffffff', pinText:'#ffffff', ribbon:'#111111', text:'rgba(120,120,120,0.95)' }
+  claro: { bg:'#ffffff', pin:'#111111', pinText:'#ffffff', ribbon:'#111111', text:'rgba(255,255,255,0.95)' },
+  escuro:{ bg:'#111111', pin:'#ffffff', pinText:'#111111', ribbon:'#ffffff', text:'rgba(17,17,17,0.95)' },
+  degrade:{ bg:'#ffffff', pin:'#111111', pinText:'#ffffff', ribbon:'#111111', text:'rgba(120,120,120,0.95)' }
 };
 let currentTheme = 'claro';
 
@@ -679,12 +679,25 @@ modeCompletaBtn.addEventListener('click', () => {
    desenho — monta marcação SVG (texto e formas vetoriais de
    verdade, não pixel) e injeta no <svg> da tela
    ============================================================ */
+// mesmo tratamento visual do .pin/.pin::before do site (index.html): sem
+// anel/contorno sólido — miolo com borda suave via blur, na mesma proporção
+// do CSS (inset:2px + blur:2px numa base de 24px de diâmetro/12px de raio),
+// escalada pro raio de cada pino aqui
+function renderPinCircleSVG(cx, cy, r, fill, filterId){
+  const coreR = r * (10/12);
+  return `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${coreR.toFixed(2)}" fill="${fill}" filter="url(#${filterId})"/>`;
+}
+function pinBlurFilterDefSVG(id, r){
+  const blurStd = r * (2/12);
+  return `<defs><filter id="${id}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="${blurStd.toFixed(2)}"/></filter></defs>`;
+}
 function renderCompletaPins(pins, strokeWidth, theme){
   const r = strokeWidth / 2;
   const fontSize = Math.max(7, r*0.8);
-  let s = '';
+  const filterId = `pinBlur-${strokeWidth}`;
+  let s = pinBlurFilterDefSVG(filterId, r);
   pins.forEach(p => {
-    s += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="${r.toFixed(2)}" fill="${theme.pin}" stroke="${theme.pinRing}" stroke-width="2"/>`;
+    s += renderPinCircleSVG(p.x, p.y, r, theme.pin, filterId);
     s += `<text x="${p.x.toFixed(2)}" y="${(p.y+0.5).toFixed(2)}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="${fontSize.toFixed(1)}" fill="${theme.pinText}" text-anchor="middle" dominant-baseline="middle">${String(alphaNum[p.loc.id]).padStart(2,'0')}</text>`;
   });
   return s;
@@ -753,8 +766,10 @@ function buildContentSVG(includeBg){
   }
 
   if (showPins){
+    const filterId = 'pinBlur-simbolo';
+    s += pinBlurFilterDefSVG(filterId, 15);
     PTS.forEach(p => {
-      s += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="15" fill="${theme.pin}" stroke="${theme.pinRing}" stroke-width="2"/>`;
+      s += renderPinCircleSVG(p.x, p.y, 15, theme.pin, filterId);
       s += `<text x="${p.x.toFixed(2)}" y="${(p.y+0.5).toFixed(2)}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="${theme.pinText}" text-anchor="middle" dominant-baseline="middle">${String(alphaNum[p.loc.id]).padStart(2,'0')}</text>`;
     });
   }
