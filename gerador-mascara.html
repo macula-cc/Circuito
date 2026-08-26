@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Gerador de Post — Circuito de Ateliês do Centro</title>
+<title>Gerador de Post Estático — Circuito de Ateliês do Centro</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -74,7 +74,7 @@
       <a href="gerador-video.html">vídeo</a>
     </div>
 
-    <h1>Gerador de<br>Post</h1>
+    <h1>Gerador de<br>Post Estático</h1>
     <div class="sub">Circuito de Ateliês do Centro</div>
 
     <div class="field">
@@ -151,8 +151,8 @@
     <div class="field">
       <label>Preenchimento</label>
       <div class="row-btns">
-        <button class="btn active" id="fill-solido">sólido</button>
-        <button class="btn" id="fill-degrade">degradê</button>
+        <button class="btn active" id="fill-degrade">degradê</button>
+        <button class="btn" id="fill-solido">sólido</button>
       </div>
     </div>
 
@@ -606,7 +606,7 @@ const THEMES = {
   preto:  { bg:'#111111', ink:'#ffffff', sub:'#b5b5b3', mark:'#ffffff' }
 };
 let currentTheme = 'branco';
-let markFill = 'solido'; // solido | degrade — independente do fundo
+let markFill = 'degrade'; // solido | degrade — independente do fundo
 
 /* ============================================================
    estado geral
@@ -942,14 +942,19 @@ function drawEventFrame(ctx2d, dMark, markPath){
   }
 
   if (showPinsEvt){
+    // mesmo tratamento visual do .pin/.pin::before do site (index.html): sem
+    // anel/contorno sólido — miolo com borda suave via blur, na mesma
+    // proporção do CSS (inset:2px + blur:2px numa base de 24px de
+    // diâmetro/12px de raio), escalada pro raio de cada pino aqui (r=15)
+    const rEvt = 15, coreREvt = rEvt * (10/12), blurPxEvt = rEvt * (2/12);
     (evtMarkPins.length ? evtMarkPins : PTS_EVT).forEach((p) => {
+      ctx2d.save();
+      ctx2d.filter = `blur(${blurPxEvt.toFixed(2)}px)`;
       ctx2d.beginPath();
-      ctx2d.arc(p.x, p.y, 15, 0, Math.PI*2);
+      ctx2d.arc(p.x, p.y, coreREvt, 0, Math.PI*2);
       ctx2d.fillStyle = theme.mark;
       ctx2d.fill();
-      ctx2d.lineWidth = 2.2;
-      ctx2d.strokeStyle = theme.bg;
-      ctx2d.stroke();
+      ctx2d.restore();
       ctx2d.fillStyle = theme.bg;
       ctx2d.font = "12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
       ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'middle';
