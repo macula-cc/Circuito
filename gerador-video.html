@@ -78,7 +78,6 @@
       <a href="gerador-marca.html">marca</a>
       <a href="gerador-mascara.html">post</a>
       <a href="gerador-video.html" class="active">vídeo</a>
-      <a href="gerador-marca-3d.html">marca 3d</a>
     </div>
 
     <h1>Gerador de<br>Vídeo</h1>
@@ -719,17 +718,22 @@ function drawStatsLayer(ctx2d){
   ctx2d.fillText(LABEL_L, LOGICAL_W/2, EVT_LABEL_Y);
   ctx2d.textAlign = 'left';
 }
+// mesmo tratamento visual do .pin/.pin::before do site (index.html): sem
+// anel/contorno sólido — miolo com borda suave via blur, na mesma proporção
+// do CSS (inset:2px + blur:2px numa base de 24px de diâmetro/12px de raio),
+// escalada pro raio de cada pino aqui (r=15)
 function drawPinsLayer(ctx2d, pins){
   if (!showPins) return;
   const theme = THEMES[currentTheme];
+  const r = 15, coreR = r * (10/12), blurPx = r * (2/12);
   (pins || PTS).forEach((p) => {
+    ctx2d.save();
+    ctx2d.filter = `blur(${blurPx.toFixed(2)}px)`;
     ctx2d.beginPath();
-    ctx2d.arc(p.x, p.y, 15, 0, Math.PI*2);
+    ctx2d.arc(p.x, p.y, coreR, 0, Math.PI*2);
     ctx2d.fillStyle = theme.mark;
     ctx2d.fill();
-    ctx2d.lineWidth = 2.2;
-    ctx2d.strokeStyle = theme.bg;
-    ctx2d.stroke();
+    ctx2d.restore();
     ctx2d.fillStyle = theme.bg;
     ctx2d.font = "12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
     ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'middle';
