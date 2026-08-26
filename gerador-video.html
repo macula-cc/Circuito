@@ -84,21 +84,21 @@
     <div class="sub">Circuito de Ateliês do Centro</div>
 
     <div class="field">
-      <label>Tipo de vídeo</label>
-      <div class="row-btns" id="tipo-row">
-        <button class="btn active" id="tipo-marcas" data-tipo="marcas">troca de marcas</button>
-        <button class="btn" id="tipo-circuito" data-tipo="circuito">cobrinha</button>
-      </div>
-      <div class="note" id="tipo-note" style="margin-top:0.6rem;"></div>
-    </div>
-
-    <div class="field">
       <label>Formato</label>
       <div class="row-btns" id="formato-row">
         <button class="btn active" id="formato-quadrado" data-formato="quadrado">quadrado</button>
         <button class="btn" id="formato-stories" data-formato="stories">stories</button>
       </div>
       <div class="note" style="margin-top:0.6rem;">quadrado: 1:1 (feed). stories: 9:16 (Instagram Stories).</div>
+    </div>
+
+    <div class="field">
+      <label>Tipo de vídeo</label>
+      <div class="row-btns" id="tipo-row">
+        <button class="btn active" id="tipo-circuito" data-tipo="circuito">cobrinha</button>
+        <button class="btn" id="tipo-marcas" data-tipo="marcas">troca de marcas</button>
+      </div>
+      <div class="note" id="tipo-note" style="margin-top:0.6rem;"></div>
     </div>
 
     <hr class="divider">
@@ -122,25 +122,8 @@
     <div class="field">
       <label>Marca</label>
       <div class="row-btns">
-        <button class="btn active" id="text-on">com texto</button>
-        <button class="btn" id="text-off">sem texto</button>
-      </div>
-    </div>
-
-    <div class="field">
-      <label>Título do evento</label>
-      <div class="row-btns">
-        <button class="btn active" id="title-on">mostrar</button>
-        <button class="btn" id="title-off">esconder</button>
-      </div>
-    </div>
-
-    <div class="field">
-      <label>Infos secundárias</label>
-      <div class="note" style="margin-bottom:0.5rem;">data e números de endereços e artistas</div>
-      <div class="row-btns">
-        <button class="btn active" id="stats-on">mostrar</button>
-        <button class="btn" id="stats-off">esconder</button>
+        <button class="btn active" id="text-off">sem texto</button>
+        <button class="btn" id="text-on">com texto</button>
       </div>
     </div>
 
@@ -156,8 +139,8 @@
     <div class="field">
       <label>Preenchimento</label>
       <div class="row-btns">
-        <button class="btn active" id="fill-solido">sólido</button>
-        <button class="btn" id="fill-degrade">degradê</button>
+        <button class="btn active" id="fill-degrade">degradê</button>
+        <button class="btn" id="fill-solido">sólido</button>
       </div>
     </div>
 
@@ -591,7 +574,7 @@ const THEMES = {
   preto:  { bg:'#111111', ink:'#ffffff', sub:'#b5b5b3', mark:'#ffffff' }
 };
 let currentTheme = 'branco';
-let markFill = 'solido'; // solido | degrade
+let markFill = 'degrade'; // solido | degrade
 
 /* ============================================================
    estado geral
@@ -604,10 +587,8 @@ let numAddresses = 0;
 let numArtists = 0;
 let showMap = true;
 let showPins = true;
-let showText = true;
-let showTitle = true;
-let showStats = true;
-let videoTipo = 'marcas'; // marcas | circuito
+let showText = false;
+let videoTipo = 'circuito'; // marcas | circuito
 let videoFormat = 'quadrado'; // quadrado | stories
 
 const canvas = document.getElementById('art');
@@ -665,8 +646,6 @@ function wireToggle(onId, offId, setter, extra){
 }
 wireToggle('pins-on','pins-off', v => showPins = v);
 wireToggle('text-on','text-off', v => showText = v);
-wireToggle('title-on','title-off', v => showTitle = v);
-wireToggle('stats-on','stats-off', v => showStats = v);
 // o mapa (mlMap) já é carregado eagerly em setupFromLocations() — esse
 // toggle só controla se drawBaseLayer desenha o basemapCanvas ou não
 wireToggle('map-on','map-off', v => showMap = v);
@@ -696,7 +675,6 @@ function drawBaseLayer(ctx2d){
   if (showMap && basemapCanvas) ctx2d.drawImage(basemapCanvas, 0, 0, LOGICAL_W, LOGICAL_H);
 }
 function drawTitleLayer(ctx2d){
-  if (!showTitle) return;
   const theme = THEMES[currentTheme];
   ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'alphabetic';
   ctx2d.fillStyle = theme.ink;
@@ -707,7 +685,6 @@ function drawTitleLayer(ctx2d){
   ctx2d.textAlign = 'left';
 }
 function drawStatsLayer(ctx2d){
-  if (!showStats) return;
   const theme = THEMES[currentTheme];
   ctx2d.textAlign = 'center';
   ctx2d.fillStyle = theme.ink;
@@ -744,7 +721,7 @@ function drawPinsLayer(ctx2d, pins){
 // "negativo": onde a fita cruza o título, revela o título na cor do fundo —
 // como se a fita fosse uma máscara pra uma versão invertida do texto por baixo
 function applyTitleNegativeMask(ctx2d, visiblePoints){
-  if (!showTitle || !visiblePoints || visiblePoints.length < 2) return;
+  if (!visiblePoints || visiblePoints.length < 2) return;
   const theme = THEMES[currentTheme];
   const off = document.createElement('canvas');
   off.width = LOGICAL_W; off.height = LOGICAL_H;
@@ -1225,7 +1202,7 @@ async function setupFromLocations(){
   alphaNum = {};
   sortedForNum.forEach((loc,i) => { alphaNum[loc.id] = i+1; });
 
-  setVideoTipo('marcas');
+  setVideoTipo('circuito');
 }
 
 async function boot(){
