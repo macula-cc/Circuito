@@ -1117,16 +1117,16 @@ btnGerarVideo.addEventListener('click', () => {
   recorder.onstop = () => {
     recDot.classList.remove('on');
     btnGerarVideo.disabled = false;
-    const ext = isMp4 ? 'mp4' : 'webm';
+    // salva sempre como .mp4, mesmo nos navegadores que só gravam webm por
+    // dentro (Chrome/Firefox) — testado e confirmado que sobe normal no
+    // Instagram assim, sem precisar converter de verdade
     const blob = new Blob(chunks, { type: isMp4 ? 'video/mp4' : 'video/webm' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `circuito-video-${videoTipo}-${videoFormat}.${ext}`;
+    a.href = url; a.download = `circuito-video-${videoTipo}-${videoFormat}.mp4`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
-    setStatus(isMp4
-      ? 'vídeo pronto (.mp4) — já dá pra postar direto no Instagram.'
-      : 'vídeo pronto (.webm) — esse navegador só grava nesse formato; talvez precise converter pra .mp4 antes de postar (o Safari grava .mp4 direto).');
+    setStatus('vídeo pronto (.mp4) — já dá pra postar direto no Instagram.');
     startPreview();
   };
 
