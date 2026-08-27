@@ -85,44 +85,30 @@
       </div>
     </div>
 
+    <!-- Fundo: compartilhado entre os dois modos — "mapa" (só faz sentido no
+         post do evento) fica escondido via JS quando o modo é artista -->
+    <div class="field">
+      <label>Fundo</label>
+      <div class="row-btns">
+        <button class="btn" id="bg-mapa" style="display:none;">mapa</button>
+        <button class="btn active" id="bg-branco">branco</button>
+        <button class="btn" id="bg-cinza">cinza</button>
+        <button class="btn" id="bg-preto">preto</button>
+      </div>
+    </div>
+
     <!-- ===== campos: post do artista ===== -->
     <div id="artist-fields">
       <div class="field">
         <label for="artist-select">Artista</label>
         <select id="artist-select"><option>carregando…</option></select>
       </div>
-
-      <div class="field">
-        <label>Foto</label>
-        <div class="note">foto do artista, sempre em retângulo, sangrando até a borda</div>
-      </div>
     </div>
 
     <!-- ===== campos: post do evento ===== -->
     <div id="event-fields" style="display:none;">
       <div class="field">
-        <label>Mapa</label>
         <div class="row-btns">
-          <button class="btn active" id="evt-map-on">mostrar mapa</button>
-          <button class="btn" id="evt-map-off">esconder mapa</button>
-        </div>
-      </div>
-
-      <div class="field">
-        <label>Pontos dos ateliês</label>
-        <div class="row-btns">
-          <button class="btn active" id="evt-pins-on">mostrar</button>
-          <button class="btn" id="evt-pins-off">esconder</button>
-        </div>
-      </div>
-
-      <div class="field">
-        <label>Marca</label>
-        <div class="row-btns">
-          <button class="btn active" id="evt-text-on">com texto</button>
-          <button class="btn" id="evt-text-off">sem texto</button>
-        </div>
-        <div class="row-btns" style="margin-top:0.5rem;">
           <button class="btn" id="btn-evt-new-mark" style="flex:1;">gerar nova marca</button>
         </div>
       </div>
@@ -132,16 +118,9 @@
       </div>
     </div>
 
-    <div class="field">
-      <label>Fundo</label>
-      <div class="row-btns">
-        <button class="btn active" id="bg-branco">branco</button>
-        <button class="btn" id="bg-cinza">cinza</button>
-        <button class="btn" id="bg-preto">preto</button>
-      </div>
-    </div>
-
-    <div class="field">
+    <!-- Preenchimento: só se aplica à marca do post do evento (o post do
+         artista não desenha mais marca nenhuma) -->
+    <div id="fill-field" class="field" style="display:none;">
       <label>Preenchimento</label>
       <div class="row-btns">
         <button class="btn active" id="fill-degrade">degradê</button>
@@ -152,7 +131,6 @@
     <div class="field">
       <label>Exportar</label>
       <div class="row-btns">
-        <button class="btn primary" id="btn-download-svg">SVG</button>
         <button class="btn primary" id="btn-download-png">PNG</button>
         <button class="btn primary" id="btn-download-pdf">PDF</button>
       </div>
@@ -603,9 +581,9 @@ let evtMarkPins = []; // pontos dos ateliês já no mesmo ajuste de escala da ma
 let numAddresses = 0;
 let numArtists = 0;
 let mode = 'artista'; // artista | evento
-let showMapEvt = true;
-let showPinsEvt = true;
-let showTextEvt = true;
+let showMapEvt = false; // "mapa" não é o Fundo padrão (branco é) — ver bgBtns
+const showPinsEvt = true; // sempre mostra os pontos dos ateliês, sem opção de esconder
+const showTextEvt = false; // marca do post do evento é sempre sem texto
 
 const svgEl = document.getElementById('art');
 const eventCanvas = document.getElementById('event-canvas');
@@ -613,7 +591,7 @@ const ectx = eventCanvas.getContext('2d');
 const artistSelect = document.getElementById('artist-select');
 const statusEl = document.getElementById('status');
 const canvasFrame = document.getElementById('canvas-frame');
-const bgBtns = { branco: document.getElementById('bg-branco'), cinza: document.getElementById('bg-cinza'), preto: document.getElementById('bg-preto') };
+const bgBtns = { mapa: document.getElementById('bg-mapa'), branco: document.getElementById('bg-branco'), cinza: document.getElementById('bg-cinza'), preto: document.getElementById('bg-preto') };
 const fillSolidoBtn = document.getElementById('fill-solido');
 const fillDegradeBtn = document.getElementById('fill-degrade');
 fillSolidoBtn.addEventListener('click', () => {
@@ -628,7 +606,7 @@ fillDegradeBtn.addEventListener('click', () => {
 });
 const artistFieldsEl = document.getElementById('artist-fields');
 const eventFieldsEl = document.getElementById('event-fields');
-const svgDownloadBtn = document.getElementById('btn-download-svg');
+const fillFieldEl = document.getElementById('fill-field');
 
 function setStatus(msg, isError){
   statusEl.textContent = msg || '';
@@ -648,16 +626,29 @@ function setMode(m){
   eventFieldsEl.style.display = m === 'evento' ? 'block' : 'none';
   svgEl.style.display = m === 'artista' ? 'block' : 'none';
   eventCanvas.style.display = m === 'evento' ? 'block' : 'none';
-  svgDownloadBtn.style.display = m === 'artista' ? 'inline-flex' : 'none';
+  // "mapa" só faz sentido no post do evento; Preenchimento só afeta a marca
+  // do post do evento (o post do artista não desenha mais marca nenhuma)
+  bgBtns.mapa.style.display = m === 'evento' ? 'inline-flex' : 'none';
+  fillFieldEl.style.display = m === 'evento' ? 'block' : 'none';
   if (m === 'artista') draw(); else redrawEvent();
 }
 
-/* ---- cores (compartilhado) ---- */
+/* ---- cores/fundo (compartilhado) — "mapa" é só relevante no post do
+   evento: mostra o mapa real em vez de uma cor chapada */
 Object.keys(bgBtns).forEach(key => {
   bgBtns[key].addEventListener('click', () => {
-    currentTheme = key;
     Object.keys(bgBtns).forEach(k => bgBtns[k].classList.toggle('active', k === key));
-    canvasFrame.style.background = THEMES[key].bg;
+    if (key === 'mapa'){
+      showMapEvt = true;
+      // texto/marca/pins precisam de contraste sobre o mapa (claro) — usa o
+      // mesmo tom de tinta escura do tema branco
+      currentTheme = 'branco';
+      canvasFrame.style.background = THEMES.branco.bg;
+    } else {
+      showMapEvt = false;
+      currentTheme = key;
+      canvasFrame.style.background = THEMES[key].bg;
+    }
     if (mode === 'artista') draw(); else redrawEvent();
   });
 });
@@ -731,7 +722,10 @@ function buildMarqueeBarSVG(y, h){
   labelSize *= scale; dateSize *= scale;
   m = measure(labelSize, dateSize);
 
-  let s = `<rect x="0" y="${y.toFixed(2)}" width="${LOGICAL}" height="${h.toFixed(2)}" fill="#d8d8d6"/>`;
+  // fundo cinza (#d8d8d6) some contra um artboard cinza (mesmo tom) — nesse
+  // caso o marquee vira branco pra manter contraste
+  const marqueeBg = currentTheme === 'cinza' ? '#ffffff' : '#d8d8d6';
+  let s = `<rect x="0" y="${y.toFixed(2)}" width="${LOGICAL}" height="${h.toFixed(2)}" fill="${marqueeBg}"/>`;
   let x = MARGIN;
   const labelLS = (labelSize*-0.025).toFixed(2);
 
@@ -811,30 +805,10 @@ function rasterizeSVG(scale){
 /* ============================================================
    post do evento
    ============================================================ */
-const evtMapOnBtn = document.getElementById('evt-map-on');
-const evtMapOffBtn = document.getElementById('evt-map-off');
-// o mapa (mlMap) já é carregado eagerly em setupFromLocations() — esse
-// botão só controla se drawEventFrame desenha o evtBasemapCanvas ou não
-evtMapOnBtn.addEventListener('click', () => {
-  showMapEvt = true;
-  evtMapOnBtn.classList.add('active'); evtMapOffBtn.classList.remove('active');
-  redrawEvent();
-});
-evtMapOffBtn.addEventListener('click', () => {
-  showMapEvt = false;
-  evtMapOffBtn.classList.add('active'); evtMapOnBtn.classList.remove('active');
-  redrawEvent();
-});
-
-const evtTextOnBtn = document.getElementById('evt-text-on');
-const evtTextOffBtn = document.getElementById('evt-text-off');
-evtTextOnBtn.addEventListener('click', () => { showTextEvt = true; evtTextOnBtn.classList.add('active'); evtTextOffBtn.classList.remove('active'); redrawEvent(); });
-evtTextOffBtn.addEventListener('click', () => { showTextEvt = false; evtTextOffBtn.classList.add('active'); evtTextOnBtn.classList.remove('active'); redrawEvent(); });
-
-const evtPinsOnBtn = document.getElementById('evt-pins-on');
-const evtPinsOffBtn = document.getElementById('evt-pins-off');
-evtPinsOnBtn.addEventListener('click', () => { showPinsEvt = true; evtPinsOnBtn.classList.add('active'); evtPinsOffBtn.classList.remove('active'); redrawEvent(); });
-evtPinsOffBtn.addEventListener('click', () => { showPinsEvt = false; evtPinsOffBtn.classList.add('active'); evtPinsOnBtn.classList.remove('active'); redrawEvent(); });
+// mapa (mostrar/esconder) virou uma das opções do Fundo compartilhado (ver
+// bgBtns.mapa); "com/sem texto" e "mostrar/esconder pontos" não são mais
+// escolhas do usuário — sempre sem texto, sempre com os pontos visíveis
+// (ver showTextEvt/showPinsEvt, const's lá em cima)
 
 function generateNewEventMark(){
   const order = [...PTS_EVT].sort(() => Math.random()-0.5);
@@ -977,9 +951,6 @@ function drawEventFrame(ctx2d, dMark, markPath){
 
   ctx2d.textAlign = 'center';
   ctx2d.fillStyle = theme.ink;
-  ctx2d.font = `${EVT_STATS_SIZE}px 'Instrument Serif', Georgia, serif`;
-  ctx2d.fillText(`${numAddresses} Endereços – ${numArtists} Artistas`, LOGICAL/2, EVT_STATS_Y);
-
   ctx2d.font = `${EVT_LABEL_WEIGHT} ${EVT_LABEL_SIZE}px ${SANS_DISPLAY}`;
   ctx2d.fillText(EVT_LABEL_L, LOGICAL/2, EVT_LABEL_Y);
   ctx2d.textAlign = 'left';
@@ -996,17 +967,6 @@ function markPathForFrame(){
 /* ============================================================
    exportação (compartilhada — ramifica por modo)
    ============================================================ */
-svgDownloadBtn.addEventListener('click', () => {
-  if (mode !== 'artista') return;
-  setStatus('');
-  const blob = new Blob([buildFullSVGString()], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'circuito-post-artista.svg';
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
-});
-
 document.getElementById('btn-download-png').addEventListener('click', async () => {
   setStatus('gerando PNG em alta resolução…');
   try{
