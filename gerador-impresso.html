@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Gerador de Impresso — Circuito de Ateliês do Centro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+
+<style>
+  :root{
+    --serif: 'Instrument Serif', Georgia, 'Iowan Old Style', 'Times New Roman', ui-serif, serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --ink:#111; --line: rgba(0,0,0,0.15); --gray:#6b6b6b; --hover:#f0f0f0; --paper:#fff;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; color:var(--ink); font-family:var(--sans); background:var(--paper); }
+  a{ color:inherit; text-decoration:none; }
+  button, select{ font:inherit; touch-action:manipulation; }
+
+  .nav{ display:flex; gap:2px; font-family:var(--mono); font-size:0.75rem;
+        background:#f4f4f4; border:1px solid var(--line); border-radius:999px; padding:3px; width:max-content; margin-bottom:1.6rem; }
+  .nav a{ padding:0.5rem 0.9rem; border-radius:999px; color:var(--gray); }
+  .nav a.active{ background:#111; color:#fff; }
+  .nav a:not(.active):hover{ background:var(--hover); color:var(--ink); }
+
+  .wrap{ display:grid; grid-template-columns:400px 1fr; min-height:100vh; }
+  @media (max-width:900px){ .wrap{ grid-template-columns:1fr; } }
+
+  .panel{ padding:calc(1.6rem + env(safe-area-inset-top)) 1.6rem 2rem; border-right:1px solid var(--line);
+          overflow-y:auto; max-height:100vh; }
+  @media (max-width:900px){ .panel{ border-right:none; border-bottom:1px solid var(--line); max-height:none; } }
+
+  h1{ font-family:var(--serif); font-weight:400; font-size:2.1rem; line-height:1.05; margin:0 0 0.2rem; }
+  .sub{ font-family:var(--mono); font-size:0.79rem; color:var(--gray); margin-bottom:1.6rem; }
+
+  .field{ margin-bottom:1.6rem; }
+  .field label{ display:block; font-family:var(--mono); font-size:0.73rem; text-transform:uppercase;
+                letter-spacing:0.04em; color:var(--gray); margin-bottom:0.5rem; }
+  select{ width:100%; padding:0.65rem 0.7rem; border:1px solid var(--ink); border-radius:0; background:#fff;
+          color:var(--ink); font-family:var(--sans); font-size:0.94rem; }
+
+  .row-btns{ display:flex; gap:0.5rem; flex-wrap:wrap; }
+  .btn{ font-family:var(--mono); font-size:0.79rem; background:#fff; color:var(--ink); border:1px solid var(--ink);
+        padding:0.6rem 0.9rem; cursor:pointer; border-radius:0; transition:background 0.15s ease, color 0.15s ease; }
+  .btn:hover{ background:var(--ink); color:#fff; }
+  .btn.active{ background:var(--ink); color:#fff; }
+  .btn.primary{ background:var(--ink); color:#fff; flex:1; padding:0.85rem; font-size:0.83rem; }
+  .btn.primary:hover{ opacity:0.8; }
+  .btn:disabled{ opacity:0.35; cursor:default; pointer-events:none; }
+
+  .status{ font-family:var(--mono); font-size:0.75rem; color:var(--gray); margin-top:0.9rem; min-height:1.2em; line-height:1.4; }
+  .status.error{ color:#9A3324; }
+  .note{ font-family:var(--mono); font-size:0.73rem; color:var(--gray); line-height:1.4; }
+
+  .stage{ display:flex; align-items:center; justify-content:center; padding:2.4rem; }
+  .canvas-frame{ width:min(70vh, 100%); max-width:560px; aspect-ratio:1000/1414; border:1px solid var(--line);
+                 box-shadow:0 12px 40px rgba(0,0,0,0.08); background:#fff; position:relative; }
+  #art{ width:100%; height:100%; display:block; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="nav">
+      <a href="ferramentas.html">ferramentas</a>
+      <a href="gerador-marca.html">marca</a>
+      <a href="gerador-mascara.html">post</a>
+      <a href="gerador-video.html">vídeo</a>
+      <a href="gerador-impresso.html" class="active">impresso</a>
+    </div>
+
+    <h1>Gerador de<br>Impresso</h1>
+    <div class="sub">Circuito de Ateliês do Centro · uma folha por espaço</div>
+
+    <div class="field">
+      <label for="loc-select">Espaço</label>
+      <select id="loc-select"><option>carregando…</option></select>
+    </div>
+
+    <div class="field">
+      <label>Grafismo</label>
+      <div class="row-btns">
+        <button class="btn" id="btn-new-artwork" style="flex:1;">gerar novo grafismo</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Exportar</label>
+      <div class="row-btns">
+        <button class="btn primary" id="btn-download-png">PNG</button>
+        <button class="btn primary" id="btn-download-pdf">PDF</button>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="canvas-frame" id="canvas-frame">
+      <svg id="art" viewBox="0 0 1000 1414" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   dados
+   ============================================================ */
+const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
+const LOGICAL_W = 1000;
+const LOGICAL_H = 1414; // proporção A4 (1:1.414) — pensado pra imprimir
+const SITE_URL = 'https://circuitodeateliesdocentro.com.br';
+const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Instrument+Serif:ital@0;1&display=swap";
+const SANS_DISPLAY = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+const SERIF = "'Instrument Serif', Georgia, serif";
+const EVENT_TITLE = 'Circuito de Ateliês do Centro';
+const EVENT_EYEBROW = 'Ateliês abertos';
+const EVENT_DATES = '18 – 19 de Setembro';
+
+function parseCSV(text){
+  const rows = []; let row = []; let field = ''; let inQuotes = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (inQuotes){
+      if (c === '"'){ if (text[i+1] === '"'){ field += '"'; i++; } else { inQuotes = false; } }
+      else { field += c; }
+    } else {
+      if (c === '"'){ inQuotes = true; }
+      else if (c === ','){ row.push(field); field = ''; }
+      else if (c === '\r'){ /* ignore */ }
+      else if (c === '\n'){ row.push(field); field = ''; rows.push(row); row = []; }
+      else { field += c; }
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+function parseCoord(raw, min, max){
+  if (!raw) return null;
+  const normalized = raw.trim().replace(',', '.');
+  if (!/^-?\d{1,3}(\.\d+)?$/.test(normalized)) return null;
+  const n = parseFloat(normalized);
+  return (isNaN(n) || n < min || n > max) ? null : n;
+}
+
+async function loadLocationsFromSheet(){
+  const res = await fetch(`${SHEET_CSV_URL}&_=${Date.now()}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const text = await res.text();
+  const table = parseCSV(text).filter(r => r.some(c => c !== undefined && c.trim() !== ''));
+  if (table.length < 2) throw new Error('planilha vazia');
+  const headers = table[0].map(h => h.trim());
+  const hIdx = {}; headers.forEach((h,i)=>hIdx[h]=i);
+  const get = (row, name) => { const i = hIdx[name]; return (i!=null && row[i]!=null) ? row[i].trim() : ''; };
+  const locMap = {}; const order = [];
+  table.slice(1).forEach(row => {
+    const local = get(row,'Local / Coletivo');
+    const endereco = get(row,'Endereço');
+    const nome = get(row,'Nome do Artista');
+    if (!endereco && !nome) return;
+    const obs = get(row,'Observações');
+    const latRaw = get(row,'Latitude');
+    const lngRaw = get(row,'Longitude');
+    const key = endereco;
+    if (!locMap[key]){
+      locMap[key] = {
+        id: 'loc' + order.length, local, endereco,
+        lat: parseCoord(latRaw, -90, 90),
+        lng: parseCoord(lngRaw, -180, 180),
+        artistas: []
+      };
+      order.push(key);
+    }
+    if (nome) locMap[key].artistas.push({ nome, obs });
+  });
+  return order.map(k => locMap[k]).sort((a,b) =>
+    (a.local||a.endereco).localeCompare(b.local||b.endereco, 'pt-BR', {sensitivity:'base'}));
+}
+
+/* ============================================================
+   projeção geográfica simples (sem mapa nenhum desenhado — só usa
+   as coordenadas reais pra manter a posição relativa entre os
+   pontos do grafismo, mesmo princípio do gerador-marca.html)
+   ============================================================ */
+function project(lat, lon){
+  const x = (lon + 180) / 360;
+  const rad = lat * Math.PI/180;
+  const y = (1 - Math.log(Math.tan(rad) + 1/Math.cos(rad)) / Math.PI) / 2;
+  return { x, y };
+}
+function computeFitTransform(points, box, fillFraction){
+  const xs = points.map(p=>p.x), ys = points.map(p=>p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const w = (maxX-minX) || 1, h = (maxY-minY) || 1;
+  const scale = Math.min(box.w*fillFraction/w, box.h*fillFraction/h);
+  const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
+  const boxCx = box.x + box.w/2, boxCy = box.y + box.h/2;
+  return { scale, cx, cy, boxCx, boxCy };
+}
+function applyFitTransform(points, t){
+  return points.map(p => ({ x: t.boxCx + (p.x-t.cx)*t.scale, y: t.boxCy + (p.y-t.cy)*t.scale }));
+}
+function buildLegPath(a, b){
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  if (Math.random() < 0.35 || len < 90){
+    return [ { x:a.x, y:a.y }, { x:b.x, y:b.y } ];
+  }
+  const nx = -dy/len, ny = dx/len;
+  const side = Math.random() < 0.5 ? 1 : -1;
+  const offset = len * (0.08 + Math.random()*0.14) * side;
+  const mx = (a.x+b.x)/2 + nx*offset;
+  const my = (a.y+b.y)/2 + ny*offset;
+  const N = Math.max(18, Math.round(len/16));
+  const pts = [];
+  for (let i=0;i<=N;i++){
+    const t = i/N; const it = 1-t;
+    pts.push({ x: it*it*a.x + 2*it*t*mx + t*t*b.x, y: it*it*a.y + 2*it*t*my + t*t*b.y });
+  }
+  return pts;
+}
+
+function escapeXML(s){
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ============================================================
+   layout — folha impressa (uma por espaço)
+   ============================================================ */
+const MARGIN = 56;
+const MARQUEE_H = 70;
+const RIGHT_COL_W = 330;
+const LEFT_COL_W = LOGICAL_W - RIGHT_COL_W;
+const CONTENT_TOP = MARQUEE_H;
+const CONTENT_BOTTOM = LOGICAL_H - MARQUEE_H;
+const RIGHT_PAD = 40; // padding interno da coluna direita (texto/QR)
+const QR_SIZE = 108;
+const INFO_TEXT_SIZE = 18; // "acesse o mapa" e o endereço do site, mesmo tamanho
+const BELOW_CROP_H = 220; // reservado embaixo do grafismo pro "acesse o mapa" + QR
+const CROP_BOX = { x: LEFT_COL_W, y: CONTENT_TOP, w: RIGHT_COL_W, h: (CONTENT_BOTTOM - CONTENT_TOP) - BELOW_CROP_H };
+const CROP_OVERSCAN = 2.4; // a "tela" onde o traçado é gerado é BEM maior que o recorte mostrado — mesmo espírito "estourado/sangrando" da cobrona do site, poucos traços bem grossos, não uma nuvem de linhas finas
+
+const TITLE_SIZE = 78;
+const TITLE_LINE_GAP = TITLE_SIZE * 0.98;
+const TITLE_TOP_Y = CONTENT_TOP + 100; // baseline da 1ª linha do título
+const ARTISTS_LABEL_GAP = 56; // do fim do bloco do título até o rótulo "ARTISTAS"
+const ARTISTS_LABEL_SIZE = 20;
+const LIST_GAP = 44; // do rótulo até a 1ª linha da lista
+const ROW_BASE_H = 44;
+const ROW_MIN_H = 22;
+
+// canvas escondido só pra medir largura de texto (nunca desenhado nem exportado)
+const measureCanvas = document.createElement('canvas');
+const measureCtx = measureCanvas.getContext('2d');
+
+// quebra um texto em no máximo `maxLines` linhas, quebrando por palavra —
+// se ainda sobrar texto depois do limite de linhas, a última linha absorve
+// o resto (raro na prática: nomes de espaço da planilha são curtos)
+function wrapTitleLines(text, fontSize, maxWidth, maxLines, fontFamily){
+  measureCtx.font = `500 ${fontSize}px ${fontFamily || SANS_DISPLAY}`;
+  const words = text.split(' ');
+  const lines = [];
+  let current = '';
+  for (const w of words){
+    const test = current ? current + ' ' + w : w;
+    if (current && measureCtx.measureText(test).width > maxWidth){
+      lines.push(current);
+      current = w;
+      if (lines.length === maxLines - 1 && words.indexOf(w) < words.length){ /* última linha recebe o resto abaixo */ }
+    } else {
+      current = test;
+    }
+  }
+  if (current) lines.push(current);
+  if (lines.length > maxLines){
+    const head = lines.slice(0, maxLines - 1);
+    const rest = lines.slice(maxLines - 1).join(' ');
+    head.push(rest);
+    return head;
+  }
+  return lines;
+}
+
+// mesma faixa de marquee do post estático (fundo cinza chapado, texto preto,
+// rótulo sans + "Ateliês abertos"/data serifados) — sempre igual em cima e
+// embaixo, sem depender de nenhum tema (essa folha não tem seletor de fundo)
+function buildMarqueeBarSVG(y, h){
+  const midY = (y + h/2 + h*0.06).toFixed(2);
+  const labelTxt = EVENT_TITLE.toUpperCase();
+  const eyebrowTxt = EVENT_EYEBROW + ' ';
+  const available = LOGICAL_W - MARGIN*2;
+
+  function measure(lblSize, dtSize){
+    measureCtx.letterSpacing = `${(lblSize*-0.025).toFixed(2)}px`;
+    measureCtx.font = `350 ${lblSize.toFixed(2)}px ${SANS_DISPLAY}`;
+    const labelW = measureCtx.measureText(labelTxt).width;
+    measureCtx.letterSpacing = '0px';
+    measureCtx.font = `${dtSize.toFixed(2)}px ${SERIF}`;
+    const eyebrowW = measureCtx.measureText(eyebrowTxt).width;
+    measureCtx.font = `italic ${dtSize.toFixed(2)}px ${SERIF}`;
+    const dateW = measureCtx.measureText(EVENT_DATES).width;
+    const gap = lblSize * 0.35;
+    return { labelW, eyebrowW, dateW, gap, total: labelW + gap + eyebrowW + dateW };
+  }
+
+  let labelSize = h * 0.4;
+  let dateSize = labelSize * (2.2/1.75);
+  let m = measure(labelSize, dateSize);
+  let scale = available / m.total;
+  const maxLabelSize = h * 0.7;
+  if (labelSize * scale > maxLabelSize) scale = maxLabelSize / labelSize;
+  labelSize *= scale; dateSize *= scale;
+  m = measure(labelSize, dateSize);
+
+  let s = `<rect x="0" y="${y.toFixed(2)}" width="${LOGICAL_W}" height="${h.toFixed(2)}" fill="#d8d8d6"/>`;
+  let x = MARGIN;
+  const labelLS = (labelSize*-0.025).toFixed(2);
+  s += `<text x="${x.toFixed(2)}" y="${midY}" font-family="${SANS_DISPLAY}" font-weight="350" letter-spacing="${labelLS}" font-size="${labelSize.toFixed(2)}" fill="#111111" dominant-baseline="middle">${escapeXML(labelTxt)}</text>`;
+  x += m.labelW + m.gap;
+  s += `<text x="${x.toFixed(2)}" y="${midY}" font-family="${SERIF}" font-size="${dateSize.toFixed(2)}" fill="#111111" dominant-baseline="middle">${escapeXML(eyebrowTxt)}</text>`;
+  x += m.eyebrowW;
+  s += `<text x="${x.toFixed(2)}" y="${midY}" font-family="${SERIF}" font-style="italic" font-size="${dateSize.toFixed(2)}" fill="#111111" dominant-baseline="middle">${escapeXML(EVENT_DATES)}</text>`;
+  return s;
+}
+
+/* ---- grafismo (recorte de uma "cobrona" aleatória) ---- */
+let cropLegs = [];
+let cropOffsetX = 0, cropOffsetY = 0;
+let gradientDefs = [], gradientCounter = 0;
+function legGradientAttr(a, b){
+  const id = 'gradImp' + (gradientCounter++);
+  gradientDefs.push(`<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${a.x.toFixed(2)}" y1="${a.y.toFixed(2)}" x2="${b.x.toFixed(2)}" y2="${b.y.toFixed(2)}"><stop offset="0%" stop-color="#000000"/><stop offset="100%" stop-color="#ffffff"/></linearGradient>`);
+  return `url(#${id})`;
+}
+// um traçado só (visitando cada ateliê uma vez) fica esparso demais pra
+// preencher visualmente o recorte — passa pelos mesmos pontos várias vezes,
+// cada vez numa ordem embaralhada diferente; as camadas sobrepostas dão a
+// densidade "cheia" de uma cobrona de verdade
+const CROP_PASSES = 2;
+function generateCropArtwork(){
+  const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
+  if (withCoords.length < 2) return;
+  const basePts = withCoords.map(l => { const p = project(l.lat, l.lng); return { x:p.x*4000, y:p.y*4000 }; });
+  const rawLegs = [];
+  const allPts = [];
+  for (let pass = 0; pass < CROP_PASSES; pass++){
+    const order = [...basePts].sort(() => Math.random()-0.5);
+    const closed = [...order, order[0]];
+    for (let i = 1; i < closed.length; i++){
+      const leg = buildLegPath(closed[i-1], closed[i]);
+      rawLegs.push(leg);
+      leg.forEach(p => allPts.push(p));
+    }
+  }
+  const virtualBox = { x:0, y:0, w: CROP_BOX.w*CROP_OVERSCAN, h: CROP_BOX.h*CROP_OVERSCAN };
+  // a nuvem real de pontos (geografia do Centro) é bem mais larga que alta —
+  // encaixar com escala ÚNICA (preservando proporção) numa caixa alta e
+  // estreita como essa deixa margens vazias em cima/embaixo. Como isso é só
+  // um grafismo decorativo (não precisa ser geograficamente fiel), estica X
+  // e Y independentemente pra preencher a "tela" virtual inteira
+  const xs = allPts.map(p=>p.x), ys = allPts.map(p=>p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const w = (maxX-minX) || 1, h = (maxY-minY) || 1;
+  const scaleX = virtualBox.w*0.95/w, scaleY = virtualBox.h*0.95/h;
+  const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
+  const boxCx = virtualBox.x + virtualBox.w/2, boxCy = virtualBox.y + virtualBox.h/2;
+  cropLegs = rawLegs.map(leg => leg.map(p => ({ x: boxCx + (p.x-cx)*scaleX, y: boxCy + (p.y-cy)*scaleY })));
+  cropOffsetX = Math.random() * (virtualBox.w - CROP_BOX.w);
+  cropOffsetY = Math.random() * (virtualBox.h - CROP_BOX.h);
+}
+function buildCropSVG(){
+  gradientDefs = []; gradientCounter = 0;
+  const strokeW = (CROP_BOX.w * CROP_OVERSCAN) * 0.11;
+  let paths = '';
+  cropLegs.forEach(points => {
+    if (points.length < 2) return;
+    let d = 'M' + points[0].x.toFixed(2) + ' ' + points[0].y.toFixed(2) + ' ';
+    for (let i = 1; i < points.length; i++) d += 'L' + points[i].x.toFixed(2) + ' ' + points[i].y.toFixed(2) + ' ';
+    const stroke = legGradientAttr(points[0], points[points.length-1]);
+    paths += `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${strokeW.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  });
+  const clipId = 'cropClip';
+  let s = `<defs>${gradientDefs.join('')}<clipPath id="${clipId}"><rect x="${CROP_BOX.x}" y="${CROP_BOX.y}" width="${CROP_BOX.w}" height="${CROP_BOX.h}"/></clipPath></defs>`;
+  s += `<rect x="${CROP_BOX.x}" y="${CROP_BOX.y}" width="${CROP_BOX.w}" height="${CROP_BOX.h}" fill="#f2f2f0"/>`;
+  // clip-path e transform num mesmo elemento têm a interação de espaço de
+  // coordenadas ambígua entre navegadores — separa em dois <g> aninhados:
+  // o de fora só recorta (coordenadas "globais", batendo com CROP_BOX), o
+  // de dentro só desloca o traçado
+  s += `<g clip-path="url(#${clipId})"><g transform="translate(${(CROP_BOX.x - cropOffsetX).toFixed(2)} ${(CROP_BOX.y - cropOffsetY).toFixed(2)})">${paths}</g></g>`;
+  return s;
+}
+
+/* ---- QR code (vetorial — um <rect> por módulo escuro) ---- */
+function buildQRSVG(text, x, y, size){
+  const qr = qrcode(0, 'M');
+  qr.addData(text);
+  qr.make();
+  const count = qr.getModuleCount();
+  const cell = size / count;
+  let s = `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${size.toFixed(2)}" height="${size.toFixed(2)}" fill="#ffffff"/>`;
+  for (let r = 0; r < count; r++){
+    for (let c = 0; c < count; c++){
+      if (qr.isDark(r, c)){
+        s += `<rect x="${(x + c*cell).toFixed(2)}" y="${(y + r*cell).toFixed(2)}" width="${(cell+0.4).toFixed(2)}" height="${(cell+0.4).toFixed(2)}" fill="#111111"/>`;
+      }
+    }
+  }
+  return s;
+}
+
+/* ---- coluna esquerda: título do espaço + lista de artistas ---- */
+function buildLeftColumnSVG(loc){
+  let s = '';
+  const title = loc.local || loc.endereco;
+  const maxW = LEFT_COL_W - MARGIN*2;
+  const lines = wrapTitleLines(title, TITLE_SIZE, maxW, 2);
+  let y = TITLE_TOP_Y;
+  lines.forEach(line => {
+    s += `<text x="${MARGIN}" y="${y.toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="500" font-size="${TITLE_SIZE}" fill="#111111">${escapeXML(line)}</text>`;
+    y += TITLE_LINE_GAP;
+  });
+  const titleBottom = y - TITLE_LINE_GAP + TITLE_SIZE*0.3;
+
+  const labelY = titleBottom + ARTISTS_LABEL_GAP;
+  s += `<text x="${MARGIN}" y="${labelY.toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="500" letter-spacing="0.06em" font-size="${ARTISTS_LABEL_SIZE}" fill="#6b6b6b">ARTISTAS</text>`;
+
+  const artists = [...loc.artistas].sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR', {sensitivity:'base'}));
+  const listTop = labelY + LIST_GAP - ROW_BASE_H*0.6;
+  const listBottom = CONTENT_BOTTOM - MARGIN;
+  const availH = Math.max(listBottom - listTop, ROW_MIN_H);
+  const rowH = artists.length ? Math.max(ROW_MIN_H, Math.min(ROW_BASE_H, availH / artists.length)) : ROW_BASE_H;
+  const nameSize = Math.min(24, rowH * 0.5);
+  const salaSize = nameSize * 0.62;
+  const rowRight = LEFT_COL_W - MARGIN;
+
+  artists.forEach((art, i) => {
+    const rowY = listTop + rowH * (i + 1) - rowH*0.32;
+    const lineY = listTop + rowH * (i + 1);
+    s += `<text x="${MARGIN}" y="${rowY.toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="400" font-size="${nameSize.toFixed(2)}" fill="#111111">${escapeXML(art.nome)}</text>`;
+    if (art.obs){
+      s += `<text x="${rowRight}" y="${rowY.toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="400" font-size="${salaSize.toFixed(2)}" fill="#6b6b6b" text-anchor="end">${escapeXML(art.obs)}</text>`;
+    }
+    if (i < artists.length - 1){
+      s += `<line x1="${MARGIN}" y1="${lineY.toFixed(2)}" x2="${rowRight}" y2="${lineY.toFixed(2)}" stroke="#d8d8d6" stroke-width="1"/>`;
+    }
+  });
+  return s;
+}
+
+/* ---- montagem completa da folha ---- */
+function buildSheetSVG(loc){
+  let s = `<rect x="0" y="0" width="${LOGICAL_W}" height="${LOGICAL_H}" fill="#ffffff"/>`;
+  s += buildMarqueeBarSVG(0, MARQUEE_H);
+  s += buildMarqueeBarSVG(LOGICAL_H - MARQUEE_H, MARQUEE_H);
+  s += buildLeftColumnSVG(loc);
+  s += buildCropSVG();
+
+  const infoX = LEFT_COL_W + RIGHT_PAD;
+  let infoY = CROP_BOX.y + CROP_BOX.h + 40;
+  s += `<text x="${infoX}" y="${infoY.toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="400" font-size="${INFO_TEXT_SIZE}" fill="#111111">Acesse o mapa</text>`;
+  infoY += INFO_TEXT_SIZE * 1.35;
+  s += `<text x="${infoX}" y="${infoY.toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="400" font-size="${INFO_TEXT_SIZE}" fill="#111111">${escapeXML(SITE_URL.replace('https://',''))}</text>`;
+  const qrY = infoY + 22;
+  s += buildQRSVG(SITE_URL, infoX, qrY, QR_SIZE);
+
+  return s;
+}
+
+/* ============================================================
+   estado / boot
+   ============================================================ */
+let LOCATIONS = [];
+let currentLoc = null;
+const svgEl = document.getElementById('art');
+const locSelect = document.getElementById('loc-select');
+const statusEl = document.getElementById('status');
+const btnNewArtwork = document.getElementById('btn-new-artwork');
+
+function setStatus(msg, isError){
+  statusEl.textContent = msg || '';
+  statusEl.classList.toggle('error', !!isError);
+}
+
+function draw(){
+  if (!currentLoc) return;
+  svgEl.innerHTML = buildSheetSVG(currentLoc);
+}
+
+function renderLocSelect(){
+  locSelect.innerHTML = '';
+  LOCATIONS.forEach((loc, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    const n = loc.artistas.length;
+    opt.textContent = `${loc.local || loc.endereco} (${n} artista${n === 1 ? '' : 's'})`;
+    locSelect.appendChild(opt);
+  });
+  if (LOCATIONS.length){ locSelect.value = 0; setLoc(0); }
+}
+function setLoc(idx){
+  currentLoc = LOCATIONS[idx];
+  generateCropArtwork();
+  draw();
+}
+locSelect.addEventListener('change', () => setLoc(parseInt(locSelect.value, 10)));
+btnNewArtwork.addEventListener('click', () => { generateCropArtwork(); draw(); });
+
+/* ============================================================
+   exportação (SVG estático rasterizado em alta resolução, mesmo
+   princípio do gerador-marca.html/gerador-mascara.html)
+   ============================================================ */
+function buildFullSVGString(scale){
+  const s = scale || 1;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LOGICAL_W} ${LOGICAL_H}" width="${LOGICAL_W*s}" height="${LOGICAL_H*s}">` +
+    `<defs><style>@import url('${FONT_IMPORT.replace(/&/g,'&amp;')}');</style></defs>` +
+    buildSheetSVG(currentLoc) +
+    `</svg>`;
+}
+function rasterizeSVG(scale){
+  return new Promise((resolve, reject) => {
+    const svgBlob = new Blob([buildFullSVGString(scale)], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = LOGICAL_W * scale; c.height = LOGICAL_H * scale;
+      const cctx = c.getContext('2d');
+      try{
+        cctx.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve(c);
+      } catch(err){ URL.revokeObjectURL(url); reject(err); }
+    };
+    img.onerror = (err) => { URL.revokeObjectURL(url); reject(err); };
+    img.src = url;
+  });
+}
+function fileSlug(){
+  return (currentLoc.local || currentLoc.endereco || 'espaco')
+    .toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+}
+document.getElementById('btn-download-png').addEventListener('click', async () => {
+  setStatus('gerando PNG em alta resolução…');
+  try{
+    const c = await rasterizeSVG(3);
+    c.toBlob(blob => {
+      if (!blob){ setStatus('Não foi possível gerar o PNG.', true); return; }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `circuito-impresso-${fileSlug()}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      setStatus('');
+    }, 'image/png');
+  } catch(err){ console.error(err); setStatus('Não foi possível gerar o PNG agora.', true); }
+});
+document.getElementById('btn-download-pdf').addEventListener('click', async () => {
+  setStatus('gerando PDF…');
+  try{
+    const c = await rasterizeSVG(3);
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'px', format: [LOGICAL_W, LOGICAL_H] });
+    doc.addImage(c.toDataURL('image/png'), 'PNG', 0, 0, LOGICAL_W, LOGICAL_H);
+    doc.save(`circuito-impresso-${fileSlug()}.pdf`);
+    setStatus('');
+  } catch(err){ console.error(err); setStatus('Não foi possível gerar o PDF agora.', true); }
+});
+
+async function boot(){
+  try{
+    // precisa carregar a fonte de verdade ANTES de qualquer medição de
+    // largura (marquee, título) — senão measureText usa uma fonte de
+    // fallback do sistema, mais estreita, e o texto real (já com a fonte
+    // certa) acaba maior do que o previsto, se sobrepondo
+    await Promise.all([
+      document.fonts.load(`350 32px 'Inter'`), // rótulo da faixa de marquee
+      document.fonts.load(`400 20px 'Inter'`), // nomes de artista, "acesse o mapa"
+      document.fonts.load(`500 20px 'Inter'`), // rótulo "ARTISTAS"
+      document.fonts.load(`500 ${TITLE_SIZE}px 'Inter'`), // título do espaço
+      document.fonts.load(`40px 'Instrument Serif'`), // "Ateliês abertos" da faixa de marquee
+      document.fonts.load(`italic 40px 'Instrument Serif'`) // data da faixa de marquee
+    ]);
+  } catch(e){}
+  try{
+    LOCATIONS = await loadLocationsFromSheet();
+  } catch(err){
+    console.error('Falha ao carregar a planilha:', err);
+    locSelect.innerHTML = '<option>falha ao carregar</option>';
+    setStatus('Não foi possível carregar os dados da planilha agora.', true);
+    return;
+  }
+  renderLocSelect();
+}
+boot();
+</script>
+</body>
+</html>
