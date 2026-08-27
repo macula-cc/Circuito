@@ -270,6 +270,20 @@ function parseCoord(raw, min, max){
   return (isNaN(n) || n < min || n > max) ? null : n;
 }
 
+// muitos artistas colam o link de "Compartilhar" do Google Drive (que abre
+// o visualizador em HTML, exige login, não é uma imagem de verdade) em vez
+// de uma URL de imagem direta. drive.google.com/thumbnail?id=... resolve a
+// imagem certa, mas faz isso via um redirect (302) que não carrega CORS no
+// próprio redirect — só no destino final — e isso é suficiente pra travar
+// o navegador quando a imagem entra num <canvas> (nosso caso: SVG vira PNG/
+// PDF). lh3.googleusercontent.com/d/{id}=w1000 é o destino final desse
+// redirect, chamado direto: uma única resposta, sem redirect, com CORS
+// liberado (testado e confirmado: canvas.toDataURL() funciona sem taint).
+function resolveDrivePhotoURL(url){
+  const m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  return m ? `https://lh3.googleusercontent.com/d/${m[1]}=w1000` : url;
+}
+
 async function loadLocationsFromSheet(){
   const res = await fetch(`${SHEET_CSV_URL}&_=${Date.now()}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -286,7 +300,7 @@ async function loadLocationsFromSheet(){
     const nome = get(row,'Nome do Artista');
     if (!endereco && !nome) return;
     const instagram = get(row,'Instagram').replace(/^@/, '');
-    const foto = get(row,'Foto do trabalho (URL)');
+    const foto = resolveDrivePhotoURL(get(row,'Foto do trabalho (URL)'));
     const latRaw = get(row,'Latitude');
     const lngRaw = get(row,'Longitude');
     const key = endereco;
@@ -738,7 +752,10 @@ function buildContentSVG(){
 
   const hasPhoto = currentArtist && currentArtist.foto && photoOk;
   if (hasPhoto){
-    s += `<image href="${currentArtist.foto}" x="${PHOTO_BOX.x}" y="${PHOTO_BOX.y}" width="${PHOTO_BOX.w}" height="${PHOTO_BOX.h}" preserveAspectRatio="xMidYMid slice"/>`;
+    // crossorigin="anonymous" é necessário pro canvas não ficar "tainted"
+    // depois (senão toDataURL/toBlob do PNG/PDF falha em silêncio ou lança
+    // SecurityError), mesmo com o servidor da foto liberando CORS
+    s += `<image href="${currentArtist.foto}" crossorigin="anonymous" x="${PHOTO_BOX.x}" y="${PHOTO_BOX.y}" width="${PHOTO_BOX.w}" height="${PHOTO_BOX.h}" preserveAspectRatio="xMidYMid slice"/>`;
   } else {
     s += `<rect x="${PHOTO_BOX.x}" y="${PHOTO_BOX.y}" width="${PHOTO_BOX.w}" height="${PHOTO_BOX.h}" fill="#000000"/>`;
     s += `<text x="${PHOTO_BOX.x+PHOTO_BOX.w/2}" y="${PHOTO_BOX.y+PHOTO_BOX.h/2}" font-family="${SANS_DISPLAY}" font-size="48" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${currentArtist ? initials(currentArtist.nome) : '—'}</text>`;
