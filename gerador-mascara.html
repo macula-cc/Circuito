@@ -90,8 +90,8 @@
     <div class="field">
       <label>Fundo</label>
       <div class="row-btns">
-        <button class="btn" id="bg-mapa" style="display:none;">mapa</button>
-        <button class="btn active" id="bg-branco">branco</button>
+        <button class="btn active" id="bg-mapa" style="display:none;">mapa</button>
+        <button class="btn" id="bg-branco">branco</button>
         <button class="btn" id="bg-cinza">cinza</button>
         <button class="btn" id="bg-preto">preto</button>
       </div>
@@ -581,7 +581,7 @@ let evtMarkPins = []; // pontos dos ateliês já no mesmo ajuste de escala da ma
 let numAddresses = 0;
 let numArtists = 0;
 let mode = 'artista'; // artista | evento
-let showMapEvt = false; // "mapa" não é o Fundo padrão (branco é) — ver bgBtns
+let showMapEvt = true; // "mapa" é o Fundo padrão — ver bgBtns
 const showPinsEvt = true; // sempre mostra os pontos dos ateliês, sem opção de esconder
 const showTextEvt = false; // marca do post do evento é sempre sem texto
 
@@ -630,14 +630,24 @@ function setMode(m){
   // do post do evento (o post do artista não desenha mais marca nenhuma)
   bgBtns.mapa.style.display = m === 'evento' ? 'inline-flex' : 'none';
   fillFieldEl.style.display = m === 'evento' ? 'block' : 'none';
+  syncBgButtonsActive();
   if (m === 'artista') draw(); else redrawEvent();
 }
 
 /* ---- cores/fundo (compartilhado) — "mapa" é só relevante no post do
    evento: mostra o mapa real em vez de uma cor chapada */
+// recalcula (sem estado incremental — sempre a partir de showMapEvt/
+// currentTheme/mode) qual botão deve aparecer marcado como ativo. "mapa"
+// não é uma opção visível no post do artista, então nesse modo o ativo
+// visual cai pro currentTheme mesmo (branco/cinza/preto) — sem perder o
+// showMapEvt=true de verdade, que volta a aparecer marcado ao voltar pro
+// post do evento
+function syncBgButtonsActive(){
+  const activeKey = (showMapEvt && mode === 'evento') ? 'mapa' : currentTheme;
+  Object.keys(bgBtns).forEach(k => bgBtns[k].classList.toggle('active', k === activeKey));
+}
 Object.keys(bgBtns).forEach(key => {
   bgBtns[key].addEventListener('click', () => {
-    Object.keys(bgBtns).forEach(k => bgBtns[k].classList.toggle('active', k === key));
     if (key === 'mapa'){
       showMapEvt = true;
       // texto/marca/pins precisam de contraste sobre o mapa (claro) — usa o
@@ -649,9 +659,11 @@ Object.keys(bgBtns).forEach(key => {
       currentTheme = key;
       canvasFrame.style.background = THEMES[key].bg;
     }
+    syncBgButtonsActive();
     if (mode === 'artista') draw(); else redrawEvent();
   });
 });
+syncBgButtonsActive();
 
 /* ============================================================
    post do artista
