@@ -684,20 +684,47 @@ artistSelect.addEventListener('change', () => setArtist(parseInt(artistSelect.va
 // arquivo) só pra medir largura de texto e encadear os pedaços lado a lado.
 function buildMarqueeBarSVG(y, h){
   const midY = (y + h/2 + h*0.06).toFixed(2); // pequeno ajuste: dominant-baseline="middle" tende a subir um pouco visualmente
-  const labelSize = h * 0.4;
-  const dateSize = labelSize * (2.2/1.75); // mesma proporção do .marquee-item/.marquee-date do site
   const labelTxt = EVENT_TITLE.toUpperCase();
   const eyebrowTxt = EVENT_EYEBROW + ' ';
+  const available = LOGICAL - MARGIN*2;
+
+  // mede os 3 pedaços numa dada escala (mesma fonte/peso/letter-spacing do
+  // .marquee-item/.marquee-date reais do site) — devolve as larguras e o
+  // gap entre o rótulo e a data, pra poder escalar tudo até caber no artboard
+  function measure(lblSize, dtSize){
+    ectx.letterSpacing = `${(lblSize*-0.025).toFixed(2)}px`; // .marquee-item: letter-spacing:-0.025em
+    ectx.font = `350 ${lblSize.toFixed(2)}px ${SANS_DISPLAY}`; // .marquee-item: font-weight:350
+    const labelW = ectx.measureText(labelTxt).width;
+    ectx.letterSpacing = '0px';
+    ectx.font = `${dtSize.toFixed(2)}px 'Instrument Serif', Georgia, serif`;
+    const eyebrowW = ectx.measureText(eyebrowTxt).width;
+    ectx.font = `italic ${dtSize.toFixed(2)}px 'Instrument Serif', Georgia, serif`;
+    const dateW = ectx.measureText(EVENT_DATES).width;
+    const gap = lblSize;
+    return { labelW, eyebrowW, dateW, gap, total: labelW + gap + eyebrowW + dateW };
+  }
+
+  let labelSize = h * 0.4;
+  let dateSize = labelSize * (2.2/1.75); // mesma proporção do .marquee-item/.marquee-date do site
+  let m = measure(labelSize, dateSize);
+  if (m.total > available){
+    // conteúdo não cabe no artboard nesse tamanho — encolhe os dois
+    // proporcionalmente (mantendo a mesma relação de tamanho entre rótulo
+    // e data) até caber, com uma pequena folga de segurança
+    const scale = (available / m.total) * 0.98;
+    labelSize *= scale; dateSize *= scale;
+    m = measure(labelSize, dateSize);
+  }
+
   let s = `<rect x="0" y="${y.toFixed(2)}" width="${LOGICAL}" height="${h.toFixed(2)}" fill="#d8d8d6"/>`;
   let x = MARGIN;
+  const labelLS = (labelSize*-0.025).toFixed(2);
 
-  s += `<text x="${x.toFixed(2)}" y="${midY}" font-family="${SANS_DISPLAY}" font-weight="600" font-size="${labelSize.toFixed(2)}" fill="#111111" dominant-baseline="middle">${escapeXML(labelTxt)}</text>`;
-  ectx.font = `600 ${labelSize.toFixed(2)}px ${SANS_DISPLAY}`;
-  x += ectx.measureText(labelTxt).width + labelSize;
+  s += `<text x="${x.toFixed(2)}" y="${midY}" font-family="${SANS_DISPLAY}" font-weight="350" letter-spacing="${labelLS}" font-size="${labelSize.toFixed(2)}" fill="#111111" dominant-baseline="middle">${escapeXML(labelTxt)}</text>`;
+  x += m.labelW + m.gap;
 
   s += `<text x="${x.toFixed(2)}" y="${midY}" font-family="'Instrument Serif', Georgia, serif" font-size="${dateSize.toFixed(2)}" fill="#111111" dominant-baseline="middle">${escapeXML(eyebrowTxt)}</text>`;
-  ectx.font = `${dateSize.toFixed(2)}px 'Instrument Serif', Georgia, serif`;
-  x += ectx.measureText(eyebrowTxt).width;
+  x += m.eyebrowW;
 
   s += `<text x="${x.toFixed(2)}" y="${midY}" font-family="'Instrument Serif', Georgia, serif" font-style="italic" font-size="${dateSize.toFixed(2)}" fill="#111111" dominant-baseline="middle">${escapeXML(EVENT_DATES)}</text>`;
 
