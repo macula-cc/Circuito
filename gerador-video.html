@@ -104,32 +104,9 @@
     <hr class="divider">
 
     <div class="field">
-      <label>Mapa</label>
-      <div class="row-btns">
-        <button class="btn active" id="map-on">mostrar mapa</button>
-        <button class="btn" id="map-off">esconder mapa</button>
-      </div>
-    </div>
-
-    <div class="field">
-      <label>Pontos dos ateliês</label>
-      <div class="row-btns">
-        <button class="btn active" id="pins-on">mostrar</button>
-        <button class="btn" id="pins-off">esconder</button>
-      </div>
-    </div>
-
-    <div class="field">
-      <label>Marca</label>
-      <div class="row-btns">
-        <button class="btn active" id="text-off">sem texto</button>
-        <button class="btn" id="text-on">com texto</button>
-      </div>
-    </div>
-
-    <div class="field">
       <label>Fundo</label>
       <div class="row-btns">
+        <button class="btn" id="bg-mapa">mapa</button>
         <button class="btn active" id="bg-branco">branco</button>
         <button class="btn" id="bg-cinza">cinza</button>
         <button class="btn" id="bg-preto">preto</button>
@@ -585,9 +562,9 @@ let PTS_TOUR = []; // mesmos pontos, reenquadrados com o fillFraction do "troca 
 let alphaNum = {};
 let numAddresses = 0;
 let numArtists = 0;
-let showMap = true;
-let showPins = true;
-let showText = false;
+let showMap = false; // "mapa" não é o Fundo padrão (branco é) — ver bgBtns
+const showPins = true; // sempre mostra os pontos dos ateliês, sem opção de esconder
+const showText = false; // marca é sempre sem texto
 let videoTipo = 'circuito'; // marcas | circuito
 let videoFormat = 'quadrado'; // quadrado | stories
 
@@ -638,28 +615,30 @@ function setStatus(msg, isError){
   statusEl.classList.toggle('error', !!isError);
 }
 
-/* ---- toggles compartilhados ---- */
-function wireToggle(onId, offId, setter, extra){
-  const onBtn = document.getElementById(onId), offBtn = document.getElementById(offId);
-  onBtn.addEventListener('click', () => { setter(true); onBtn.classList.add('active'); offBtn.classList.remove('active'); if (extra) extra(true); redrawNow(); });
-  offBtn.addEventListener('click', () => { setter(false); offBtn.classList.add('active'); onBtn.classList.remove('active'); if (extra) extra(false); redrawNow(); });
-}
-wireToggle('pins-on','pins-off', v => showPins = v);
-wireToggle('text-on','text-off', v => showText = v);
-// o mapa (mlMap) já é carregado eagerly em setupFromLocations() — esse
-// toggle só controla se drawBaseLayer desenha o basemapCanvas ou não
-wireToggle('map-on','map-off', v => showMap = v);
+// mapa (mostrar/esconder) virou uma das opções do Fundo (ver bgBtns);
+// "com/sem texto" e "mostrar/esconder pontos" não são mais escolhas do
+// usuário — sempre sem texto, sempre com os pontos visíveis (ver
+// showText/showPins, const's lá em cima)
 
 const fillSolidoBtn = document.getElementById('fill-solido');
 const fillDegradeBtn = document.getElementById('fill-degrade');
 fillSolidoBtn.addEventListener('click', () => { markFill='solido'; fillSolidoBtn.classList.add('active'); fillDegradeBtn.classList.remove('active'); redrawNow(); });
 fillDegradeBtn.addEventListener('click', () => { markFill='degrade'; fillDegradeBtn.classList.add('active'); fillSolidoBtn.classList.remove('active'); redrawNow(); });
 
-const bgBtns = { branco: document.getElementById('bg-branco'), cinza: document.getElementById('bg-cinza'), preto: document.getElementById('bg-preto') };
+/* ---- fundo — "mapa" mostra o mapa real em vez de uma cor chapada ---- */
+const bgBtns = { mapa: document.getElementById('bg-mapa'), branco: document.getElementById('bg-branco'), cinza: document.getElementById('bg-cinza'), preto: document.getElementById('bg-preto') };
 Object.keys(bgBtns).forEach(key => {
   bgBtns[key].addEventListener('click', () => {
-    currentTheme = key;
     Object.keys(bgBtns).forEach(k => bgBtns[k].classList.toggle('active', k === key));
+    if (key === 'mapa'){
+      showMap = true;
+      // texto/marca/pins precisam de contraste sobre o mapa (claro) — usa o
+      // mesmo tom de tinta escura do tema branco
+      currentTheme = 'branco';
+    } else {
+      showMap = false;
+      currentTheme = key;
+    }
     redrawNow();
   });
 });
@@ -688,9 +667,6 @@ function drawStatsLayer(ctx2d){
   const theme = THEMES[currentTheme];
   ctx2d.textAlign = 'center';
   ctx2d.fillStyle = theme.ink;
-  ctx2d.font = `${STATS_SIZE}px 'Instrument Serif', Georgia, serif`;
-  ctx2d.fillText(`${numAddresses} Endereços – ${numArtists} Artistas`, LOGICAL_W/2, EVT_STATS_Y);
-
   ctx2d.font = `${LABEL_WEIGHT} ${LABEL_SIZE}px ${SANS_DISPLAY}`;
   ctx2d.fillText(LABEL_L, LOGICAL_W/2, EVT_LABEL_Y);
   ctx2d.textAlign = 'left';
@@ -700,7 +676,6 @@ function drawStatsLayer(ctx2d){
 // do CSS (inset:2px + blur:2px numa base de 24px de diâmetro/12px de raio),
 // escalada pro raio de cada pino aqui (r=15)
 function drawPinsLayer(ctx2d, pins){
-  if (!showPins) return;
   const theme = THEMES[currentTheme];
   const r = 15, coreR = r * (10/12), blurPx = r * (2/12);
   (pins || PTS).forEach((p) => {
