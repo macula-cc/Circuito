@@ -94,14 +94,7 @@
 
       <div class="field">
         <label>Foto</label>
-        <div class="note">foto do artista, sempre em retângulo</div>
-      </div>
-
-      <div class="field">
-        <label>Marca (abaixo da foto)</label>
-        <div class="row-btns">
-          <button class="btn" id="btn-new-mark" style="flex:1;">gerar nova marca</button>
-        </div>
+        <div class="note">foto do artista, sempre em retângulo, sangrando até a borda</div>
       </div>
     </div>
 
@@ -192,17 +185,18 @@ const SANS_DISPLAY = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Ro
 const EVENT_TITLE = 'Circuito de Ateliês do Centro';
 const EVENT_EYEBROW = 'Ateliês abertos';
 const EVENT_DATES = '18 – 19 de Setembro';
-const EVENT_EYEBROW_DATE = `${EVENT_EYEBROW}: ${EVENT_DATES}`; // post do artista (subtítulo abaixo da marca)
 
-// layout — post do artista
-const MARGIN = 60;
-const NAME_Y = 110;
-const ADDR_Y = 162;
-const MARK_BOX = { x: MARGIN, y: LOGICAL - MARGIN - 120, w: 120, h: 120 };
-const PHOTO_BOX = { x: MARGIN, y: ADDR_Y + 50, w: LOGICAL - MARGIN*2, h: MARK_BOX.y - 50 - (ADDR_Y + 50) };
-const NAME_SIZE = 64;
-const ADDR_SIZE = 24;
-const TITLE_SIZE = 36;
+// layout — post do artista: uma faixa de marquee em cima e outra embaixo
+// (sempre no mesmo cinza/preto, independente do tema de fundo escolhido —
+// mesmo princípio do .event-marquee/.map-dim do site), foto em sangria
+// total no meio, nome + endereço em Inter logo abaixo da foto
+const MARQUEE_BAR_H = 80;
+const MARGIN = 44;
+const PHOTO_BOX = { x: 0, y: MARQUEE_BAR_H, w: LOGICAL, h: 620 };
+const NAME_SIZE = 76;
+const ADDR_SIZE = 27;
+const NAME_Y = PHOTO_BOX.y + PHOTO_BOX.h + 92;
+const ADDR_Y = NAME_Y + 48;
 
 // layout — post do evento: título grande é o par tagline/data (serifado,
 // 2ª linha em itálico); o nome do evento vira o label pequeno em caixa
@@ -317,35 +311,11 @@ function initials(name){
   return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
 }
 
-/* ============================================================
-   geometria genérica (sem mapa) — usada no post do artista pra
-   posicionar os pontos da marca pequena
-   ============================================================ */
-function project(lat, lon){
-  const x = (lon + 180) / 360;
-  const rad = lat * Math.PI/180;
-  const y = (1 - Math.log(Math.tan(rad) + 1/Math.cos(rad)) / Math.PI) / 2;
-  return { x, y };
-}
 function expandBounds(b, factor){
   const cLat = (b.minLat+b.maxLat)/2, cLng = (b.minLng+b.maxLng)/2;
   const spanLat = Math.max((b.maxLat-b.minLat)*factor, 0.002);
   const spanLng = Math.max((b.maxLng-b.minLng)*factor, 0.002);
   return { minLat:cLat-spanLat/2, maxLat:cLat+spanLat/2, minLng:cLng-spanLng/2, maxLng:cLng+spanLng/2 };
-}
-let proj = null;
-function computeProjection(bounds, W, H, padFactor){
-  const expanded = expandBounds(bounds, padFactor);
-  const p1 = project(expanded.maxLat, expanded.minLng);
-  const p2 = project(expanded.minLat, expanded.maxLng);
-  const worldW = p2.x - p1.x, worldH = p2.y - p1.y;
-  const scale = Math.min(W/worldW, H/worldH);
-  const offsetX = (W - worldW*scale)/2, offsetY = (H - worldH*scale)/2;
-  return { p1, scale, offsetX, offsetY };
-}
-function pixelOf(lat, lon){
-  const p = project(lat, lon);
-  return { x: proj.offsetX + (p.x - proj.p1.x)*proj.scale, y: proj.offsetY + (p.y - proj.p1.y)*proj.scale };
 }
 function computeFitTransform(points, box, fillFraction){
   const xs = points.map(p=>p.x), ys = points.map(p=>p.y);
@@ -360,10 +330,6 @@ function computeFitTransform(points, box, fillFraction){
 function applyFitTransform(points, t){
   return points.map(p => ({ ...p, x: t.boxCx + (p.x-t.cx)*t.scale, y: t.boxCy + (p.y-t.cy)*t.scale }));
 }
-function fitPointsToBox(points, box, fillFraction){
-  return applyFitTransform(points, computeFitTransform(points, box, fillFraction));
-}
-
 /* ============================================================
    mapa real (MapLibre GL, mesmo estilo xerox do index.html) — usado no
    post do evento. Renderizado fora da tela num container escondido, e
@@ -612,14 +578,12 @@ let markFill = 'degrade'; // solido | degrade — independente do fundo
    estado geral
    ============================================================ */
 let LOCATIONS = [];
-let PTS = [];        // post do artista (geometria livre)
 let PTS_EVT = [];    // post do evento (geometria real, mesma do mapa)
 let alphaNumEvt = {};
 let FLAT_ARTISTS = [];
 let currentArtist = null;
 let photoOk = false;
 let loadedImg = null;
-let markPoints = [];   // marca do post do artista
 let evtMarkLegs = []; // marca (estática) do post do evento — pernas separadas
 let evtMarkPins = []; // pontos dos ateliês já no mesmo ajuste de escala da marca
 let numAddresses = 0;
@@ -713,50 +677,53 @@ function setArtist(idx){
 }
 artistSelect.addEventListener('change', () => setArtist(parseInt(artistSelect.value, 10)));
 
-function generateNewMark(){
-  const order = [...PTS].sort(() => Math.random()-0.5);
-  const closed = [...order, order[0]];
-  const pts = [ { x: closed[0].x, y: closed[0].y } ];
-  for (let i = 1; i < closed.length; i++){
-    buildLegPath(closed[i-1], closed[i]).slice(1).forEach(p => pts.push(p));
-  }
-  markPoints = fitPointsToBox(pts, MARK_BOX, 0.9);
-  draw();
-}
-document.getElementById('btn-new-mark').addEventListener('click', generateNewMark);
+// faixa de marquee (mesmo texto/hierarquia do .event-marquee do site: rótulo
+// sans maiúsculo + "Ateliês abertos" serifado com a data em itálico) — cor
+// fixa (cinza claro + tinta preta), igual em cima/embaixo, independente do
+// tema de fundo escolhido. Usa `ectx` (canvas escondido já existente no
+// arquivo) só pra medir largura de texto e encadear os pedaços lado a lado.
+function buildMarqueeBarSVG(y, h){
+  const midY = (y + h/2 + h*0.06).toFixed(2); // pequeno ajuste: dominant-baseline="middle" tende a subir um pouco visualmente
+  const labelSize = h * 0.4;
+  const dateSize = labelSize * (2.2/1.75); // mesma proporção do .marquee-item/.marquee-date do site
+  const labelTxt = EVENT_TITLE.toUpperCase();
+  const eyebrowTxt = EVENT_EYEBROW + ' ';
+  let s = `<rect x="0" y="${y.toFixed(2)}" width="${LOGICAL}" height="${h.toFixed(2)}" fill="#d8d8d6"/>`;
+  let x = MARGIN;
 
-function buildOpenPathD(points){
-  if (points.length < 2) return '';
-  let d = 'M' + points[0].x.toFixed(2) + ' ' + points[0].y.toFixed(2) + ' ';
-  for (let i = 1; i < points.length; i++) d += 'L' + points[i].x.toFixed(2) + ' ' + points[i].y.toFixed(2) + ' ';
-  return d;
-}
+  s += `<text x="${x.toFixed(2)}" y="${midY}" font-family="${SANS_DISPLAY}" font-weight="600" font-size="${labelSize.toFixed(2)}" fill="#111111" dominant-baseline="middle">${escapeXML(labelTxt)}</text>`;
+  ectx.font = `600 ${labelSize.toFixed(2)}px ${SANS_DISPLAY}`;
+  x += ectx.measureText(labelTxt).width + labelSize;
 
+  s += `<text x="${x.toFixed(2)}" y="${midY}" font-family="'Instrument Serif', Georgia, serif" font-size="${dateSize.toFixed(2)}" fill="#111111" dominant-baseline="middle">${escapeXML(eyebrowTxt)}</text>`;
+  ectx.font = `${dateSize.toFixed(2)}px 'Instrument Serif', Georgia, serif`;
+  x += ectx.measureText(eyebrowTxt).width;
+
+  s += `<text x="${x.toFixed(2)}" y="${midY}" font-family="'Instrument Serif', Georgia, serif" font-style="italic" font-size="${dateSize.toFixed(2)}" fill="#111111" dominant-baseline="middle">${escapeXML(EVENT_DATES)}</text>`;
+
+  return s;
+}
 function buildContentSVG(){
   const theme = THEMES[currentTheme];
   let s = '';
   s += `<rect x="0" y="0" width="${LOGICAL}" height="${LOGICAL}" fill="${theme.bg}"/>`;
 
-  s += `<text x="${MARGIN}" y="${NAME_Y}" font-family="'Instrument Serif', Georgia, serif" font-size="${NAME_SIZE}" fill="${theme.ink}">${escapeXML(currentArtist ? currentArtist.nome : '—')}</text>`;
-  const addrLine = currentArtist
-    ? (currentArtist.loc.local ? `${currentArtist.loc.local} — ${currentArtist.loc.endereco}` : currentArtist.loc.endereco)
-    : '—';
-  s += `<text x="${MARGIN}" y="${ADDR_Y}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="${ADDR_SIZE}" fill="${theme.sub}">${escapeXML(addrLine)}</text>`;
-
   const hasPhoto = currentArtist && currentArtist.foto && photoOk;
   if (hasPhoto){
     s += `<image href="${currentArtist.foto}" x="${PHOTO_BOX.x}" y="${PHOTO_BOX.y}" width="${PHOTO_BOX.w}" height="${PHOTO_BOX.h}" preserveAspectRatio="xMidYMid slice"/>`;
   } else {
-    s += `<rect x="${PHOTO_BOX.x}" y="${PHOTO_BOX.y}" width="${PHOTO_BOX.w}" height="${PHOTO_BOX.h}" fill="${currentTheme==='preto' ? '#2a2a2a' : '#e4e4e4'}"/>`;
-    s += `<text x="${PHOTO_BOX.x+PHOTO_BOX.w/2}" y="${PHOTO_BOX.y+PHOTO_BOX.h/2}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="48" fill="${theme.sub}" text-anchor="middle" dominant-baseline="middle">${currentArtist ? initials(currentArtist.nome) : '—'}</text>`;
+    s += `<rect x="${PHOTO_BOX.x}" y="${PHOTO_BOX.y}" width="${PHOTO_BOX.w}" height="${PHOTO_BOX.h}" fill="#000000"/>`;
+    s += `<text x="${PHOTO_BOX.x+PHOTO_BOX.w/2}" y="${PHOTO_BOX.y+PHOTO_BOX.h/2}" font-family="${SANS_DISPLAY}" font-size="48" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${currentArtist ? initials(currentArtist.nome) : '—'}</text>`;
   }
 
-  if (markPoints.length >= 2){
-    s += `<path d="${buildOpenPathD(markPoints)}" fill="none" stroke="${theme.mark}" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>`;
-  }
-  const textX = MARK_BOX.x + MARK_BOX.w + 26;
-  s += `<text x="${textX}" y="${MARK_BOX.y+52}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE}" fill="${theme.ink}">${escapeXML(EVENT_TITLE)}</text>`;
-  s += `<text x="${textX}" y="${MARK_BOX.y+98}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE}" fill="${theme.sub}">${escapeXML(EVENT_EYEBROW_DATE)}</text>`;
+  s += buildMarqueeBarSVG(0, MARQUEE_BAR_H);
+  s += buildMarqueeBarSVG(LOGICAL - MARQUEE_BAR_H, MARQUEE_BAR_H);
+
+  s += `<text x="${MARGIN}" y="${NAME_Y}" font-family="${SANS_DISPLAY}" font-weight="500" font-size="${NAME_SIZE}" fill="${theme.ink}">${escapeXML(currentArtist ? currentArtist.nome : '—')}</text>`;
+  const addrLine = currentArtist
+    ? (currentArtist.loc.local ? `${currentArtist.loc.local} — ${currentArtist.loc.endereco}` : currentArtist.loc.endereco)
+    : '—';
+  s += `<text x="${MARGIN}" y="${ADDR_Y}" font-family="${SANS_DISPLAY}" font-weight="400" font-size="${ADDR_SIZE}" fill="${theme.ink}">${escapeXML(addrLine)}</text>`;
 
   return s;
 }
@@ -1110,11 +1077,6 @@ async function setupFromLocations(){
     maxLng: Math.max(...withCoords.map(l=>l.lng)),
   };
 
-  // post do artista — geometria abstrata (sem mapa real), fica de fora
-  // da migração pro MapLibre
-  proj = computeProjection(bounds, LOGICAL, LOGICAL, 1.0);
-  PTS = withCoords.map(loc => pixelOf(loc.lat, loc.lng));
-
   // post do evento — sempre carrega o mapa (mesmo com "esconder mapa"
   // ativo): pixelOfEvt() depende da instância viva do MapLibre pra
   // projetar os pontos, então precisamos dela de qualquer jeito; o botão
@@ -1133,15 +1095,16 @@ async function setupFromLocations(){
   alphaNumEvt = {};
   sortedForNum.forEach((loc,i) => { alphaNumEvt[loc.id] = i+1; });
 
-  generateNewMark();
   generateNewEventMark();
 }
 
 async function boot(){
   try{
     await Promise.all([
-      document.fonts.load(`${NAME_SIZE}px 'Instrument Serif'`),
-      document.fonts.load(`${TITLE_SIZE}px 'Instrument Serif'`),
+      document.fonts.load(`500 ${NAME_SIZE}px 'Inter'`),
+      document.fonts.load(`400 ${ADDR_SIZE}px 'Inter'`),
+      document.fonts.load(`600 32px 'Inter'`), // rótulo da faixa de marquee
+      document.fonts.load(`italic 40px 'Instrument Serif'`), // data da faixa de marquee
       document.fonts.load(`${EVT_TITLE_SIZE}px 'Instrument Serif'`),
       document.fonts.load(`italic ${EVT_TITLE_SIZE}px 'Instrument Serif'`),
       document.fonts.load(`${EVT_STATS_SIZE}px 'Instrument Serif'`),
