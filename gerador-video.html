@@ -126,8 +126,7 @@
     <div class="field">
       <label>Prévia / exportação</label>
       <div class="row-btns">
-        <button class="btn" id="btn-restart">reiniciar prévia</button>
-        <button class="btn primary" id="btn-gerar-video">gerar vídeo</button>
+        <button class="btn primary" id="btn-gerar-video">gerar e salvar vídeo</button>
       </div>
       <div class="status" id="status"></div>
     </div>
@@ -607,7 +606,6 @@ window.addEventListener('resize', resizeCanvasFrame);
 const statusEl = document.getElementById('status');
 const recDot = document.getElementById('rec-dot');
 const btnGerarVideo = document.getElementById('btn-gerar-video');
-const btnRestart = document.getElementById('btn-restart');
 const tipoNote = document.getElementById('tipo-note');
 
 function setStatus(msg, isError){
@@ -1021,8 +1019,6 @@ document.getElementById('tipo-row').addEventListener('click', (e) => {
   if (!btn) return;
   setVideoTipo(btn.dataset.tipo);
 });
-btnRestart.addEventListener('click', () => startPreview());
-
 const formatoQuadradoBtn = document.getElementById('formato-quadrado');
 const formatoStoriesBtn = document.getElementById('formato-stories');
 document.getElementById('formato-row').addEventListener('click', async (e) => {
