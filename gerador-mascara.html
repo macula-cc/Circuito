@@ -708,9 +708,10 @@ function buildMarqueeBarSVG(y, h){
   let dateSize = labelSize * (2.2/1.75); // mesma proporção do .marquee-item/.marquee-date do site
   let m = measure(labelSize, dateSize);
   // sempre escala pra usar a largura disponível inteira (cresce ou encolhe,
-  // mantendo a proporção entre rótulo e data), sem deixar o texto passar da
-  // altura da própria faixa
-  let scale = (available / m.total) * 0.98;
+  // mantendo a proporção entre rótulo e data), terminando exatamente na
+  // mesma margem usada do lado esquerdo (MARGIN) — sem deixar o texto
+  // passar da altura da própria faixa
+  let scale = available / m.total;
   const maxLabelSize = h * 0.7;
   if (labelSize * scale > maxLabelSize) scale = maxLabelSize / labelSize;
   labelSize *= scale; dateSize *= scale;
