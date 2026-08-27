@@ -110,9 +110,9 @@
     <div class="field">
       <label>Cores</label>
       <div class="row-btns">
-        <button class="btn active" id="theme-claro">fita preta · texto branco</button>
+        <button class="btn active" id="theme-degrade">degradê</button>
+        <button class="btn" id="theme-claro">fita preta · texto branco</button>
         <button class="btn" id="theme-escuro">fita branca · texto preto</button>
-        <button class="btn" id="theme-degrade">degradê</button>
       </div>
     </div>
 
@@ -128,8 +128,8 @@
       <div class="field">
         <label>Texto na linha</label>
         <div class="row-btns">
-          <button class="btn active" id="text-on">com texto</button>
-          <button class="btn" id="text-off">sem texto</button>
+          <button class="btn active" id="text-off">sem texto</button>
+          <button class="btn" id="text-on">com texto</button>
         </div>
       </div>
     </div>
@@ -540,7 +540,7 @@ const THEMES = {
   escuro:{ bg:'#111111', pin:'#ffffff', pinText:'#111111', ribbon:'#ffffff', text:'rgba(17,17,17,0.95)' },
   degrade:{ bg:'#ffffff', pin:'#111111', pinText:'#ffffff', ribbon:'#111111', text:'rgba(120,120,120,0.95)' }
 };
-let currentTheme = 'claro';
+let currentTheme = 'degrade';
 
 // degradê: cada trecho (perna) ganha um gradiente linear preto→branco,
 // orientado do começo ao fim daquele trecho específico
@@ -570,7 +570,7 @@ const themeDegradeBtn = document.getElementById('theme-degrade');
 
 let selectedOrder = []; // sempre contém TODOS os pontos com coordenada, em ordem embaralhada
 let showPins = true;
-let showText = true;
+let showText = false;
 let modeMarca = 'simbolo'; // simbolo | completa
 let orientMarca = 'horizontal'; // vertical | horizontal
 let completeMarkLegs = [];
