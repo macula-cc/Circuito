@@ -700,21 +700,21 @@ function buildMarqueeBarSVG(y, h){
     const eyebrowW = ectx.measureText(eyebrowTxt).width;
     ectx.font = `italic ${dtSize.toFixed(2)}px 'Instrument Serif', Georgia, serif`;
     const dateW = ectx.measureText(EVENT_DATES).width;
-    const gap = lblSize;
+    const gap = lblSize * 0.35; // aproxima os dois blocos (rótulo e data)
     return { labelW, eyebrowW, dateW, gap, total: labelW + gap + eyebrowW + dateW };
   }
 
   let labelSize = h * 0.4;
   let dateSize = labelSize * (2.2/1.75); // mesma proporção do .marquee-item/.marquee-date do site
   let m = measure(labelSize, dateSize);
-  if (m.total > available){
-    // conteúdo não cabe no artboard nesse tamanho — encolhe os dois
-    // proporcionalmente (mantendo a mesma relação de tamanho entre rótulo
-    // e data) até caber, com uma pequena folga de segurança
-    const scale = (available / m.total) * 0.98;
-    labelSize *= scale; dateSize *= scale;
-    m = measure(labelSize, dateSize);
-  }
+  // sempre escala pra usar a largura disponível inteira (cresce ou encolhe,
+  // mantendo a proporção entre rótulo e data), sem deixar o texto passar da
+  // altura da própria faixa
+  let scale = (available / m.total) * 0.98;
+  const maxLabelSize = h * 0.7;
+  if (labelSize * scale > maxLabelSize) scale = maxLabelSize / labelSize;
+  labelSize *= scale; dateSize *= scale;
+  m = measure(labelSize, dateSize);
 
   let s = `<rect x="0" y="${y.toFixed(2)}" width="${LOGICAL}" height="${h.toFixed(2)}" fill="#d8d8d6"/>`;
   let x = MARGIN;
