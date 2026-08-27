@@ -865,7 +865,7 @@ function startMarcasPreview(){
    ============================================================ */
 const LEG_DURATION = 0.32; // s — tempo de cada trecho ao desenhar (independe da distância real)
 const ERASE_DURATION = 3; // s — tempo do circuito INTEIRO ao apagar, num movimento só
-const CIRCUITO_RECORD_CYCLES = 5; // ao gravar vídeo, dura o equivalente a 5 circuitos completos (desenha+apaga)
+const CIRCUITO_RECORD_CYCLES = 3; // ao gravar vídeo, dura o equivalente a 3 circuitos completos (desenha+apaga)
 function easeOutSnap(t){ return t >= 1 ? 1 : 1 - Math.pow(2, -10*t); } // dispara rápido, desacelera forte no fim
 
 function buildTourLegs(){
@@ -1126,19 +1126,27 @@ async function geocodeAddress(query){
 }
 async function resolveMissingCoordinates(){
   const pending = LOCATIONS.filter(l => (l.lat == null || l.lng == null) && !/confirmar/i.test(l.endereco));
+  let resolvedAny = false;
   for (const loc of pending){
     const query = `${loc.endereco}, Centro, Rio de Janeiro, Brasil`;
     const coords = await geocodeAddress(query);
     if (coords){
       loc.lat = coords.lat;
       loc.lng = coords.lng;
-      await setupFromLocations();
+      resolvedAny = true;
     }
     await new Promise(r => setTimeout(r, 1100));
   }
+  // só atualiza os pontos do mapa UMA VEZ, depois de resolver todos os
+  // endereços pendentes — não a cada um. Refazer o basemap (MapLibre/WebGL)
+  // é pesado, e refazer isso a cada endereço travava a prévia/gravação em
+  // andamento por vários segundos repetidas vezes. startNow=false: não
+  // interrompe nada que já esteja rodando (ver comentário em
+  // setupFromLocations) — o ponto novo entra a partir do próximo ciclo.
+  if (resolvedAny) await setupFromLocations(false);
 }
 
-async function setupFromLocations(){
+async function setupFromLocations(startNow = true){
   const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
   if (withCoords.length < 3){
     setStatus('poucos ateliês com coordenadas preenchidas ainda — é preciso pelo menos 3 pra fechar um circuito.', true);
@@ -1174,7 +1182,14 @@ async function setupFromLocations(){
   alphaNum = {};
   sortedForNum.forEach((loc,i) => { alphaNum[loc.id] = i+1; });
 
-  setVideoTipo('circuito');
+  // startNow=false acontece quando um endereço termina de ser geocodificado
+  // em segundo plano (resolveMissingCoordinates) bem depois do carregamento
+  // inicial: só queremos que PTS/PTS_TOUR fiquem atualizados (o próximo
+  // ciclo da cobrinha já passa a incluir o ponto novo), sem reiniciar nada
+  // que já esteja rodando — senão uma prévia ou gravação em andamento é
+  // interrompida do nada (era a causa da cobrinha "sumir" no meio do
+  // circuito e do vídeo às vezes nunca terminar de gravar)
+  if (startNow) setVideoTipo('circuito');
 }
 
 async function boot(){
