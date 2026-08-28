@@ -1049,7 +1049,13 @@ btnGerarVideo.addEventListener('click', () => {
     stream = canvas.captureStream(30);
     const mimeCandidates = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
     const mimeType = mimeCandidates.find(m => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || '';
-    isMp4 = mimeType.indexOf('mp4') === 0;
+    // bug real: todo mimeType candidato começa com "video/", então
+    // `.indexOf('mp4') === 0` nunca era verdadeiro — isMp4 ficava sempre
+    // false, mesmo quando o navegador gravava mp4/h264 de verdade (visto e
+    // confirmado com ffprobe: bytes reais eram h264/mp4 válido, mas o Blob
+    // saía marcado como "video/webm", só o nome do arquivo é que dizia
+    // .mp4 — um Content-Type incoerente com o conteúdo real do arquivo)
+    isMp4 = mimeType.includes('mp4');
     // bitrate alto de propósito — sem isso o MediaRecorder escolhe uma taxa
     // baixa por padrão, que borra bastante o texto fino da fita no vídeo final
     const recOptions = { videoBitsPerSecond: 16000000 };
