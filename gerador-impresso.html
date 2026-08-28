@@ -114,7 +114,6 @@ const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXp
 const LOGICAL_W = 1000;
 const LOGICAL_H = 1414; // proporção A4 (1:1.414) — pensado pra imprimir
 const SITE_URL = 'https://circuitodeateliesdocentro.com.br';
-const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Instrument+Serif:ital@0;1&display=swap";
 const SANS_DISPLAY = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const SERIF = "'Instrument Serif', Georgia, serif";
 const EVENT_TITLE = 'Circuito de Ateliês do Centro';
@@ -287,11 +286,10 @@ function wrapTitleLines(text, fontSize, maxWidth, maxLines, fontFamily){
   return lines;
 }
 
-// mesma faixa de marquee do post estático (fundo cinza chapado, texto preto,
-// rótulo sans + "Ateliês abertos"/data serifados) — sempre igual em cima e
-// embaixo, sem depender de nenhum tema (essa folha não tem seletor de fundo)
-function buildMarqueeBarSVG(y, h){
-  const midY = (y + h/2 + h*0.06).toFixed(2);
+// calcula tamanhos/larguras dos 3 pedaços do marquee — única fonte de
+// verdade do cálculo, usada tanto pelo SVG (prévia) quanto pelo canvas
+// (exportação)
+function computeMarqueeLayout(h){
   const labelTxt = EVENT_TITLE.toUpperCase();
   const eyebrowTxt = EVENT_EYEBROW + ' ';
   const available = LOGICAL_W - MARGIN*2;
@@ -318,7 +316,20 @@ function buildMarqueeBarSVG(y, h){
   labelSize *= scale; dateSize *= scale;
   m = measure(labelSize, dateSize);
 
+  return { labelTxt, eyebrowTxt, labelSize, dateSize, m };
+}
+// mesma faixa de marquee do post estático (fundo cinza chapado, texto preto,
+// rótulo sans + "Ateliês abertos"/data serifados) — sempre igual em cima e
+// embaixo, sem depender de nenhum tema (essa folha não tem seletor de fundo).
+// prévia: SVG ao vivo, dentro do próprio documento — fontes da página
+// carregam normal, sem risco de blob isolado
+function buildMarqueeBarSVG(y, h, opts){
+  const skipText = opts && opts.skipText;
+  const midY = (y + h/2 + h*0.06).toFixed(2);
   let s = `<rect x="0" y="${y.toFixed(2)}" width="${LOGICAL_W}" height="${h.toFixed(2)}" fill="#d8d8d6"/>`;
+  if (skipText) return s; // exportação: texto desenhado depois, direto no canvas (ver drawMarqueeBarCanvas)
+
+  const { labelTxt, eyebrowTxt, labelSize, dateSize, m } = computeMarqueeLayout(h);
   let x = MARGIN;
   const labelLS = (labelSize*-0.025).toFixed(2);
   s += `<text x="${x.toFixed(2)}" y="${midY}" font-family="${SANS_DISPLAY}" font-weight="350" letter-spacing="${labelLS}" font-size="${labelSize.toFixed(2)}" fill="#111111" dominant-baseline="middle">${escapeXML(labelTxt)}</text>`;
@@ -327,6 +338,32 @@ function buildMarqueeBarSVG(y, h){
   x += m.eyebrowW;
   s += `<text x="${x.toFixed(2)}" y="${midY}" font-family="${SERIF}" font-style="italic" font-size="${dateSize.toFixed(2)}" fill="#111111" dominant-baseline="middle">${escapeXML(EVENT_DATES)}</text>`;
   return s;
+}
+// exportação: mesmo marquee, desenhado direto no canvas de destino (bitmap
+// de verdade) — um <text> num SVG carregado como blob/<img> depende do
+// navegador aceitar fonte custom nesse contexto isolado, o que se mostrou
+// pouco confiável no Safari mesmo com a fonte embutida (mesmo bug já visto
+// e corrigido assim no gerador-mascara.html)
+function drawMarqueeBarCanvas(cctx, y, h){
+  const midY = y + h/2 + h*0.06;
+  const { labelTxt, eyebrowTxt, labelSize, dateSize, m } = computeMarqueeLayout(h);
+  cctx.textBaseline = 'middle';
+  cctx.fillStyle = '#111111';
+  let x = MARGIN;
+
+  cctx.font = `350 ${labelSize.toFixed(2)}px ${SANS_DISPLAY}`;
+  try{ cctx.letterSpacing = `${(labelSize*-0.025).toFixed(2)}px`; }catch(e){}
+  cctx.fillText(labelTxt, x, midY);
+  try{ cctx.letterSpacing = '0px'; }catch(e){}
+  x += m.labelW + m.gap;
+
+  cctx.font = `${dateSize.toFixed(2)}px ${SERIF}`;
+  cctx.fillText(eyebrowTxt, x, midY);
+  x += m.eyebrowW;
+
+  cctx.font = `italic ${dateSize.toFixed(2)}px ${SERIF}`;
+  cctx.fillText(EVENT_DATES, x, midY);
+  cctx.textBaseline = 'alphabetic';
 }
 
 /* ---- grafismo (recorte de uma "cobrona" aleatória) ---- */
@@ -416,20 +453,19 @@ function buildQRSVG(text, x, y, size){
 }
 
 /* ---- coluna esquerda: título do espaço + lista de artistas ---- */
-function buildLeftColumnSVG(loc){
-  let s = '';
+// calcula toda a posição/tamanho (título quebrado em linhas, linhas da
+// lista de artistas) — única fonte de verdade, usada tanto pelo SVG
+// (prévia) quanto pelo canvas (exportação)
+function computeLeftColumnLayout(loc){
   const title = loc.local || loc.endereco;
   const maxW = LEFT_COL_W - MARGIN*2;
   const lines = wrapTitleLines(title, TITLE_SIZE, maxW, 2);
   let y = TITLE_TOP_Y;
-  lines.forEach(line => {
-    s += `<text x="${MARGIN}" y="${y.toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="500" font-size="${TITLE_SIZE}" fill="#111111">${escapeXML(line)}</text>`;
-    y += TITLE_LINE_GAP;
-  });
+  const titleLineYs = [];
+  lines.forEach(() => { titleLineYs.push(y); y += TITLE_LINE_GAP; });
   const titleBottom = y - TITLE_LINE_GAP + TITLE_SIZE*0.3;
 
   const labelY = titleBottom + ARTISTS_LABEL_GAP;
-  s += `<text x="${MARGIN}" y="${labelY.toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="500" letter-spacing="0.06em" font-size="${ARTISTS_LABEL_SIZE}" fill="#6b6b6b">ARTISTAS</text>`;
 
   const artists = [...loc.artistas].sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR', {sensitivity:'base'}));
   const listTop = labelY + LIST_GAP - ROW_BASE_H*0.6;
@@ -440,37 +476,108 @@ function buildLeftColumnSVG(loc){
   const salaSize = nameSize * 0.62;
   const rowRight = LEFT_COL_W - MARGIN;
 
-  artists.forEach((art, i) => {
-    const rowY = listTop + rowH * (i + 1) - rowH*0.32;
-    const lineY = listTop + rowH * (i + 1);
-    s += `<text x="${MARGIN}" y="${rowY.toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="400" font-size="${nameSize.toFixed(2)}" fill="#111111">${escapeXML(art.nome)}</text>`;
-    if (art.obs){
-      s += `<text x="${rowRight}" y="${rowY.toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="400" font-size="${salaSize.toFixed(2)}" fill="#6b6b6b" text-anchor="end">${escapeXML(art.obs)}</text>`;
+  const rows = artists.map((art, i) => ({
+    nome: art.nome, obs: art.obs,
+    rowY: listTop + rowH * (i + 1) - rowH*0.32,
+    lineY: listTop + rowH * (i + 1),
+    showLine: i < artists.length - 1
+  }));
+
+  return { lines, titleLineYs, labelY, rows, rowRight, nameSize, salaSize };
+}
+// prévia: SVG ao vivo — as separações (<line>) não têm fonte nenhuma
+// envolvida, então ficam sempre no SVG (seguras até na exportação); o
+// texto (título/rótulo/nomes/sala) só entra aqui fora do modo de exportação
+function buildLeftColumnSVG(loc, opts){
+  const forExport = opts && opts.forExport;
+  const layout = computeLeftColumnLayout(loc);
+  let s = '';
+  if (!forExport){
+    layout.lines.forEach((line, i) => {
+      s += `<text x="${MARGIN}" y="${layout.titleLineYs[i].toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="500" font-size="${TITLE_SIZE}" fill="#111111">${escapeXML(line)}</text>`;
+    });
+    s += `<text x="${MARGIN}" y="${layout.labelY.toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="500" letter-spacing="0.06em" font-size="${ARTISTS_LABEL_SIZE}" fill="#6b6b6b">ARTISTAS</text>`;
+  }
+  layout.rows.forEach(row => {
+    if (!forExport){
+      s += `<text x="${MARGIN}" y="${row.rowY.toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="400" font-size="${layout.nameSize.toFixed(2)}" fill="#111111">${escapeXML(row.nome)}</text>`;
+      if (row.obs){
+        s += `<text x="${layout.rowRight}" y="${row.rowY.toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="400" font-size="${layout.salaSize.toFixed(2)}" fill="#6b6b6b" text-anchor="end">${escapeXML(row.obs)}</text>`;
+      }
     }
-    if (i < artists.length - 1){
-      s += `<line x1="${MARGIN}" y1="${lineY.toFixed(2)}" x2="${rowRight}" y2="${lineY.toFixed(2)}" stroke="#d8d8d6" stroke-width="1"/>`;
+    if (row.showLine){
+      s += `<line x1="${MARGIN}" y1="${row.lineY.toFixed(2)}" x2="${layout.rowRight}" y2="${row.lineY.toFixed(2)}" stroke="#d8d8d6" stroke-width="1"/>`;
     }
   });
   return s;
 }
+// exportação: mesmo texto da coluna esquerda, desenhado direto no canvas
+function drawLeftColumnCanvas(cctx, loc){
+  const layout = computeLeftColumnLayout(loc);
+  cctx.textAlign = 'left';
+  cctx.fillStyle = '#111111';
+  layout.lines.forEach((line, i) => {
+    cctx.font = `500 ${TITLE_SIZE}px ${SANS_DISPLAY}`;
+    cctx.fillText(line, MARGIN, layout.titleLineYs[i]);
+  });
+  cctx.fillStyle = '#6b6b6b';
+  cctx.font = `500 ${ARTISTS_LABEL_SIZE}px ${SANS_DISPLAY}`;
+  try{ cctx.letterSpacing = `${(ARTISTS_LABEL_SIZE*0.06).toFixed(2)}px`; }catch(e){}
+  cctx.fillText('ARTISTAS', MARGIN, layout.labelY);
+  try{ cctx.letterSpacing = '0px'; }catch(e){}
+
+  layout.rows.forEach(row => {
+    cctx.fillStyle = '#111111';
+    cctx.font = `400 ${layout.nameSize.toFixed(2)}px ${SANS_DISPLAY}`;
+    cctx.fillText(row.nome, MARGIN, row.rowY);
+    if (row.obs){
+      cctx.fillStyle = '#6b6b6b';
+      cctx.font = `400 ${layout.salaSize.toFixed(2)}px ${SANS_DISPLAY}`;
+      cctx.textAlign = 'right';
+      cctx.fillText(row.obs, layout.rowRight, row.rowY);
+      cctx.textAlign = 'left';
+    }
+  });
+}
 
 /* ---- montagem completa da folha ---- */
-function buildSheetSVG(loc){
-  let s = `<rect x="0" y="0" width="${LOGICAL_W}" height="${LOGICAL_H}" fill="#ffffff"/>`;
-  s += buildMarqueeBarSVG(0, MARQUEE_H);
-  s += buildMarqueeBarSVG(LOGICAL_H - MARQUEE_H, MARQUEE_H);
-  s += buildLeftColumnSVG(loc);
-  s += buildCropSVG();
-
+// posição do bloco "Acesse o mapa" + URL + QR — única fonte de verdade,
+// usada pelo SVG (prévia/QR, que não depende de fonte nenhuma) e pelo
+// canvas (texto na exportação)
+function computeInfoLayout(){
   const infoX = LEFT_COL_W + RIGHT_PAD;
   let infoY = CROP_BOX.y + CROP_BOX.h + 40;
-  s += `<text x="${infoX}" y="${infoY.toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="400" font-size="${INFO_TEXT_SIZE}" fill="#111111">Acesse o mapa</text>`;
+  const line1Y = infoY;
   infoY += INFO_TEXT_SIZE * 1.35;
-  s += `<text x="${infoX}" y="${infoY.toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="400" font-size="${INFO_TEXT_SIZE}" fill="#111111">${escapeXML(SITE_URL.replace('https://',''))}</text>`;
+  const line2Y = infoY;
   const qrY = infoY + 22;
+  return { infoX, line1Y, line2Y, qrY };
+}
+function buildSheetSVG(loc, opts){
+  const forExport = opts && opts.forExport;
+  let s = `<rect x="0" y="0" width="${LOGICAL_W}" height="${LOGICAL_H}" fill="#ffffff"/>`;
+  s += buildMarqueeBarSVG(0, MARQUEE_H, { skipText: forExport });
+  s += buildMarqueeBarSVG(LOGICAL_H - MARQUEE_H, MARQUEE_H, { skipText: forExport });
+  s += buildLeftColumnSVG(loc, { forExport });
+  s += buildCropSVG();
+
+  const { infoX, line1Y, line2Y, qrY } = computeInfoLayout();
+  if (!forExport){
+    s += `<text x="${infoX}" y="${line1Y.toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="400" font-size="${INFO_TEXT_SIZE}" fill="#111111">Acesse o mapa</text>`;
+    s += `<text x="${infoX}" y="${line2Y.toFixed(2)}" font-family="${SANS_DISPLAY}" font-weight="400" font-size="${INFO_TEXT_SIZE}" fill="#111111">${escapeXML(SITE_URL.replace('https://',''))}</text>`;
+  }
   s += buildQRSVG(SITE_URL, infoX, qrY, QR_SIZE);
 
   return s;
+}
+// exportação: mesmo texto "Acesse o mapa" + URL, desenhado direto no canvas
+function drawInfoTextCanvas(cctx){
+  const { infoX, line1Y, line2Y } = computeInfoLayout();
+  cctx.textAlign = 'left';
+  cctx.fillStyle = '#111111';
+  cctx.font = `400 ${INFO_TEXT_SIZE}px ${SANS_DISPLAY}`;
+  cctx.fillText('Acesse o mapa', infoX, line1Y);
+  cctx.fillText(SITE_URL.replace('https://',''), infoX, line2Y);
 }
 
 /* ============================================================
@@ -516,12 +623,14 @@ btnNewArtwork.addEventListener('click', () => { generateCropArtwork(); draw(); }
    exportação (SVG estático rasterizado em alta resolução, mesmo
    princípio do gerador-marca.html/gerador-mascara.html)
    ============================================================ */
+// forExport:true não deixa nenhum <text> no SVG (ver buildSheetSVG) — sem
+// texto nenhum, não precisa de @import/@font-face aqui: todo o desenho de
+// fonte acontece depois, direto no canvas (ver rasterizeSVG)
 function buildFullSVGString(scale){
   const s = scale || 1;
   return `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LOGICAL_W} ${LOGICAL_H}" width="${LOGICAL_W*s}" height="${LOGICAL_H*s}">` +
-    `<defs><style>@import url('${FONT_IMPORT.replace(/&/g,'&amp;')}');</style></defs>` +
-    buildSheetSVG(currentLoc) +
+    buildSheetSVG(currentLoc, { forExport: true }) +
     `</svg>`;
 }
 function rasterizeSVG(scale){
@@ -536,6 +645,17 @@ function rasterizeSVG(scale){
       try{
         cctx.drawImage(img, 0, 0, c.width, c.height);
         URL.revokeObjectURL(url);
+
+        // todo o texto (marquees, título, lista de artistas, "acesse o
+        // mapa") é desenhado AQUI, bitmap de verdade, direto no canvas —
+        // não dentro do SVG. Ver comentário em drawMarqueeBarCanvas.
+        cctx.save();
+        cctx.scale(scale, scale);
+        drawMarqueeBarCanvas(cctx, 0, MARQUEE_H);
+        drawMarqueeBarCanvas(cctx, LOGICAL_H - MARQUEE_H, MARQUEE_H);
+        drawLeftColumnCanvas(cctx, currentLoc);
+        drawInfoTextCanvas(cctx);
+        cctx.restore();
         resolve(c);
       } catch(err){ URL.revokeObjectURL(url); reject(err); }
     };
