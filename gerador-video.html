@@ -616,6 +616,23 @@ function setStatus(msg, isError){
   statusEl.classList.toggle('error', !!isError);
 }
 
+// enquanto os últimos endereços ainda estão sendo geocodificados em segundo
+// plano (resolveMissingCoordinates), o botão de gravar fica desabilitado —
+// gerar o vídeo antes disso terminar significa arriscar publicar um
+// circuito que ainda não passa por todos os ateliês (o(s) ponto(s) que
+// faltava(m) resolver simplesmente não existiam ainda pro traçado)
+let coordsResolving = true;
+const AGUARDANDO_MSG = 'resolvendo os últimos endereços antes de liberar a gravação…';
+function updateGerarVideoAvailability(){
+  btnGerarVideo.disabled = coordsResolving;
+  if (coordsResolving){
+    setStatus(AGUARDANDO_MSG);
+  } else if (statusEl.textContent === AGUARDANDO_MSG){
+    setStatus('');
+  }
+}
+updateGerarVideoAvailability(); // desabilita o botão já de cara, antes do boot() terminar
+
 // mapa (mostrar/esconder) virou uma das opções do Fundo (ver bgBtns);
 // "com/sem texto" e "mostrar/esconder pontos" não são mais escolhas do
 // usuário — sempre sem texto, sempre com os pontos visíveis (ver
@@ -1043,6 +1060,12 @@ document.getElementById('formato-row').addEventListener('click', async (e) => {
    gravação (compartilhada pelos dois tipos)
    ============================================================ */
 btnGerarVideo.addEventListener('click', () => {
+  // segunda trava, além do botão desabilitado — se por algum motivo o
+  // clique passar mesmo assim, não deixa gravar com pontos faltando
+  if (coordsResolving){
+    setStatus(AGUARDANDO_MSG);
+    return;
+  }
   if (!('MediaRecorder' in window)){
     setStatus('Este navegador não suporta gravação de vídeo (tente no Chrome ou Firefox).', true);
     return;
@@ -1135,25 +1158,34 @@ async function geocodeAddress(query){
   return null;
 }
 async function resolveMissingCoordinates(){
-  const pending = LOCATIONS.filter(l => (l.lat == null || l.lng == null) && !/confirmar/i.test(l.endereco));
-  let resolvedAny = false;
-  for (const loc of pending){
-    const query = `${loc.endereco}, Centro, Rio de Janeiro, Brasil`;
-    const coords = await geocodeAddress(query);
-    if (coords){
-      loc.lat = coords.lat;
-      loc.lng = coords.lng;
-      resolvedAny = true;
+  try{
+    const pending = LOCATIONS.filter(l => (l.lat == null || l.lng == null) && !/confirmar/i.test(l.endereco));
+    let resolvedAny = false;
+    for (const loc of pending){
+      const query = `${loc.endereco}, Centro, Rio de Janeiro, Brasil`;
+      const coords = await geocodeAddress(query);
+      if (coords){
+        loc.lat = coords.lat;
+        loc.lng = coords.lng;
+        resolvedAny = true;
+      }
+      await new Promise(r => setTimeout(r, 1100));
     }
-    await new Promise(r => setTimeout(r, 1100));
+    // só atualiza os pontos do mapa UMA VEZ, depois de resolver todos os
+    // endereços pendentes — não a cada um. Refazer o basemap (MapLibre/WebGL)
+    // é pesado, e refazer isso a cada endereço travava a prévia/gravação em
+    // andamento por vários segundos repetidas vezes. startNow=false: não
+    // interrompe nada que já esteja rodando (ver comentário em
+    // setupFromLocations) — o ponto novo entra a partir do próximo ciclo.
+    if (resolvedAny) await setupFromLocations(false);
+  } finally {
+    // libera a gravação mesmo se algum endereço não resolveu de verdade
+    // (geocodeAddress já trata falha individual como null e segue em
+    // frente) — o que importa é que TODOS os pendentes já foram tentados
+    // pelo menos uma vez antes de qualquer vídeo poder ser gerado
+    coordsResolving = false;
+    updateGerarVideoAvailability();
   }
-  // só atualiza os pontos do mapa UMA VEZ, depois de resolver todos os
-  // endereços pendentes — não a cada um. Refazer o basemap (MapLibre/WebGL)
-  // é pesado, e refazer isso a cada endereço travava a prévia/gravação em
-  // andamento por vários segundos repetidas vezes. startNow=false: não
-  // interrompe nada que já esteja rodando (ver comentário em
-  // setupFromLocations) — o ponto novo entra a partir do próximo ciclo.
-  if (resolvedAny) await setupFromLocations(false);
 }
 
 async function setupFromLocations(startNow = true){
@@ -1226,6 +1258,7 @@ async function boot(){
   numArtists = LOCATIONS.reduce((sum, l) => sum + l.artistas.length, 0);
 
   await setupFromLocations();
+  updateGerarVideoAvailability(); // reafirma o aviso — setupFromLocations() pode ter limpado o status
   resolveMissingCoordinates();
 }
 boot();
