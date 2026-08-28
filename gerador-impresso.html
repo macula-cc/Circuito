@@ -378,8 +378,11 @@ function legGradientAttr(a, b){
 // um traçado só (visitando cada ateliê uma vez) fica esparso demais pra
 // preencher visualmente o recorte — passa pelos mesmos pontos várias vezes,
 // cada vez numa ordem embaralhada diferente; as camadas sobrepostas dão a
-// densidade "cheia" de uma cobrona de verdade
-const CROP_PASSES = 2;
+// densidade "cheia" de uma cobrona de verdade. Mais passes que o normal
+// (ver CROP_PASSES) porque a escala agora é proporcional (ver abaixo) — sem
+// o "esticado" de antes preenchendo sozinho, precisa de mais linha pra
+// manter a mesma densidade visual
+const CROP_PASSES = 5;
 function generateCropArtwork(){
   const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
   if (withCoords.length < 2) return;
@@ -395,22 +398,27 @@ function generateCropArtwork(){
       leg.forEach(p => allPts.push(p));
     }
   }
-  const virtualBox = { x:0, y:0, w: CROP_BOX.w*CROP_OVERSCAN, h: CROP_BOX.h*CROP_OVERSCAN };
-  // a nuvem real de pontos (geografia do Centro) é bem mais larga que alta —
-  // encaixar com escala ÚNICA (preservando proporção) numa caixa alta e
-  // estreita como essa deixa margens vazias em cima/embaixo. Como isso é só
-  // um grafismo decorativo (não precisa ser geograficamente fiel), estica X
-  // e Y independentemente pra preencher a "tela" virtual inteira
+  // escala ÚNICA (proporcional, sem distorcer nenhum ângulo — mesmo
+  // princípio da marca de verdade em gerador-marca.html/computeFitTransform)
+  // grande o bastante pra cobrir a caixa de recorte inteira em QUALQUER
+  // janela aleatória dentro dela (mesmo espírito "cover"/object-fit:cover,
+  // igual coverDrawParams usa pra foto). A versão anterior esticava X e Y
+  // *independentemente* pra preencher uma caixa bem mais alta que larga —
+  // isso forçava toda linha (não importa a ordem aleatória) a ficar quase
+  // vertical, fazendo os grafismos parecerem distorcidos e repetitivos
+  // entre si, bem diferente da variedade de ângulos da marca de verdade.
   const xs = allPts.map(p=>p.x), ys = allPts.map(p=>p.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
   const w = (maxX-minX) || 1, h = (maxY-minY) || 1;
-  const scaleX = virtualBox.w*0.95/w, scaleY = virtualBox.h*0.95/h;
+  const targetW = CROP_BOX.w * CROP_OVERSCAN, targetH = CROP_BOX.h * CROP_OVERSCAN;
+  const uniformScale = Math.max(targetW/w, targetH/h);
   const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
-  const boxCx = virtualBox.x + virtualBox.w/2, boxCy = virtualBox.y + virtualBox.h/2;
-  cropLegs = rawLegs.map(leg => leg.map(p => ({ x: boxCx + (p.x-cx)*scaleX, y: boxCy + (p.y-cy)*scaleY })));
-  cropOffsetX = Math.random() * (virtualBox.w - CROP_BOX.w);
-  cropOffsetY = Math.random() * (virtualBox.h - CROP_BOX.h);
+  const scaledW = w*uniformScale, scaledH = h*uniformScale;
+  const boxCx = scaledW/2, boxCy = scaledH/2;
+  cropLegs = rawLegs.map(leg => leg.map(p => ({ x: boxCx + (p.x-cx)*uniformScale, y: boxCy + (p.y-cy)*uniformScale })));
+  cropOffsetX = Math.random() * Math.max(0, scaledW - CROP_BOX.w);
+  cropOffsetY = Math.random() * Math.max(0, scaledH - CROP_BOX.h);
 }
 function buildCropSVG(){
   gradientDefs = []; gradientCounter = 0;
