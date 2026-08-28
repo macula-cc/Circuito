@@ -175,6 +175,13 @@ const NAME_SIZE = 76;
 const ADDR_SIZE = 27;
 const NAME_Y = PHOTO_BOX.y + PHOTO_BOX.h + 92;
 const ADDR_Y = NAME_Y + 48;
+// nome que não cabe numa linha só (ex: "Francisco 'Chiko' Guimarães") quebra
+// em até duas linhas, numa fonte um pouco menor — pra caber no mesmo espaço
+// vertical reservado entre a foto e a faixa de baixo sem encostar em nada
+const NAME_SIZE_WRAP = 54;
+const NAME_WRAP_GAP0 = 65;     // foto → baseline da 1ª linha
+const NAME_WRAP_LINE_GAP = 57; // 1ª linha → 2ª linha
+const NAME_WRAP_ADDR_GAP = 36; // última linha do nome → endereço
 
 // layout — post do evento: título grande é o par tagline/data (serifado,
 // 2ª linha em itálico); o nome do evento vira o label pequeno em caixa
@@ -777,19 +784,53 @@ function buildMarqueeBarSVG(y, h){
 
   return s;
 }
-function buildContentSVG(){
+// nome do artista: usa NAME_SIZE numa linha só sempre que couber (caso comum,
+// layout igual ao de sempre); quando não cabe, quebra em até duas linhas
+// numa fonte um pouco menor (NAME_SIZE_WRAP), reposicionando o endereço
+// logo abaixo da última linha
+function computeNameLayout(name){
+  const availableW = LOGICAL - MARGIN*2;
+  ectx.font = `500 ${NAME_SIZE}px ${SANS_DISPLAY}`;
+  if (ectx.measureText(name).width <= availableW){
+    return { size: NAME_SIZE, lines: [name], baseline0: NAME_Y, lineGap: 0, addrY: ADDR_Y };
+  }
+  const size = NAME_SIZE_WRAP;
+  ectx.font = `500 ${size}px ${SANS_DISPLAY}`;
+  const words = name.split(/\s+/).filter(Boolean);
+  let line1 = words[0] || name;
+  let i = 1;
+  for (; i < words.length; i++){
+    const test = line1 + ' ' + words[i];
+    if (ectx.measureText(test).width > availableW) break;
+    line1 = test;
+  }
+  const rest = words.slice(i).join(' ');
+  const lines = rest ? [line1, rest] : [line1];
+  const baseline0 = PHOTO_BOX.y + PHOTO_BOX.h + NAME_WRAP_GAP0;
+  const lastBaseline = baseline0 + (lines.length - 1) * NAME_WRAP_LINE_GAP;
+  return { size, lines, baseline0, lineGap: NAME_WRAP_LINE_GAP, addrY: lastBaseline + NAME_WRAP_ADDR_GAP };
+}
+function buildContentSVG(opts){
+  const skipPhotoImage = opts && opts.skipPhotoImage;
   const theme = THEMES[currentTheme];
   let s = '';
   s += `<rect x="0" y="0" width="${LOGICAL}" height="${LOGICAL}" fill="${theme.bg}"/>`;
 
   const hasPhoto = currentArtist && currentArtist.foto && photoOk;
-  if (hasPhoto){
-    // usa a cópia local (data URL) sempre que existir — nunca depende de
-    // rede de novo, nem na prévia nem na exportação (ver setArtist()).
-    // Se por algum motivo raro não deu pra embutir, cai pra URL externa
-    // com crossorigin="anonymous" (necessário pro canvas não ficar
-    // "tainted" — senão toDataURL/toBlob do PNG/PDF falha em silêncio ou
-    // lança SecurityError), igual ao comportamento de antes dessa foto.
+  if (hasPhoto && skipPhotoImage){
+    // exportação: NÃO desenha a foto aqui dentro do SVG — deixa só o fundo,
+    // e a foto de verdade é desenhada depois direto no canvas de destino
+    // (ver rasterizeSVG/coverDrawParams). É mais confiável: um <image>
+    // (mesmo com data URL) dentro de um SVG carregado como blob pode não
+    // esperar o recurso terminar de decodificar antes do onload da imagem
+    // externa disparar em alguns navegadores (visto no Safari do celular)
+    // — o canvas.drawImage() de uma <img> já carregada é sempre síncrono.
+    s += `<rect x="${PHOTO_BOX.x}" y="${PHOTO_BOX.y}" width="${PHOTO_BOX.w}" height="${PHOTO_BOX.h}" fill="${theme.bg}"/>`;
+  } else if (hasPhoto){
+    // prévia (SVG ao vivo, dentro do próprio documento — sem esse risco de
+    // blob isolado): usa a cópia local (data URL) sempre que existir, senão
+    // cai pra URL externa com crossorigin="anonymous" (necessário pro
+    // canvas não ficar "tainted" depois)
     const href = photoDataURL || currentArtist.foto;
     const corsAttr = photoDataURL ? '' : ' crossorigin="anonymous"';
     s += `<image href="${href}"${corsAttr} x="${PHOTO_BOX.x}" y="${PHOTO_BOX.y}" width="${PHOTO_BOX.w}" height="${PHOTO_BOX.h}" preserveAspectRatio="xMidYMid slice"/>`;
@@ -801,29 +842,85 @@ function buildContentSVG(){
   s += buildMarqueeBarSVG(0, MARQUEE_BAR_H);
   s += buildMarqueeBarSVG(LOGICAL - MARQUEE_BAR_H, MARQUEE_BAR_H);
 
-  s += `<text x="${MARGIN}" y="${NAME_Y}" font-family="${SANS_DISPLAY}" font-weight="500" font-size="${NAME_SIZE}" fill="${theme.ink}">${escapeXML(currentArtist ? currentArtist.nome : '—')}</text>`;
+  const nameLayout = computeNameLayout(currentArtist ? currentArtist.nome : '—');
+  nameLayout.lines.forEach((line, i) => {
+    const y = nameLayout.baseline0 + i * nameLayout.lineGap;
+    s += `<text x="${MARGIN}" y="${y}" font-family="${SANS_DISPLAY}" font-weight="500" font-size="${nameLayout.size}" fill="${theme.ink}">${escapeXML(line)}</text>`;
+  });
   const addrLine = currentArtist
     ? (currentArtist.loc.local ? `${currentArtist.loc.local} — ${currentArtist.loc.endereco}` : currentArtist.loc.endereco)
     : '—';
-  s += `<text x="${MARGIN}" y="${ADDR_Y}" font-family="${SANS_DISPLAY}" font-weight="400" font-size="${ADDR_SIZE}" fill="${theme.ink}">${escapeXML(addrLine)}</text>`;
+  s += `<text x="${MARGIN}" y="${nameLayout.addrY}" font-family="${SANS_DISPLAY}" font-weight="400" font-size="${ADDR_SIZE}" fill="${theme.ink}">${escapeXML(addrLine)}</text>`;
 
   return s;
 }
 function draw(){
   svgEl.innerHTML = buildContentSVG();
 }
-function buildFullSVGString(scale){
+// exportação: em vez de confiar num @import externo (rede, assíncrono, sem
+// garantia nenhuma de terminar antes do onload da imagem do SVG-blob — é
+// exatamente esse tipo de corrida que causava texto do marquee sobreposto/
+// bagunçado no download, visto no Safari do celular mas não reproduzível no
+// Chrome), busca os arquivos de fonte de verdade uma vez, embute como
+// data URL dentro do próprio <style> — fica 100% autocontido, sem nenhuma
+// dependência de rede no momento de rasterizar
+let embeddedFontsCSSPromise = null;
+async function buildEmbeddedFontsCSS(){
+  if (embeddedFontsCSSPromise) return embeddedFontsCSSPromise;
+  embeddedFontsCSSPromise = (async () => {
+    try{
+      const cssRes = await fetch(FONT_IMPORT);
+      if (!cssRes.ok) throw new Error('HTTP ' + cssRes.status);
+      let cssText = await cssRes.text();
+      const urls = [...new Set([...cssText.matchAll(/url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/g)].map(m => m[1]))];
+      for (const fontUrl of urls){
+        const fontRes = await fetch(fontUrl);
+        if (!fontRes.ok) throw new Error('HTTP ' + fontRes.status + ' na fonte');
+        const blob = await fontRes.blob();
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        cssText = cssText.split(fontUrl).join(dataUrl);
+      }
+      return cssText;
+    } catch(err){
+      console.warn('Não foi possível embutir as fontes pra exportação — caindo pro @import externo (menos confiável em alguns navegadores):', err);
+      return `@import url('${FONT_IMPORT.replace(/&/g,'&amp;')}');`;
+    }
+  })();
+  return embeddedFontsCSSPromise;
+}
+
+// recorte "cover" (mesmo efeito do preserveAspectRatio="xMidYMid slice"/
+// object-fit:cover): preenche a caixa de destino cortando o excesso da
+// imagem fonte, mantendo a proporção, centralizado
+function coverDrawParams(imgW, imgH, boxW, boxH){
+  const imgRatio = imgW / imgH, boxRatio = boxW / boxH;
+  if (imgRatio > boxRatio){
+    const sh = imgH, sw = imgH * boxRatio;
+    return { sx: (imgW - sw) / 2, sy: 0, sw, sh };
+  }
+  const sw = imgW, sh = imgW / boxRatio;
+  return { sx: 0, sy: (imgH - sh) / 2, sw, sh };
+}
+
+function buildFullSVGString(scale, fontsCSS){
   const s = scale || 1;
-  const content = buildContentSVG();
+  const content = buildContentSVG({ skipPhotoImage: true });
+  const styleBlock = fontsCSS || `@import url('${FONT_IMPORT.replace(/&/g,'&amp;')}');`;
   return `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LOGICAL} ${LOGICAL}" width="${LOGICAL*s}" height="${LOGICAL*s}">` +
-    `<defs><style>@import url('${FONT_IMPORT.replace(/&/g,'&amp;')}');</style></defs>` +
+    `<defs><style>${styleBlock}</style></defs>` +
     content +
     `</svg>`;
 }
-function rasterizeSVG(scale){
+async function rasterizeSVG(scale){
+  const fontsCSS = await buildEmbeddedFontsCSS();
   return new Promise((resolve, reject) => {
-    const svgBlob = new Blob([buildFullSVGString(scale)], { type: 'image/svg+xml;charset=utf-8' });
+    const svgBlob = new Blob([buildFullSVGString(scale, fontsCSS)], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
     const img = new Image();
     img.onload = () => {
@@ -834,6 +931,14 @@ function rasterizeSVG(scale){
       try{
         cctx.drawImage(img, 0, 0, c.width, c.height);
         URL.revokeObjectURL(url);
+        // desenha a foto de verdade por cima, direto no canvas — não passou
+        // pelo SVG (ver buildContentSVG/skipPhotoImage), então não depende
+        // de nenhum carregamento assíncrono aqui: loadedImg já está
+        // totalmente decodificada desde que carregou em setArtist()
+        if (currentArtist && currentArtist.foto && photoOk && loadedImg){
+          const { sx, sy, sw, sh } = coverDrawParams(loadedImg.naturalWidth, loadedImg.naturalHeight, PHOTO_BOX.w, PHOTO_BOX.h);
+          cctx.drawImage(loadedImg, sx, sy, sw, sh, PHOTO_BOX.x*scale, PHOTO_BOX.y*scale, PHOTO_BOX.w*scale, PHOTO_BOX.h*scale);
+        }
         resolve(c);
       } catch(err){
         URL.revokeObjectURL(url);
@@ -1150,6 +1255,7 @@ async function boot(){
   try{
     await Promise.all([
       document.fonts.load(`500 ${NAME_SIZE}px 'Inter'`),
+      document.fonts.load(`500 ${NAME_SIZE_WRAP}px 'Inter'`),
       document.fonts.load(`400 ${ADDR_SIZE}px 'Inter'`),
       document.fonts.load(`600 32px 'Inter'`), // rótulo da faixa de marquee
       document.fonts.load(`italic 40px 'Instrument Serif'`), // data da faixa de marquee
@@ -1160,6 +1266,7 @@ async function boot(){
       document.fonts.load(`350 20px 'Inter'`)
     ]);
   } catch(e){}
+  buildEmbeddedFontsCSS(); // dispara em segundo plano — já fica pronto (ou tentando) antes do primeiro clique em exportar
   computeEvtLabelSize();
   try{
     LOCATIONS = await loadLocationsFromSheet();
