@@ -882,22 +882,32 @@ async function geocodeAddress(query){
 }
 async function resolveMissingCoordinates(){
   const pending = LOCATIONS.filter(l => (l.lat == null || l.lng == null) && !/confirmar/i.test(l.endereco));
+  let resolvedAny = false;
   for (const loc of pending){
     const query = `${loc.endereco}, Centro, Rio de Janeiro, Brasil`;
     const coords = await geocodeAddress(query);
     if (coords){
       loc.lat = coords.lat;
       loc.lng = coords.lng;
-      setupFromLocations();
+      resolvedAny = true;
     }
     await new Promise(r => setTimeout(r, 1100));
   }
+  // só atualiza os pontos UMA VEZ, no final, depois de resolver todos os
+  // endereços pendentes — e sem reiniciar a marca já gerada na tela
+  // (startNow=false). Antes disso, CADA endereço resolvido em segundo
+  // plano chamava setupFromLocations() de novo, que sempre terminava
+  // gerando uma marca NOVA (generateNewRoute/generateCompleteMark
+  // embaralham a ordem) — a marca "mudava sozinha" na tela, sem nenhum
+  // clique em "gerar nova". O ponto novo passa a entrar só na próxima vez
+  // que alguém clicar em "gerar nova"/trocar modo.
+  if (resolvedAny) setupFromLocations(false);
 }
 
 /* ============================================================
    boot
    ============================================================ */
-function setupFromLocations(){
+function setupFromLocations(startNow = true){
   const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
   if (withCoords.length < 2){
     setStatus('poucos ateliês com coordenadas preenchidas ainda.', true);
@@ -926,8 +936,10 @@ function setupFromLocations(){
   alphaNum = {};
   sortedForNum.forEach((loc,i) => { alphaNum[loc.id] = i+1; });
 
-  generateNewRoute();
-  generateCompleteMark();
+  if (startNow){
+    generateNewRoute();
+    generateCompleteMark();
+  }
 }
 
 async function boot(){

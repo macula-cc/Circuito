@@ -1201,22 +1201,29 @@ async function geocodeAddress(query){
 }
 async function resolveMissingCoordinates(){
   const pending = LOCATIONS.filter(l => (l.lat == null || l.lng == null) && !/confirmar/i.test(l.endereco));
+  let resolvedAny = false;
   for (const loc of pending){
     const query = `${loc.endereco}, Centro, Rio de Janeiro, Brasil`;
     const coords = await geocodeAddress(query);
     if (coords){
       loc.lat = coords.lat;
       loc.lng = coords.lng;
-      await setupFromLocations();
+      resolvedAny = true;
     }
     await new Promise(r => setTimeout(r, 1100));
   }
+  // só atualiza os pontos UMA VEZ, no final, e sem gerar uma marca nova
+  // (startNow=false) — antes, cada endereço resolvido em segundo plano
+  // chamava setupFromLocations() de novo, que sempre terminava com
+  // generateNewEventMark() (embaralha a ordem) — a marca do post do evento
+  // "mudava sozinha" na tela, sem clique nenhum em "gerar nova marca".
+  if (resolvedAny) await setupFromLocations(false);
 }
 
 /* ============================================================
    boot
    ============================================================ */
-async function setupFromLocations(){
+async function setupFromLocations(startNow = true){
   const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
   if (withCoords.length < 3){
     setStatus('poucos ateliês com coordenadas preenchidas ainda — é preciso pelo menos 3 pra fechar uma forma.', true);
@@ -1248,7 +1255,7 @@ async function setupFromLocations(){
   alphaNumEvt = {};
   sortedForNum.forEach((loc,i) => { alphaNumEvt[loc.id] = i+1; });
 
-  generateNewEventMark();
+  if (startNow) generateNewEventMark();
 }
 
 async function boot(){
