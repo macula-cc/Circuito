@@ -158,7 +158,6 @@
    ============================================================ */
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
 const LOGICAL = 1000;
-const FONT_IMPORT = "https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Instrument+Serif:ital@0;1&display=swap";
 const SANS_DISPLAY = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const EVENT_TITLE = 'Circuito de Ateliês do Centro';
 const EVENT_EYEBROW = 'Ateliês abertos';
@@ -732,15 +731,14 @@ artistSelect.addEventListener('change', () => setArtist(parseInt(artistSelect.va
 // fixa (cinza claro + tinta preta), igual em cima/embaixo, independente do
 // tema de fundo escolhido. Usa `ectx` (canvas escondido já existente no
 // arquivo) só pra medir largura de texto e encadear os pedaços lado a lado.
-function buildMarqueeBarSVG(y, h){
-  const midY = (y + h/2 + h*0.06).toFixed(2); // pequeno ajuste: dominant-baseline="middle" tende a subir um pouco visualmente
+// calcula tamanhos/larguras dos 3 pedaços do marquee (rótulo + data),
+// escalados pra usar a largura disponível inteira — única fonte de verdade
+// desse cálculo, usada tanto pelo SVG (prévia) quanto pelo canvas (export)
+function computeMarqueeLayout(h){
   const labelTxt = EVENT_TITLE.toUpperCase();
   const eyebrowTxt = EVENT_EYEBROW + ' ';
   const available = LOGICAL - MARGIN*2;
 
-  // mede os 3 pedaços numa dada escala (mesma fonte/peso/letter-spacing do
-  // .marquee-item/.marquee-date reais do site) — devolve as larguras e o
-  // gap entre o rótulo e a data, pra poder escalar tudo até caber no artboard
   function measure(lblSize, dtSize){
     ectx.letterSpacing = `${(lblSize*-0.025).toFixed(2)}px`; // .marquee-item: letter-spacing:-0.025em
     ectx.font = `350 ${lblSize.toFixed(2)}px ${SANS_DISPLAY}`; // .marquee-item: font-weight:350
@@ -767,10 +765,20 @@ function buildMarqueeBarSVG(y, h){
   labelSize *= scale; dateSize *= scale;
   m = measure(labelSize, dateSize);
 
+  return { labelTxt, eyebrowTxt, labelSize, dateSize, m };
+}
+// prévia (SVG ao vivo, dentro do próprio documento — fontes da página
+// carregam normal, sem risco nenhum de blob isolado)
+function buildMarqueeBarSVG(y, h, opts){
+  const skipText = opts && opts.skipText;
+  const midY = (y + h/2 + h*0.06).toFixed(2); // pequeno ajuste: dominant-baseline="middle" tende a subir um pouco visualmente
   // fundo cinza (#d8d8d6) some contra um artboard cinza (mesmo tom) — nesse
   // caso o marquee vira branco pra manter contraste
   const marqueeBg = currentTheme === 'cinza' ? '#ffffff' : '#d8d8d6';
   let s = `<rect x="0" y="${y.toFixed(2)}" width="${LOGICAL}" height="${h.toFixed(2)}" fill="${marqueeBg}"/>`;
+  if (skipText) return s; // exportação: o texto é desenhado depois, direto no canvas (ver drawMarqueeBarCanvas)
+
+  const { labelTxt, eyebrowTxt, labelSize, dateSize, m } = computeMarqueeLayout(h);
   let x = MARGIN;
   const labelLS = (labelSize*-0.025).toFixed(2);
 
@@ -783,6 +791,30 @@ function buildMarqueeBarSVG(y, h){
   s += `<text x="${x.toFixed(2)}" y="${midY}" font-family="'Instrument Serif', Georgia, serif" font-style="italic" font-size="${dateSize.toFixed(2)}" fill="#111111" dominant-baseline="middle">${escapeXML(EVENT_DATES)}</text>`;
 
   return s;
+}
+// exportação: desenha o mesmo marquee direto no canvas de destino (bitmap
+// de verdade, não SVG) — ver comentário grande em rasterizeSVG sobre por
+// que isso é necessário
+function drawMarqueeBarCanvas(cctx, y, h){
+  const midY = y + h/2 + h*0.06;
+  const { labelTxt, eyebrowTxt, labelSize, dateSize, m } = computeMarqueeLayout(h);
+  cctx.textBaseline = 'middle';
+  cctx.fillStyle = '#111111';
+  let x = MARGIN;
+
+  cctx.font = `350 ${labelSize.toFixed(2)}px ${SANS_DISPLAY}`;
+  try{ cctx.letterSpacing = `${(labelSize*-0.025).toFixed(2)}px`; }catch(e){}
+  cctx.fillText(labelTxt, x, midY);
+  try{ cctx.letterSpacing = '0px'; }catch(e){}
+  x += m.labelW + m.gap;
+
+  cctx.font = `${dateSize.toFixed(2)}px 'Instrument Serif', Georgia, serif`;
+  cctx.fillText(eyebrowTxt, x, midY);
+  x += m.eyebrowW;
+
+  cctx.font = `italic ${dateSize.toFixed(2)}px 'Instrument Serif', Georgia, serif`;
+  cctx.fillText(EVENT_DATES, x, midY);
+  cctx.textBaseline = 'alphabetic';
 }
 // nome do artista: usa NAME_SIZE numa linha só sempre que couber (caso
 // comum, layout igual ao de sempre); quando não cabe, quebra em até duas
@@ -808,21 +840,24 @@ function computeNameLayout(name){
   const lastBaseline = baseline0 + (lines.length - 1) * NAME_WRAP_LINE_GAP;
   return { size: NAME_SIZE, lines, baseline0, lineGap: NAME_WRAP_LINE_GAP, addrY: lastBaseline + NAME_WRAP_ADDR_GAP };
 }
+function computeAddrLine(){
+  return currentArtist
+    ? (currentArtist.loc.local ? `${currentArtist.loc.local} — ${currentArtist.loc.endereco}` : currentArtist.loc.endereco)
+    : '—';
+}
 function buildContentSVG(opts){
-  const skipPhotoImage = opts && opts.skipPhotoImage;
+  // forExport: nenhum <text> entra no SVG — fundo/foto-placeholder ficam
+  // (só cor sólida, sem fonte nenhuma envolvida), mas TODO o texto de
+  // verdade (marquees, nome, endereço, iniciais) é desenhado depois, direto
+  // no canvas de destino (ver rasterizeSVG). Ver o comentário grande lá
+  // pra entender por quê.
+  const forExport = opts && opts.forExport;
   const theme = THEMES[currentTheme];
   let s = '';
   s += `<rect x="0" y="0" width="${LOGICAL}" height="${LOGICAL}" fill="${theme.bg}"/>`;
 
   const hasPhoto = currentArtist && currentArtist.foto && photoOk;
-  if (hasPhoto && skipPhotoImage){
-    // exportação: NÃO desenha a foto aqui dentro do SVG — deixa só o fundo,
-    // e a foto de verdade é desenhada depois direto no canvas de destino
-    // (ver rasterizeSVG/coverDrawParams). É mais confiável: um <image>
-    // (mesmo com data URL) dentro de um SVG carregado como blob pode não
-    // esperar o recurso terminar de decodificar antes do onload da imagem
-    // externa disparar em alguns navegadores (visto no Safari do celular)
-    // — o canvas.drawImage() de uma <img> já carregada é sempre síncrono.
+  if (hasPhoto && forExport){
     s += `<rect x="${PHOTO_BOX.x}" y="${PHOTO_BOX.y}" width="${PHOTO_BOX.w}" height="${PHOTO_BOX.h}" fill="${theme.bg}"/>`;
   } else if (hasPhoto){
     // prévia (SVG ao vivo, dentro do próprio documento — sem esse risco de
@@ -834,64 +869,28 @@ function buildContentSVG(opts){
     s += `<image href="${href}"${corsAttr} x="${PHOTO_BOX.x}" y="${PHOTO_BOX.y}" width="${PHOTO_BOX.w}" height="${PHOTO_BOX.h}" preserveAspectRatio="xMidYMid slice"/>`;
   } else {
     s += `<rect x="${PHOTO_BOX.x}" y="${PHOTO_BOX.y}" width="${PHOTO_BOX.w}" height="${PHOTO_BOX.h}" fill="#000000"/>`;
-    s += `<text x="${PHOTO_BOX.x+PHOTO_BOX.w/2}" y="${PHOTO_BOX.y+PHOTO_BOX.h/2}" font-family="${SANS_DISPLAY}" font-size="48" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${currentArtist ? initials(currentArtist.nome) : '—'}</text>`;
+    if (!forExport){
+      s += `<text x="${PHOTO_BOX.x+PHOTO_BOX.w/2}" y="${PHOTO_BOX.y+PHOTO_BOX.h/2}" font-family="${SANS_DISPLAY}" font-size="48" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${currentArtist ? initials(currentArtist.nome) : '—'}</text>`;
+    }
   }
 
-  s += buildMarqueeBarSVG(0, MARQUEE_BAR_H);
-  s += buildMarqueeBarSVG(LOGICAL - MARQUEE_BAR_H, MARQUEE_BAR_H);
+  s += buildMarqueeBarSVG(0, MARQUEE_BAR_H, { skipText: forExport });
+  s += buildMarqueeBarSVG(LOGICAL - MARQUEE_BAR_H, MARQUEE_BAR_H, { skipText: forExport });
 
-  const nameLayout = computeNameLayout(currentArtist ? currentArtist.nome : '—');
-  nameLayout.lines.forEach((line, i) => {
-    const y = nameLayout.baseline0 + i * nameLayout.lineGap;
-    s += `<text x="${MARGIN}" y="${y}" font-family="${SANS_DISPLAY}" font-weight="500" font-size="${nameLayout.size}" fill="${theme.ink}">${escapeXML(line)}</text>`;
-  });
-  const addrLine = currentArtist
-    ? (currentArtist.loc.local ? `${currentArtist.loc.local} — ${currentArtist.loc.endereco}` : currentArtist.loc.endereco)
-    : '—';
-  s += `<text x="${MARGIN}" y="${nameLayout.addrY}" font-family="${SANS_DISPLAY}" font-weight="400" font-size="${ADDR_SIZE}" fill="${theme.ink}">${escapeXML(addrLine)}</text>`;
+  if (!forExport){
+    const nameLayout = computeNameLayout(currentArtist ? currentArtist.nome : '—');
+    nameLayout.lines.forEach((line, i) => {
+      const y = nameLayout.baseline0 + i * nameLayout.lineGap;
+      s += `<text x="${MARGIN}" y="${y}" font-family="${SANS_DISPLAY}" font-weight="500" font-size="${nameLayout.size}" fill="${theme.ink}">${escapeXML(line)}</text>`;
+    });
+    s += `<text x="${MARGIN}" y="${nameLayout.addrY}" font-family="${SANS_DISPLAY}" font-weight="400" font-size="${ADDR_SIZE}" fill="${theme.ink}">${escapeXML(computeAddrLine())}</text>`;
+  }
 
   return s;
 }
 function draw(){
   svgEl.innerHTML = buildContentSVG();
 }
-// exportação: em vez de confiar num @import externo (rede, assíncrono, sem
-// garantia nenhuma de terminar antes do onload da imagem do SVG-blob — é
-// exatamente esse tipo de corrida que causava texto do marquee sobreposto/
-// bagunçado no download, visto no Safari do celular mas não reproduzível no
-// Chrome), busca os arquivos de fonte de verdade uma vez, embute como
-// data URL dentro do próprio <style> — fica 100% autocontido, sem nenhuma
-// dependência de rede no momento de rasterizar
-let embeddedFontsCSSPromise = null;
-async function buildEmbeddedFontsCSS(){
-  if (embeddedFontsCSSPromise) return embeddedFontsCSSPromise;
-  embeddedFontsCSSPromise = (async () => {
-    try{
-      const cssRes = await fetch(FONT_IMPORT);
-      if (!cssRes.ok) throw new Error('HTTP ' + cssRes.status);
-      let cssText = await cssRes.text();
-      const urls = [...new Set([...cssText.matchAll(/url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/g)].map(m => m[1]))];
-      for (const fontUrl of urls){
-        const fontRes = await fetch(fontUrl);
-        if (!fontRes.ok) throw new Error('HTTP ' + fontRes.status + ' na fonte');
-        const blob = await fontRes.blob();
-        const dataUrl = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-        cssText = cssText.split(fontUrl).join(dataUrl);
-      }
-      return cssText;
-    } catch(err){
-      console.warn('Não foi possível embutir as fontes pra exportação — caindo pro @import externo (menos confiável em alguns navegadores):', err);
-      return `@import url('${FONT_IMPORT.replace(/&/g,'&amp;')}');`;
-    }
-  })();
-  return embeddedFontsCSSPromise;
-}
-
 // recorte "cover" (mesmo efeito do preserveAspectRatio="xMidYMid slice"/
 // object-fit:cover): preenche a caixa de destino cortando o excesso da
 // imagem fonte, mantendo a proporção, centralizado
@@ -905,20 +904,20 @@ function coverDrawParams(imgW, imgH, boxW, boxH){
   return { sx: 0, sy: (imgH - sh) / 2, sw, sh };
 }
 
-function buildFullSVGString(scale, fontsCSS){
+// forExport:true não deixa nenhum <text> no SVG (ver buildContentSVG) — sem
+// texto nenhum, não precisa de nenhum @import/@font-face aqui: todo o
+// desenho de fonte acontece depois, direto no canvas (ver rasterizeSVG)
+function buildFullSVGString(scale){
   const s = scale || 1;
-  const content = buildContentSVG({ skipPhotoImage: true });
-  const styleBlock = fontsCSS || `@import url('${FONT_IMPORT.replace(/&/g,'&amp;')}');`;
+  const content = buildContentSVG({ forExport: true });
   return `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LOGICAL} ${LOGICAL}" width="${LOGICAL*s}" height="${LOGICAL*s}">` +
-    `<defs><style>${styleBlock}</style></defs>` +
     content +
     `</svg>`;
 }
 async function rasterizeSVG(scale){
-  const fontsCSS = await buildEmbeddedFontsCSS();
   return new Promise((resolve, reject) => {
-    const svgBlob = new Blob([buildFullSVGString(scale, fontsCSS)], { type: 'image/svg+xml;charset=utf-8' });
+    const svgBlob = new Blob([buildFullSVGString(scale)], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
     const img = new Image();
     img.onload = () => {
@@ -930,13 +929,48 @@ async function rasterizeSVG(scale){
         cctx.drawImage(img, 0, 0, c.width, c.height);
         URL.revokeObjectURL(url);
         // desenha a foto de verdade por cima, direto no canvas — não passou
-        // pelo SVG (ver buildContentSVG/skipPhotoImage), então não depende
+        // pelo SVG (ver buildContentSVG/forExport), então não depende
         // de nenhum carregamento assíncrono aqui: loadedImg já está
         // totalmente decodificada desde que carregou em setArtist()
-        if (currentArtist && currentArtist.foto && photoOk && loadedImg){
+        const hasPhoto = currentArtist && currentArtist.foto && photoOk;
+        if (hasPhoto && loadedImg){
           const { sx, sy, sw, sh } = coverDrawParams(loadedImg.naturalWidth, loadedImg.naturalHeight, PHOTO_BOX.w, PHOTO_BOX.h);
           cctx.drawImage(loadedImg, sx, sy, sw, sh, PHOTO_BOX.x*scale, PHOTO_BOX.y*scale, PHOTO_BOX.w*scale, PHOTO_BOX.h*scale);
         }
+
+        // todo o texto (marquees, nome, endereço, iniciais) é desenhado
+        // AQUI, bitmap de verdade, direto no canvas de destino — não dentro
+        // do SVG. Um <text> num SVG carregado como blob/<img> depende do
+        // navegador respeitar a fonte custom (mesmo embutida como data URL)
+        // nesse contexto isolado, o que se mostrou pouco confiável no
+        // Safari do celular — o texto saía com a fonte de fallback errada,
+        // sobrepondo tudo (mesmo depois de embutir a fonte via
+        // buildEmbeddedFontsCSS). canvas.fillText() usa as fontes já
+        // carregadas na PÁGINA de verdade — sem esse risco, WYSIWYG com a
+        // prévia em qualquer navegador.
+        const theme = THEMES[currentTheme];
+        cctx.save();
+        cctx.scale(scale, scale);
+        drawMarqueeBarCanvas(cctx, 0, MARQUEE_BAR_H);
+        drawMarqueeBarCanvas(cctx, LOGICAL - MARQUEE_BAR_H, MARQUEE_BAR_H);
+        if (!hasPhoto){
+          cctx.fillStyle = '#ffffff';
+          cctx.font = `48px ${SANS_DISPLAY}`;
+          cctx.textAlign = 'center'; cctx.textBaseline = 'middle';
+          cctx.fillText(currentArtist ? initials(currentArtist.nome) : '—', PHOTO_BOX.x+PHOTO_BOX.w/2, PHOTO_BOX.y+PHOTO_BOX.h/2);
+          cctx.textAlign = 'left'; cctx.textBaseline = 'alphabetic';
+        }
+        const nameLayout = computeNameLayout(currentArtist ? currentArtist.nome : '—');
+        cctx.fillStyle = theme.ink;
+        nameLayout.lines.forEach((line, i) => {
+          const y = nameLayout.baseline0 + i * nameLayout.lineGap;
+          cctx.font = `500 ${nameLayout.size}px ${SANS_DISPLAY}`;
+          cctx.fillText(line, MARGIN, y);
+        });
+        cctx.font = `400 ${ADDR_SIZE}px ${SANS_DISPLAY}`;
+        cctx.fillText(computeAddrLine(), MARGIN, nameLayout.addrY);
+        cctx.restore();
+
         resolve(c);
       } catch(err){
         URL.revokeObjectURL(url);
@@ -1270,7 +1304,6 @@ async function boot(){
       document.fonts.load(`350 20px 'Inter'`)
     ]);
   } catch(e){}
-  buildEmbeddedFontsCSS(); // dispara em segundo plano — já fica pronto (ou tentando) antes do primeiro clique em exportar
   computeEvtLabelSize();
   try{
     LOCATIONS = await loadLocationsFromSheet();
