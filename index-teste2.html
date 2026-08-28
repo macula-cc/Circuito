@@ -761,7 +761,7 @@ async function loadLocationsFromSheet(){
     const instagram = get(row, 'Instagram').replace(/^@/, '');
     const foto = resolveDrivePhotoURL(get(row, 'Foto do trabalho (URL)'));
     const bio = get(row, 'Mini bio (1 parágrafo curto)');
-    const obs = get(row, 'Observações');
+    const obs = get(row, 'Sala') || get(row, 'Observações');
     const latRaw = get(row, 'Latitude');
     const lngRaw = get(row, 'Longitude');
     const d18Raw = get(row, 'Presente dia 18/09 (X)');

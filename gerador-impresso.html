@@ -162,7 +162,7 @@ async function loadLocationsFromSheet(){
     const endereco = get(row,'Endereço');
     const nome = get(row,'Nome do Artista');
     if (!endereco && !nome) return;
-    const obs = get(row,'Observações');
+    const obs = get(row,'Sala') || get(row,'Observações');
     const latRaw = get(row,'Latitude');
     const lngRaw = get(row,'Longitude');
     const key = endereco;
