@@ -604,11 +604,28 @@ themeClaroBtn.addEventListener('click', () => setTheme('claro'));
 themeEscuroBtn.addEventListener('click', () => setTheme('escuro'));
 themeDegradeBtn.addEventListener('click', () => setTheme('degrade'));
 
+// traçado do modo símbolo — computado só aqui (uma vez por "gerar nova"),
+// não a cada draw(): antes disso, buildContentSVG() chamava buildLegPath()
+// de novo a cada redesenho (troca de tema, mostrar/esconder pontos etc — e
+// não só no clique em "gerar nova"), e como buildLegPath() usa Math.random()
+// pra decidir a curva, a fita mudava de forma sozinha a cada clique em
+// qualquer botão. Também precisa ficar estável pra exportação: o texto
+// (desenhado depois, direto no canvas — ver rasterizeSVG) tem que seguir
+// EXATAMENTE o mesmo traçado da fita do SVG, senão as letras saem
+// flutuando fora da fita
+let simboloLegs = [];
+function computeSimboloLegs(){
+  const selPts = selectedOrder.map(id => PTS.find(p => p.loc.id === id)).filter(Boolean);
+  const legs = [];
+  for (let i = 1; i < selPts.length; i++) legs.push(buildLegPath(selPts[i-1], selPts[i]));
+  simboloLegs = legs;
+}
 function generateNewRoute(){
   const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
   const shuffled = [...withCoords].sort(() => Math.random()-0.5);
   selectedOrder = shuffled.map(l => l.id);
   countNote.textContent = `${selectedOrder.length} ateliês conectados, nesta ordem`;
+  computeSimboloLegs();
   draw();
 }
 function generateCompleteMark(){
@@ -690,19 +707,126 @@ function pinBlurFilterDefSVG(id, r){
   const blurStd = r * (2/12);
   return `<defs><filter id="${id}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="${blurStd.toFixed(2)}"/></filter></defs>`;
 }
-function renderCompletaPins(pins, strokeWidth, theme){
+function renderCompletaPins(pins, strokeWidth, theme, opts){
+  const forExport = opts && opts.forExport;
   const r = strokeWidth / 2;
   const fontSize = Math.max(7, r*0.8);
   const filterId = `pinBlur-${strokeWidth}`;
   let s = pinBlurFilterDefSVG(filterId, r);
   pins.forEach(p => {
     s += renderPinCircleSVG(p.x, p.y, r, theme.pin, filterId);
-    s += `<text x="${p.x.toFixed(2)}" y="${(p.y+0.5).toFixed(2)}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="${fontSize.toFixed(1)}" fill="${theme.pinText}" text-anchor="middle" dominant-baseline="middle">${String(alphaNum[p.loc.id]).padStart(2,'0')}</text>`;
+    if (!forExport){
+      s += `<text x="${p.x.toFixed(2)}" y="${(p.y+0.5).toFixed(2)}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="${fontSize.toFixed(1)}" fill="${theme.pinText}" text-anchor="middle" dominant-baseline="middle">${String(alphaNum[p.loc.id]).padStart(2,'0')}</text>`;
+    }
   });
   return s;
 }
+// exportação: mesmos números de pino, desenhados direto no canvas (bitmap
+// de verdade) — ver comentário grande em rasterizeSVG
+function drawPinNumbersCanvas(cctx, pins, strokeWidth, theme){
+  const r = strokeWidth / 2;
+  const fontSize = Math.max(7, r*0.8);
+  cctx.font = `${fontSize.toFixed(1)}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+  cctx.fillStyle = theme.pinText;
+  cctx.textAlign = 'center';
+  cctx.textBaseline = 'middle';
+  pins.forEach(p => {
+    cctx.fillText(String(alphaNum[p.loc.id]).padStart(2,'0'), p.x, p.y+0.5);
+  });
+  cctx.textAlign = 'left';
+  cctx.textBaseline = 'alphabetic';
+}
+// exportação: label + tagline/data da marca completa, desenhados direto no
+// canvas — vertical (sem transform nenhum) e horizontal (dentro do mesmo
+// grupo translate/scale/translate que a marca inteira usa, replicado aqui
+// via cctx.translate/scale) têm cada um sua função
+function drawCompletaTextCanvasVertical(cctx, theme){
+  cctx.textAlign = 'left'; cctx.textBaseline = 'alphabetic';
+  cctx.fillStyle = theme.ribbon;
+  cctx.font = `350 ${LABEL_SIZE_V.toFixed(2)}px ${SANS_DISPLAY}`;
+  try{ cctx.letterSpacing = `${(LABEL_SIZE_V*-0.025).toFixed(2)}px`; }catch(e){}
+  cctx.fillText(LABEL_LINE1_V, TITLE_X_V, LABEL1_V_Y);
+  cctx.fillText(LABEL_LINE2_V, TITLE_X_V, LABEL2_V_Y);
+  try{ cctx.letterSpacing = '0px'; }catch(e){}
+  cctx.font = `${TITLE_SIZE_V.toFixed(2)}px 'Instrument Serif', Georgia, serif`;
+  cctx.fillText(EVENT_TAGLINE, TITLE_X_V, TITLE1_V_Y);
+  cctx.font = `italic ${TITLE_SIZE_V.toFixed(2)}px 'Instrument Serif', Georgia, serif`;
+  cctx.fillText(EVENT_DATES, TITLE_X_V, TITLE2_V_Y);
+}
+// devolve o mesmo transform (translate/scale/translate) que o modo
+// horizontal aplica em volta de toda a composição — reaproveitado tanto
+// pelo texto quanto pelos números dos pinos na exportação
+function applyHorizontalGroupTransform(cctx){
+  const fillFactor = 0.94;
+  const scaleUp = Math.min(fillFactor*LOGICAL/TOTAL_W_H, fillFactor*LOGICAL/SYMBOL_H_SIZE);
+  const c = LOGICAL/2;
+  const pivotX = START_X_H + TOTAL_W_H/2;
+  cctx.translate(c, c);
+  cctx.scale(scaleUp, scaleUp);
+  cctx.translate(-pivotX, -c);
+}
+function drawCompletaTextCanvasHorizontal(cctx, theme){
+  cctx.save();
+  applyHorizontalGroupTransform(cctx);
+  cctx.textAlign = 'left'; cctx.textBaseline = 'alphabetic';
+  cctx.fillStyle = theme.ribbon;
+  cctx.font = `350 ${LABEL_SIZE.toFixed(2)}px ${SANS_DISPLAY}`;
+  try{ cctx.letterSpacing = `${(LABEL_SIZE*-0.025).toFixed(2)}px`; }catch(e){}
+  cctx.fillText(EVENT_LABEL, TITLE_X_H, LABEL_Y_H);
+  try{ cctx.letterSpacing = '0px'; }catch(e){}
+  cctx.font = `${TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
+  const tagW = cctx.measureText(EVENT_TAGLINE + ' ').width;
+  cctx.fillText(EVENT_TAGLINE + ' ', TITLE_X_H, TITLE_Y_H);
+  cctx.font = `italic ${TITLE_SIZE}px 'Instrument Serif', Georgia, serif`;
+  cctx.fillText(EVENT_DATES, TITLE_X_H + tagW, TITLE_Y_H);
+  cctx.restore();
+}
+// exportação: texto da fita (modo símbolo, "com texto") seguindo a mesma
+// curva do <path> — cada caractere com sua própria posição+rotação, igual
+// buildRibbonAndTextSVG, só que com cctx.translate/rotate/fillText em vez
+// de <text transform="...">. Usa simboloLegs (mesmo traçado do SVG — ver
+// comentário em computeSimboloLegs) pra garantir que as letras caiam
+// exatamente em cima da fita desenhada, não numa curva aleatória diferente
+function drawRibbonTextCanvas(cctx, runs, legs, textColor){
+  const chars = [];
+  runs.forEach(run => { for (const ch of run.text) chars.push({ ch, run }); });
+  let charPos = 0;
+  cctx.fillStyle = textColor;
+  cctx.textAlign = 'left';
+  cctx.textBaseline = 'alphabetic';
+  legs.forEach(points => {
+    if (points.length < 2) return;
+    const total = pathLength(points);
+    if (total < 4) return;
+    let d = 0, safety = 0;
+    while (d < total && safety < 4000){
+      const item = chars[charPos % chars.length];
+      const w = charWidth(item.ch, item.run.fontSize, item.run.fontFamily, item.run.weight, item.run.italic);
+      if (d >= total) break;
+      const pt = pointAtDistance(points, d);
+      cctx.save();
+      cctx.translate(pt.x, pt.y);
+      cctx.rotate(pt.angle); // já em radianos (Math.atan2) — cctx.rotate() usa radianos direto
+      cctx.font = `${item.run.italic ? 'italic ' : ''}${item.run.weight ? item.run.weight+' ' : ''}${item.run.fontSize}px ${item.run.fontFamily}`;
+      cctx.fillText(item.ch, 0, item.run.dy);
+      cctx.restore();
+      d += w;
+      charPos++;
+      safety++;
+    }
+  });
+}
 
-function buildContentSVG(includeBg){
+function buildContentSVG(includeBg, opts){
+  // forExport: nenhum <text> entra no SVG (rótulo/tagline/data da marca
+  // completa, números dos pinos, texto da fita) — tudo isso é desenhado
+  // depois, direto no canvas de destino (ver rasterizeSVG). Motivo: um
+  // <text> num SVG carregado como blob/<img> depende do navegador aceitar
+  // fonte custom nesse contexto isolado, o que se mostrou pouco confiável
+  // no Safari (mesmo bug já visto e corrigido assim no gerador-mascara.html
+  // e no gerador-impresso.html) — o Eduardo mandou um print confirmando
+  // esse problema aqui também.
+  const forExport = opts && opts.forExport;
   const theme = THEMES[currentTheme];
   let s = '';
   if (includeBg){
@@ -727,17 +851,21 @@ function buildContentSVG(includeBg){
     content += pathsOut;
 
     if (orientMarca === 'vertical'){
-      const labelLS = (LABEL_SIZE_V*-0.025).toFixed(2);
-      content += `<text x="${TITLE_X_V}" y="${LABEL1_V_Y}" font-family="${SANS_DISPLAY}" font-weight="350" letter-spacing="${labelLS}" font-size="${LABEL_SIZE_V.toFixed(2)}" fill="${theme.ribbon}">${escapeXML(LABEL_LINE1_V)}</text>`;
-      content += `<text x="${TITLE_X_V}" y="${LABEL2_V_Y}" font-family="${SANS_DISPLAY}" font-weight="350" letter-spacing="${labelLS}" font-size="${LABEL_SIZE_V.toFixed(2)}" fill="${theme.ribbon}">${escapeXML(LABEL_LINE2_V)}</text>`;
-      content += `<text x="${TITLE_X_V}" y="${TITLE1_V_Y}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V.toFixed(2)}" fill="${theme.ribbon}">${escapeXML(EVENT_TAGLINE)}</text>`;
-      content += `<text x="${TITLE_X_V}" y="${TITLE2_V_Y}" font-family="'Instrument Serif', Georgia, serif" font-style="italic" font-size="${TITLE_SIZE_V.toFixed(2)}" fill="${theme.ribbon}">${escapeXML(EVENT_DATES)}</text>`;
-      if (showPinsCompleta) content += renderCompletaPins(completeMarkPins, SYMBOL_V_STROKE, theme);
+      if (!forExport){
+        const labelLS = (LABEL_SIZE_V*-0.025).toFixed(2);
+        content += `<text x="${TITLE_X_V}" y="${LABEL1_V_Y}" font-family="${SANS_DISPLAY}" font-weight="350" letter-spacing="${labelLS}" font-size="${LABEL_SIZE_V.toFixed(2)}" fill="${theme.ribbon}">${escapeXML(LABEL_LINE1_V)}</text>`;
+        content += `<text x="${TITLE_X_V}" y="${LABEL2_V_Y}" font-family="${SANS_DISPLAY}" font-weight="350" letter-spacing="${labelLS}" font-size="${LABEL_SIZE_V.toFixed(2)}" fill="${theme.ribbon}">${escapeXML(LABEL_LINE2_V)}</text>`;
+        content += `<text x="${TITLE_X_V}" y="${TITLE1_V_Y}" font-family="'Instrument Serif', Georgia, serif" font-size="${TITLE_SIZE_V.toFixed(2)}" fill="${theme.ribbon}">${escapeXML(EVENT_TAGLINE)}</text>`;
+        content += `<text x="${TITLE_X_V}" y="${TITLE2_V_Y}" font-family="'Instrument Serif', Georgia, serif" font-style="italic" font-size="${TITLE_SIZE_V.toFixed(2)}" fill="${theme.ribbon}">${escapeXML(EVENT_DATES)}</text>`;
+      }
+      if (showPinsCompleta) content += renderCompletaPins(completeMarkPins, SYMBOL_V_STROKE, theme, { forExport });
       s += content;
     } else {
-      content += `<text x="${TITLE_X_H}" y="${LABEL_Y_H}" font-family="${SANS_DISPLAY}" font-weight="350" letter-spacing="${(LABEL_SIZE*-0.025).toFixed(2)}" font-size="${LABEL_SIZE.toFixed(2)}" fill="${theme.ribbon}">${escapeXML(EVENT_LABEL)}</text>`;
-      content += `<text x="${TITLE_X_H}" y="${TITLE_Y_H}" font-size="${TITLE_SIZE}" fill="${theme.ribbon}"><tspan font-family="'Instrument Serif', Georgia, serif">${escapeXML(EVENT_TAGLINE)} </tspan><tspan font-family="'Instrument Serif', Georgia, serif" font-style="italic">${escapeXML(EVENT_DATES)}</tspan></text>`;
-      if (showPinsCompleta) content += renderCompletaPins(completeMarkPins, SYMBOL_H_STROKE, theme);
+      if (!forExport){
+        content += `<text x="${TITLE_X_H}" y="${LABEL_Y_H}" font-family="${SANS_DISPLAY}" font-weight="350" letter-spacing="${(LABEL_SIZE*-0.025).toFixed(2)}" font-size="${LABEL_SIZE.toFixed(2)}" fill="${theme.ribbon}">${escapeXML(EVENT_LABEL)}</text>`;
+        content += `<text x="${TITLE_X_H}" y="${TITLE_Y_H}" font-size="${TITLE_SIZE}" fill="${theme.ribbon}"><tspan font-family="'Instrument Serif', Georgia, serif">${escapeXML(EVENT_TAGLINE)} </tspan><tspan font-family="'Instrument Serif', Georgia, serif" font-style="italic">${escapeXML(EVENT_DATES)}</tspan></text>`;
+      }
+      if (showPinsCompleta) content += renderCompletaPins(completeMarkPins, SYMBOL_H_STROKE, theme, { forExport });
       // só a apresentação muda aqui: a composição inteira é ampliada em
       // volta do centro do artboard, sem alterar nenhuma proporção da marca
       const fillFactor = 0.94;
@@ -751,15 +879,10 @@ function buildContentSVG(includeBg){
   }
 
   if (selectedOrder.length >= 2){
-    const selPts = selectedOrder.map(id => PTS.find(p => p.loc.id === id)).filter(Boolean);
-    const legs = [];
-    for (let i = 1; i < selPts.length; i++){
-      legs.push(buildLegPath(selPts[i-1], selPts[i]));
-    }
     resetGradients();
-    const ribbonMarkup = showText
-      ? buildRibbonAndTextSVG(buildRibbonRuns(24), legs, 38, theme.ribbon, theme.text)
-      : buildRibbonOnlySVG(legs, 38, theme.ribbon);
+    const ribbonMarkup = (showText && !forExport)
+      ? buildRibbonAndTextSVG(buildRibbonRuns(24), simboloLegs, 38, theme.ribbon, theme.text)
+      : buildRibbonOnlySVG(simboloLegs, 38, theme.ribbon);
     if (gradientDefs.length) s += `<defs>${gradientDefs.join('')}</defs>`;
     s += ribbonMarkup;
   }
@@ -769,7 +892,9 @@ function buildContentSVG(includeBg){
     s += pinBlurFilterDefSVG(filterId, 15);
     PTS.forEach(p => {
       s += renderPinCircleSVG(p.x, p.y, 15, theme.pin, filterId);
-      s += `<text x="${p.x.toFixed(2)}" y="${(p.y+0.5).toFixed(2)}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="${theme.pinText}" text-anchor="middle" dominant-baseline="middle">${String(alphaNum[p.loc.id]).padStart(2,'0')}</text>`;
+      if (!forExport){
+        s += `<text x="${p.x.toFixed(2)}" y="${(p.y+0.5).toFixed(2)}" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="${theme.pinText}" text-anchor="middle" dominant-baseline="middle">${String(alphaNum[p.loc.id]).padStart(2,'0')}</text>`;
+      }
     });
   }
 
@@ -785,12 +910,19 @@ function draw(){
   }
 }
 
-function buildFullSVGString(scale){
+// opts.forExport: sem nenhum <text> no SVG (ver buildContentSVG) — usado
+// só pela rasterização (PNG/PDF, ver rasterizeSVG). O download de SVG
+// vetorial (botão "SVG") chama isso SEM opts — continua com texto de
+// verdade + @import, porque ali o objetivo é um arquivo vetorial editável
+// de verdade, não uma imagem rasterizada
+function buildFullSVGString(scale, opts){
   const s = scale || 1;
-  const content = buildContentSVG(false); // exportação sai com fundo transparente por padrão
+  const forExport = opts && opts.forExport;
+  const content = buildContentSVG(false, opts); // exportação sai com fundo transparente por padrão
+  const styleBlock = forExport ? '' : `<defs><style>@import url('${FONT_IMPORT.replace(/&/g,'&amp;')}');</style></defs>`;
   return `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LOGICAL} ${LOGICAL}" width="${LOGICAL*s}" height="${LOGICAL*s}">` +
-    `<defs><style>@import url('${FONT_IMPORT.replace(/&/g,'&amp;')}');</style></defs>` +
+    styleBlock +
     content +
     `</svg>`;
 }
@@ -811,7 +943,7 @@ document.getElementById('btn-download-svg').addEventListener('click', () => {
 
 function rasterizeSVG(scale){
   return new Promise((resolve, reject) => {
-    const svgBlob = new Blob([buildFullSVGString(scale)], { type: 'image/svg+xml;charset=utf-8' });
+    const svgBlob = new Blob([buildFullSVGString(scale, { forExport: true })], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
     const img = new Image();
     img.onload = () => {
@@ -819,9 +951,46 @@ function rasterizeSVG(scale){
       c.width = LOGICAL * scale;
       c.height = LOGICAL * scale;
       const cctx = c.getContext('2d');
-      cctx.drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url);
-      resolve(c);
+      try{
+        cctx.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+
+        // todo o texto (rótulo/tagline/data da marca completa, números dos
+        // pinos, texto da fita) é desenhado AQUI, bitmap de verdade, direto
+        // no canvas — não dentro do SVG. Ver comentário grande em
+        // buildContentSVG sobre por quê.
+        const theme = THEMES[currentTheme];
+        cctx.save();
+        cctx.scale(scale, scale);
+        if (modeMarca === 'completa'){
+          if (orientMarca === 'vertical'){
+            drawCompletaTextCanvasVertical(cctx, theme);
+            if (showPinsCompleta) drawPinNumbersCanvas(cctx, completeMarkPins, SYMBOL_V_STROKE, theme);
+          } else {
+            drawCompletaTextCanvasHorizontal(cctx, theme);
+            if (showPinsCompleta){
+              // números dos pinos também ficam dentro do grupo
+              // translate/scale/translate do modo horizontal — mesmo
+              // transform aplicado aqui antes de desenhar
+              cctx.save();
+              applyHorizontalGroupTransform(cctx);
+              drawPinNumbersCanvas(cctx, completeMarkPins, SYMBOL_H_STROKE, theme);
+              cctx.restore();
+            }
+          }
+        } else {
+          if (selectedOrder.length >= 2 && showText){
+            drawRibbonTextCanvas(cctx, buildRibbonRuns(24), simboloLegs, theme.text);
+          }
+          if (showPins) drawPinNumbersCanvas(cctx, PTS, 30, theme); // strokeWidth 30 → r=15, mesmo raio do pino do símbolo
+        }
+        cctx.restore();
+
+        resolve(c);
+      } catch(err){
+        URL.revokeObjectURL(url);
+        reject(err);
+      }
     };
     img.onerror = (err) => { URL.revokeObjectURL(url); reject(err); };
     img.src = url;
