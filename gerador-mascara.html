@@ -576,6 +576,7 @@ let FLAT_ARTISTS = [];
 let currentArtist = null;
 let photoOk = false;
 let loadedImg = null;
+let photoDataURL = null; // cópia embutida (base64) da foto já carregada — ver setArtist()
 let evtMarkLegs = []; // marca (estática) do post do evento — pernas separadas
 let evtMarkPins = []; // pontos dos ateliês já no mesmo ajuste de escala da marca
 let numAddresses = 0;
@@ -682,10 +683,35 @@ function setArtist(idx){
   currentArtist = FLAT_ARTISTS[idx];
   photoOk = false;
   loadedImg = null;
+  photoDataURL = null;
   if (currentArtist && currentArtist.foto){
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => { photoOk = true; loadedImg = img; draw(); };
+    img.onload = () => {
+      photoOk = true; loadedImg = img;
+      // embute a foto como data URL (base64) uma única vez, assim que
+      // carrega — a prévia e a exportação passam a usar essa cópia local,
+      // sem depender de buscar a foto na rede de novo depois disso. Sem
+      // isso: rasterizeSVG() reconstrói o SVG inteiro como um blob e
+      // carrega de novo como <img> pra virar canvas — isso faz o
+      // navegador buscar a foto externa OUTRA VEZ, e um <image> apontando
+      // pra fora dentro de um blob de SVG pode falhar de forma totalmente
+      // silenciosa (a promise resolve normal, sem erro nenhum) — a
+      // exportação "funciona" mas sai sem a foto, sem nenhum aviso. Já
+      // aconteceu na prática: prévia com foto ok, PNG/PDF baixado sem foto.
+      try{
+        const off = document.createElement('canvas');
+        off.width = img.naturalWidth; off.height = img.naturalHeight;
+        off.getContext('2d').drawImage(img, 0, 0);
+        photoDataURL = off.toDataURL('image/jpeg', 0.92);
+      } catch(e){
+        // canvas ficou "tainted" apesar do crossOrigin (servidor não
+        // libera CORS de verdade) — sem cópia local, mas ainda tenta usar
+        // a URL externa direto (comportamento de antes, sem regressão)
+        console.warn('Não foi possível embutir a foto localmente:', e);
+      }
+      draw();
+    };
     img.onerror = () => { photoOk = false; loadedImg = null; draw(); };
     img.src = currentArtist.foto;
   } else {
@@ -758,10 +784,15 @@ function buildContentSVG(){
 
   const hasPhoto = currentArtist && currentArtist.foto && photoOk;
   if (hasPhoto){
-    // crossorigin="anonymous" é necessário pro canvas não ficar "tainted"
-    // depois (senão toDataURL/toBlob do PNG/PDF falha em silêncio ou lança
-    // SecurityError), mesmo com o servidor da foto liberando CORS
-    s += `<image href="${currentArtist.foto}" crossorigin="anonymous" x="${PHOTO_BOX.x}" y="${PHOTO_BOX.y}" width="${PHOTO_BOX.w}" height="${PHOTO_BOX.h}" preserveAspectRatio="xMidYMid slice"/>`;
+    // usa a cópia local (data URL) sempre que existir — nunca depende de
+    // rede de novo, nem na prévia nem na exportação (ver setArtist()).
+    // Se por algum motivo raro não deu pra embutir, cai pra URL externa
+    // com crossorigin="anonymous" (necessário pro canvas não ficar
+    // "tainted" — senão toDataURL/toBlob do PNG/PDF falha em silêncio ou
+    // lança SecurityError), igual ao comportamento de antes dessa foto.
+    const href = photoDataURL || currentArtist.foto;
+    const corsAttr = photoDataURL ? '' : ' crossorigin="anonymous"';
+    s += `<image href="${href}"${corsAttr} x="${PHOTO_BOX.x}" y="${PHOTO_BOX.y}" width="${PHOTO_BOX.w}" height="${PHOTO_BOX.h}" preserveAspectRatio="xMidYMid slice"/>`;
   } else {
     s += `<rect x="${PHOTO_BOX.x}" y="${PHOTO_BOX.y}" width="${PHOTO_BOX.w}" height="${PHOTO_BOX.h}" fill="#000000"/>`;
     s += `<text x="${PHOTO_BOX.x+PHOTO_BOX.w/2}" y="${PHOTO_BOX.y+PHOTO_BOX.h/2}" font-family="${SANS_DISPLAY}" font-size="48" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${currentArtist ? initials(currentArtist.nome) : '—'}</text>`;
