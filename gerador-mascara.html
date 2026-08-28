@@ -176,12 +176,12 @@ const ADDR_SIZE = 27;
 const NAME_Y = PHOTO_BOX.y + PHOTO_BOX.h + 92;
 const ADDR_Y = NAME_Y + 48;
 // nome que não cabe numa linha só (ex: "Francisco 'Chiko' Guimarães") quebra
-// em até duas linhas, numa fonte um pouco menor — pra caber no mesmo espaço
-// vertical reservado entre a foto e a faixa de baixo sem encostar em nada
-const NAME_SIZE_WRAP = 54;
-const NAME_WRAP_GAP0 = 65;     // foto → baseline da 1ª linha
-const NAME_WRAP_LINE_GAP = 57; // 1ª linha → 2ª linha
-const NAME_WRAP_ADDR_GAP = 36; // última linha do nome → endereço
+// em até duas linhas, no MESMO tamanho de fonte (NAME_SIZE) — não encolhe,
+// só quebra — reaproveitando o mesmo espaço vertical reservado entre a foto
+// e a faixa de baixo, com entrelinha mais justa pra caber sem encostar em nada
+const NAME_WRAP_GAP0 = NAME_Y - PHOTO_BOX.y - PHOTO_BOX.h; // mesma posição da 1ª linha do caso de 1 linha só (92)
+const NAME_WRAP_LINE_GAP = NAME_SIZE * 0.92; // entrelinha justa entre as duas linhas do nome
+const NAME_WRAP_ADDR_GAP = 30; // última linha do nome → endereço
 
 // layout — post do evento: título grande é o par tagline/data (serifado,
 // 2ª linha em itálico); o nome do evento vira o label pequeno em caixa
@@ -784,18 +784,16 @@ function buildMarqueeBarSVG(y, h){
 
   return s;
 }
-// nome do artista: usa NAME_SIZE numa linha só sempre que couber (caso comum,
-// layout igual ao de sempre); quando não cabe, quebra em até duas linhas
-// numa fonte um pouco menor (NAME_SIZE_WRAP), reposicionando o endereço
-// logo abaixo da última linha
+// nome do artista: usa NAME_SIZE numa linha só sempre que couber (caso
+// comum, layout igual ao de sempre); quando não cabe, quebra em até duas
+// linhas — sempre no MESMO tamanho de fonte (não encolhe), reposicionando
+// o endereço logo abaixo da última linha
 function computeNameLayout(name){
   const availableW = LOGICAL - MARGIN*2;
   ectx.font = `500 ${NAME_SIZE}px ${SANS_DISPLAY}`;
   if (ectx.measureText(name).width <= availableW){
     return { size: NAME_SIZE, lines: [name], baseline0: NAME_Y, lineGap: 0, addrY: ADDR_Y };
   }
-  const size = NAME_SIZE_WRAP;
-  ectx.font = `500 ${size}px ${SANS_DISPLAY}`;
   const words = name.split(/\s+/).filter(Boolean);
   let line1 = words[0] || name;
   let i = 1;
@@ -808,7 +806,7 @@ function computeNameLayout(name){
   const lines = rest ? [line1, rest] : [line1];
   const baseline0 = PHOTO_BOX.y + PHOTO_BOX.h + NAME_WRAP_GAP0;
   const lastBaseline = baseline0 + (lines.length - 1) * NAME_WRAP_LINE_GAP;
-  return { size, lines, baseline0, lineGap: NAME_WRAP_LINE_GAP, addrY: lastBaseline + NAME_WRAP_ADDR_GAP };
+  return { size: NAME_SIZE, lines, baseline0, lineGap: NAME_WRAP_LINE_GAP, addrY: lastBaseline + NAME_WRAP_ADDR_GAP };
 }
 function buildContentSVG(opts){
   const skipPhotoImage = opts && opts.skipPhotoImage;
@@ -1262,7 +1260,6 @@ async function boot(){
   try{
     await Promise.all([
       document.fonts.load(`500 ${NAME_SIZE}px 'Inter'`),
-      document.fonts.load(`500 ${NAME_SIZE_WRAP}px 'Inter'`),
       document.fonts.load(`400 ${ADDR_SIZE}px 'Inter'`),
       document.fonts.load(`600 32px 'Inter'`), // rótulo da faixa de marquee
       document.fonts.load(`italic 40px 'Instrument Serif'`), // data da faixa de marquee
