@@ -180,10 +180,30 @@ const ADDR_Y = NAME_Y + 48;
 // e a faixa de baixo, com entrelinha mais justa pra caber sem encostar em nada
 const NAME_WRAP_LINE_GAP = NAME_SIZE * 0.92; // entrelinha justa entre as duas linhas do nome
 const NAME_WRAP_ADDR_GAP = 46; // última linha do nome → endereço
-// margem de cima (foto → 1ª linha do nome) igual à margem de baixo
-// (endereço → faixa debaixo) — reparte o espaço total disponível (foto →
-// faixa) igualmente dos dois lados do bloco de texto
-const NAME_WRAP_GAP0 = ((LOGICAL - MARQUEE_BAR_H) - (PHOTO_BOX.y + PHOTO_BOX.h) - NAME_WRAP_LINE_GAP - NAME_WRAP_ADDR_GAP) / 2;
+// margem de cima (foto → topo visual da 1ª linha do nome) igual à margem
+// de baixo (base visual do endereço → faixa debaixo). NAME_WRAP_GAP0 mede
+// da foto até a BASELINE do nome, não até o topo visível da letra — só
+// igualar essa distância à distância endereço→faixa deixava a margem de
+// cima bem menor na prática, porque o nome (76px) tem uma letra bem mais
+// alta acima da baseline do que o endereço (27px) tem abaixo dela. Por
+// isso essa conta só fecha de verdade depois que as fontes carregam de
+// vez (ver computeNameWrapGap0(), chamada no boot() com métrica real de
+// ascent/descent — não dá pra confiar em medir com a fonte de fallback)
+let NAME_WRAP_GAP0 = 60; // valor inicial de segurança, substituído no boot()
+function computeNameWrapGap0(){
+  // actualBoundingBoxAscent/Descent de um texto de exemplo REALISTA (não
+  // fontBoundingBox — essa métrica da fonte inclui uma folga própria do
+  // desenho da fonte que, testado, não bate com o espaço em branco que o
+  // olho realmente vê em volta da letra; e não o pior caso possível tipo
+  // "Áç" — isso ficava consistente mas puxava a margem de cima bem mais
+  // funda que o necessário pra nomes comuns sem acento)
+  ectx.font = `500 ${NAME_SIZE}px ${SANS_DISPLAY}`;
+  const nameAscent = ectx.measureText('Guimarães').actualBoundingBoxAscent;
+  ectx.font = `400 ${ADDR_SIZE}px ${SANS_DISPLAY}`;
+  const addrDescent = ectx.measureText('Praça XV de Novembro').actualBoundingBoxDescent;
+  const totalSpace = (LOGICAL - MARQUEE_BAR_H) - (PHOTO_BOX.y + PHOTO_BOX.h);
+  NAME_WRAP_GAP0 = (totalSpace - NAME_WRAP_LINE_GAP - NAME_WRAP_ADDR_GAP - addrDescent + nameAscent) / 2;
+}
 
 // layout — post do evento: título grande é o par tagline/data (serifado,
 // 2ª linha em itálico); o nome do evento vira o label pequeno em caixa
@@ -1308,6 +1328,7 @@ async function boot(){
     ]);
   } catch(e){}
   computeEvtLabelSize();
+  computeNameWrapGap0();
   try{
     LOCATIONS = await loadLocationsFromSheet();
   } catch(err){
