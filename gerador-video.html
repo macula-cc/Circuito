@@ -283,6 +283,59 @@ function parseCoord(raw, min, max){
   return (isNaN(n) || n < min || n > max) ? null : n;
 }
 
+// coordenadas curadas à mão pros endereços já confirmados — mesmo
+// princípio das estações de metrô/VLT (curadas no código, sem depender de
+// serviço externo): evita depender de Latitude/Longitude digitado certo na
+// planilha (a formatação de célula do Sheets já corrompeu esses valores
+// mais de uma vez — vírgula decimal virando separador de milhar) e evita
+// geocodificação ao vivo (lenta, ~1.1s por endereço) pros endereços mais
+// comuns. Endereço NOVO que ainda não estiver aqui cai automaticamente no
+// comportamento de sempre (lê Latitude/Longitude da planilha, ou
+// geocodifica via Nominatim se estiver vazio) — nada quebra, só não fica
+// com essa otimização até alguém adicionar aqui. Só edita quem mexe no
+// código (não é editável pela planilha).
+const CURATED_COORDS = {
+  'Arco do Telles, 17 - Pça XV': { lat: -22.9027582, lng: -43.1746864 },
+  'Av. Churchill 94, 4o andar': { lat: -22.9095612, lng: -43.1717542 },
+  'Av. Erasmo Braga 255, Sobreloja': { lat: -22.9056853, lng: -43.1744404 },
+  'Av. Marechal Floriano 143': { lat: -22.9024075, lng: -43.1853374 },
+  'Av. Nilo Peçanha 50, 2201': { lat: -22.9060475, lng: -43.1776024 },
+  'Av. Presidente Vargas 509/1603': { lat: -22.9004357, lng: -43.177257 },
+  'Av. Rio Branco 277': { lat: -22.9118133, lng: -43.1747917 },
+  'Avenida Beira Mar 216': { lat: -22.9105342, lng: -43.1704502 },
+  'Avenida Franklin Roosevelt 39': { lat: -22.9096441, lng: -43.1714199 },
+  'Avenida Treze de Maio, nº 13, 1909': { lat: -22.9090323, lng: -43.1771338 },
+  'Largo de Santa Rita 6, sobrado': { lat: -22.8998691, lng: -43.1811527 },
+  'Praça XV de Novembro 34, Sobreloja': { lat: -22.902694, lng: -43.174694 },
+  'Rua Acre 83': { lat: -22.9005015, lng: -43.181881 },
+  'Rua Andre Cavalcanti 108': { lat: -22.914189, lng: -43.1868113 },
+  'Rua Buenos Aires 70, 601': { lat: -22.9022024, lng: -43.1774392 },
+  'Rua Camerino, 59': { lat: -22.9007393, lng: -43.1862836 },
+  'Rua Conde de Lages 27': { lat: -22.9172024, lng: -43.1777996 },
+  'Rua Conde de Lages 44': { lat: -22.9172024, lng: -43.1777996 },
+  'Rua da Alfândega 91': { lat: -22.9025776, lng: -43.1797789 },
+  'Rua da Conceição 105': { lat: -22.9016505, lng: -43.1836073 },
+  'Rua da Quitanda 3': { lat: -22.9053821, lng: -43.1760508 },
+  'Rua da quitanda 3': { lat: -22.9054597, lng: -43.1760521 },
+  'Rua do Passeio 2': { lat: -22.9125195, lng: -43.1754608 },
+  'Rua do Rosário 104, 4º andar': { lat: -22.9026452, lng: -43.1777889 },
+  'Rua do Russel, 300': { lat: -22.9233172, lng: -43.1728138 },
+  'Rua do Senado 227': { lat: -22.9107373, lng: -43.1891061 },
+  'Rua dos invalidos 27, sobrado': { lat: -22.9090507, lng: -43.1856628 },
+  'Rua dos Inválidos 08': { lat: -22.913504, lng: -43.1842394 },
+  'Rua Luis de Camões 42': { lat: -22.9055693, lng: -43.1822654 },
+  'Rua Luís de Camões 02, sobrado': { lat: -22.904813, lng: -43.1811294 },
+  'Rua Mayrink Veiga 6, 11º andar': { lat: -22.899271, lng: -43.180383 },
+  'Rua México 164': { lat: -22.9071644, lng: -43.1757713 },
+  'Rua México 31': { lat: -22.9114856, lng: -43.1743552 },
+  'Rua Pedro Ernesto 56': { lat: -22.8960326, lng: -43.1936254 },
+  'Rua Pedro Ernesto 56 - Gamboa': { lat: -22.8961902, lng: -43.1935285 },
+  'Rua Teixeira de Freitas 5': { lat: -22.914568, lng: -43.176575 },
+  'Rua Uruguaiana 10': { lat: -22.9061872, lng: -43.1785202 },
+  'Rua Álvaro Alvim 21, 18º andar': { lat: -22.9115713, lng: -43.1761788 },
+  'Travessa do Paço 23': { lat: -22.904291, lng: -43.1733626 },
+};
+
 async function loadLocationsFromSheet(){
   const res = await fetch(`${SHEET_CSV_URL}&_=${Date.now()}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -304,8 +357,8 @@ async function loadLocationsFromSheet(){
     if (!locMap[key]){
       locMap[key] = {
         id: 'loc' + order.length, local, endereco,
-        lat: parseCoord(latRaw, -90, 90),
-        lng: parseCoord(lngRaw, -180, 180),
+        lat: CURATED_COORDS[endereco] ? CURATED_COORDS[endereco].lat : parseCoord(latRaw, -90, 90),
+        lng: CURATED_COORDS[endereco] ? CURATED_COORDS[endereco].lng : parseCoord(lngRaw, -180, 180),
         artistas: []
       };
       order.push(key);
