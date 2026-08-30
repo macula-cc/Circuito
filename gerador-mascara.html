@@ -178,9 +178,9 @@ const ADDR_Y = NAME_Y + 48;
 // em até duas linhas, no MESMO tamanho de fonte (NAME_SIZE) — não encolhe,
 // só quebra — reaproveitando o mesmo espaço vertical reservado entre a foto
 // e a faixa de baixo, com entrelinha mais justa pra caber sem encostar em nada
-const NAME_WRAP_GAP0 = NAME_Y - PHOTO_BOX.y - PHOTO_BOX.h; // mesma posição da 1ª linha do caso de 1 linha só (92)
+const NAME_WRAP_GAP0 = 74; // foto → baseline da 1ª linha (um pouco menor que os 92 do caso de 1 linha só, pra abrir espaço embaixo)
 const NAME_WRAP_LINE_GAP = NAME_SIZE * 0.92; // entrelinha justa entre as duas linhas do nome
-const NAME_WRAP_ADDR_GAP = 30; // última linha do nome → endereço
+const NAME_WRAP_ADDR_GAP = 46; // última linha do nome → endereço
 
 // layout — post do evento: título grande é o par tagline/data (serifado,
 // 2ª linha em itálico); o nome do evento vira o label pequeno em caixa
