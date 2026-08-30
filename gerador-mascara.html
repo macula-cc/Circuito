@@ -1275,10 +1275,22 @@ async function resolveMissingCoordinates(){
   if (resolvedAny) await setupFromLocations(false);
 }
 
+// mostra os dois números quando não batem (endereços com coordenada válida
+// vs total da planilha) — sem isso, "39 endereços" parecia dizer que o
+// mapa/marca tem 39 pontos, quando na real só os que têm coordenada
+// preenchida (e válida — ver parseCoord) entram no traçado. Fica óbvio na
+// hora se algum endereço quebrar de novo no futuro.
+function updateEvtStatsNote(){
+  const withCoordsCount = LOCATIONS.filter(l => l.lat != null && l.lng != null).length;
+  const suffix = withCoordsCount === numAddresses ? '' : ` (${withCoordsCount} no mapa agora)`;
+  document.getElementById('evt-stats-note').textContent = `${numAddresses} endereços${suffix} · ${numArtists} artistas (direto da planilha)`;
+}
+
 /* ============================================================
    boot
    ============================================================ */
 async function setupFromLocations(startNow = true){
+  updateEvtStatsNote();
   const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
   if (withCoords.length < 3){
     setStatus('poucos ateliês com coordenadas preenchidas ainda — é preciso pelo menos 3 pra fechar uma forma.', true);
@@ -1339,7 +1351,7 @@ async function boot(){
 
   numAddresses = LOCATIONS.length;
   numArtists = LOCATIONS.reduce((sum, l) => sum + l.artistas.filter(a => a.nome).length, 0);
-  document.getElementById('evt-stats-note').textContent = `${numAddresses} endereços · ${numArtists} artistas (direto da planilha)`;
+  updateEvtStatsNote();
 
   LOCATIONS.forEach(loc => loc.artistas.forEach(art => {
     if (art.nome) FLAT_ARTISTS.push({ ...art, loc });
