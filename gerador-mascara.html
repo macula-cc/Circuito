@@ -418,6 +418,18 @@ function computeFitTransform(points, box, fillFraction){
   const boxCx = box.x + box.w/2, boxCy = box.y + box.h/2;
   return { scale, cx, cy, boxCx, boxCy };
 }
+// como computeFitTransform, mas desce o centro vertical o máximo que der
+// pra chegar perto do rótulo "CIRCUITO..." no rodapé sem encostar nele
+// (em vez de ficar centralizado na caixa toda). labelY é a baseline do
+// texto do rótulo (EVT_LABEL_Y); a margem de segurança soma a metade da
+// espessura da fita/pino (~15px) mais um respiro visual
+function computeFitTransformNearLabel(points, box, fillFraction, labelY){
+  const t = computeFitTransform(points, box, fillFraction);
+  const halfH = ((Math.max(...points.map(p=>p.y)) - Math.min(...points.map(p=>p.y))) || 1) * t.scale / 2;
+  const safeMargin = 15 + 40;
+  t.boxCy = labelY - safeMargin - halfH;
+  return t;
+}
 function applyFitTransform(points, t){
   return points.map(p => ({ ...p, x: t.boxCx + (p.x-t.cx)*t.scale, y: t.boxCy + (p.y-t.cy)*t.scale }));
 }
@@ -1090,7 +1102,14 @@ function generateNewEventMark(){
   for (let i = 1; i < closed.length; i++) rawLegs.push(buildLegPath(closed[i-1], closed[i]));
   const pts = [ { x: closed[0].x, y: closed[0].y } ];
   rawLegs.forEach(leg => leg.slice(1).forEach(p => pts.push(p)));
-  const t = computeFitTransform(pts, EVT_MAP_BOX, 0.82);
+  // 0.92 em vez de 0.82: com a Rua do Russel fora do traçado, os pontos
+  // que sobraram formam uma nuvem mais larga que alta — em 0.82 isso
+  // deixava muito espaço vazio em cima/embaixo (traçado "achatado"/
+  // horizontal dentro do quadro). computeFitTransformNearLabel ainda
+  // desce o centro o quanto der pra ficar perto do rótulo "CIRCUITO..."
+  // no rodapé, sem encostar nele — testado visualmente até não sobrar
+  // nenhum ponto cortado pelas bordas
+  const t = computeFitTransformNearLabel(pts, EVT_MAP_BOX, 0.92, EVT_LABEL_Y);
   evtMarkLegs = rawLegs.map(leg => applyFitTransform(leg, t));
   evtMarkPins = applyFitTransform(order, t);
   redrawEvent();
@@ -1367,11 +1386,20 @@ async function setupFromLocations(startNow = true){
     return;
   }
   setStatus('');
+  // bounds usa o mesmo conjunto de pontos do traçado (exclui
+  // EXCLUDE_FROM_MARK) — precisa bater com o PTS_EVT logo abaixo. Se bounds
+  // incluísse o endereço excluído e PTS_EVT não, o mapa de fundo ficaria
+  // "zoomado" pra um território maior do que o necessário e o
+  // re-enquadramento (generateNewEventMark, mais abaixo) precisaria esticar
+  // o traçado de forma desigual pra compensar, achatando a composição (bug
+  // real: foi assim que a marca ficou horizontal ao excluir a Rua do
+  // Russel)
+  const withCoordsForMark = withCoords.filter(l => !EXCLUDE_FROM_MARK.has(l.endereco));
   const bounds = {
-    minLat: Math.min(...withCoords.map(l=>l.lat)),
-    maxLat: Math.max(...withCoords.map(l=>l.lat)),
-    minLng: Math.min(...withCoords.map(l=>l.lng)),
-    maxLng: Math.max(...withCoords.map(l=>l.lng)),
+    minLat: Math.min(...withCoordsForMark.map(l=>l.lat)),
+    maxLat: Math.max(...withCoordsForMark.map(l=>l.lat)),
+    minLng: Math.min(...withCoordsForMark.map(l=>l.lng)),
+    maxLng: Math.max(...withCoordsForMark.map(l=>l.lng)),
   };
 
   // post do evento — sempre carrega o mapa (mesmo com "esconder mapa"
@@ -1382,12 +1410,7 @@ async function setupFromLocations(startNow = true){
   await buildEvtBasemapMapLibre(bounds, 45);
   setStatus('');
   // PTS_EVT alimenta só o traçado decorativo da marca (generateNewEventMark)
-  // — exclui EXCLUDE_FROM_MARK aqui, mas NÃO no bounds acima: o mapa de
-  // fundo continua mostrando a área geográfica completa normalmente, só o
-  // traçado/pontos da marca em cima dele que pulam esse endereço
-  PTS_EVT = withCoords
-    .filter(l => !EXCLUDE_FROM_MARK.has(l.endereco))
-    .map(loc => ({ ...pixelOfEvt(loc.lat, loc.lng), id: loc.id }));
+  PTS_EVT = withCoordsForMark.map(loc => ({ ...pixelOfEvt(loc.lat, loc.lng), id: loc.id }));
 
   // numerado entre TODOS os endereços da planilha (não só os com coordenada
   // já preenchida) — mesmo critério do index.html, senão o número de um
