@@ -320,6 +320,11 @@ const CURATED_COORDS = {
   'Rua Luis de Camões 42': { lat: -22.9055693, lng: -43.1822654 },
   'Rua Luís de Camões 02, sobrado': { lat: -22.904813, lng: -43.1811294 },
   'Rua Mayrink Veiga 6, 11º andar': { lat: -22.899271, lng: -43.180383 },
+  'Rua Sara, 82': { lat: -22.9008919, lng: -43.2041747 },
+  'Rua Luís de Camões 75': { lat: -22.9055693, lng: -43.1822654 },
+  'Rua Sarah, 34': { lat: -22.9013783, lng: -43.2044414 }, // corrigido: célula com lat/lng corrompida pela planilha ("-229.013.783"), caiu no geocoding automático e resolveu em Nilópolis por engano
+  'Av. Gomes Freire, 33': { lat: -22.9116751, lng: -43.1835037 }, // Ateliê 2050 LAPA — endereço novo, geocodado (trecho da Av. Gomes Freire na Lapa)
+  'Rua Conde de Lages ,27': { lat: -22.9172024, lng: -43.1777996 }, // mesma coordenada de "Rua Conde de Lages 27" — variação de formatação na planilha (vírgula antes do número)
   'Rua México 164': { lat: -22.9071644, lng: -43.1757713 },
   'Rua México 31': { lat: -22.9114856, lng: -43.1743552 },
   'Rua Pedro Ernesto 56': { lat: -22.8960326, lng: -43.1936254 },
@@ -329,6 +334,18 @@ const CURATED_COORDS = {
   'Rua Álvaro Alvim 21, 18º andar': { lat: -22.9115713, lng: -43.1761788 },
   'Travessa do Paço 23': { lat: -22.904291, lng: -43.1733626 },
 };
+
+// endereços deliberadamente fora do traçado decorativo da marca do post do
+// evento — continuam aparecendo normalmente em tudo mais (mapa do site,
+// numeração, lista de artistas). Hoje só usado pro "1/4 Coletivo de Arte"
+// (Rua do Russel, 300): geograficamente bem mais distante do resto do
+// Centro, puxava sozinho o núcleo denso do traçado pra fora do centro
+// visual da composição, sobrepondo o título — decisão de design do
+// Eduardo (testado recentralizar automaticamente, não ficou bom), não bug
+// de código.
+const EXCLUDE_FROM_MARK = new Set([
+  'Rua do Russel, 300',
+]);
 
 // muitos artistas colam o link de "Compartilhar" do Google Drive (que abre
 // o visualizador em HTML, exige login, não é uma imagem de verdade) em vez
@@ -1364,7 +1381,13 @@ async function setupFromLocations(startNow = true){
   setStatus('carregando mapa…');
   await buildEvtBasemapMapLibre(bounds, 45);
   setStatus('');
-  PTS_EVT = withCoords.map(loc => ({ ...pixelOfEvt(loc.lat, loc.lng), id: loc.id }));
+  // PTS_EVT alimenta só o traçado decorativo da marca (generateNewEventMark)
+  // — exclui EXCLUDE_FROM_MARK aqui, mas NÃO no bounds acima: o mapa de
+  // fundo continua mostrando a área geográfica completa normalmente, só o
+  // traçado/pontos da marca em cima dele que pulam esse endereço
+  PTS_EVT = withCoords
+    .filter(l => !EXCLUDE_FROM_MARK.has(l.endereco))
+    .map(loc => ({ ...pixelOfEvt(loc.lat, loc.lng), id: loc.id }));
 
   // numerado entre TODOS os endereços da planilha (não só os com coordenada
   // já preenchida) — mesmo critério do index.html, senão o número de um

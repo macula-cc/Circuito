@@ -327,6 +327,11 @@ const CURATED_COORDS = {
   'Rua Luis de Camões 42': { lat: -22.9055693, lng: -43.1822654 },
   'Rua Luís de Camões 02, sobrado': { lat: -22.904813, lng: -43.1811294 },
   'Rua Mayrink Veiga 6, 11º andar': { lat: -22.899271, lng: -43.180383 },
+  'Rua Sara, 82': { lat: -22.9008919, lng: -43.2041747 },
+  'Rua Luís de Camões 75': { lat: -22.9055693, lng: -43.1822654 },
+  'Rua Sarah, 34': { lat: -22.9013783, lng: -43.2044414 }, // corrigido: célula com lat/lng corrompida pela planilha ("-229.013.783"), caiu no geocoding automático e resolveu em Nilópolis por engano
+  'Av. Gomes Freire, 33': { lat: -22.9116751, lng: -43.1835037 }, // Ateliê 2050 LAPA — endereço novo, geocodado (trecho da Av. Gomes Freire na Lapa)
+  'Rua Conde de Lages ,27': { lat: -22.9172024, lng: -43.1777996 }, // mesma coordenada de "Rua Conde de Lages 27" — variação de formatação na planilha (vírgula antes do número)
   'Rua México 164': { lat: -22.9071644, lng: -43.1757713 },
   'Rua México 31': { lat: -22.9114856, lng: -43.1743552 },
   'Rua Pedro Ernesto 56': { lat: -22.8960326, lng: -43.1936254 },
@@ -336,6 +341,17 @@ const CURATED_COORDS = {
   'Rua Álvaro Alvim 21, 18º andar': { lat: -22.9115713, lng: -43.1761788 },
   'Travessa do Paço 23': { lat: -22.904291, lng: -43.1733626 },
 };
+
+// endereços deliberadamente fora do traçado decorativo (marca/fita) —
+// continuam aparecendo normalmente em tudo mais (mapa do site, numeração,
+// lista de artistas). Hoje só usado pro "1/4 Coletivo de Arte" (Rua do
+// Russel, 300): geograficamente bem mais distante do resto do Centro,
+// puxava sozinho o núcleo denso do traçado pra fora do centro visual da
+// composição, sobrepondo o título — decisão de design do Eduardo (testado
+// tentar recentralizar automaticamente, não ficou bom), não bug de código.
+const EXCLUDE_FROM_MARK = new Set([
+  'Rua do Russel, 300',
+]);
 
 async function loadLocationsFromSheet(){
   const res = await fetch(`${SHEET_CSV_URL}&_=${Date.now()}`, { cache: 'no-store' });
@@ -674,7 +690,7 @@ function computeSimboloLegs(){
   simboloLegs = legs;
 }
 function generateNewRoute(){
-  const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null);
+  const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null && !EXCLUDE_FROM_MARK.has(l.endereco));
   const shuffled = [...withCoords].sort(() => Math.random()-0.5);
   selectedOrder = shuffled.map(l => l.id);
   countNote.textContent = `${selectedOrder.length} ateliês conectados, nesta ordem`;
@@ -1136,15 +1152,21 @@ function setupFromLocations(startNow = true){
     return;
   }
   setStatus('');
+  // withCoordsForMark: exclui os endereços fora do traçado (ver
+  // EXCLUDE_FROM_MARK) tanto do enquadramento (bounds/proj) quanto dos
+  // próprios pontos — senão a projeção continuaria "reservando espaço"
+  // pro endereço excluído mesmo sem desenhar ele, deixando o núcleo real
+  // menor/descentralizado à toa
+  const withCoordsForMark = withCoords.filter(l => !EXCLUDE_FROM_MARK.has(l.endereco));
   const bounds = {
-    minLat: Math.min(...withCoords.map(l=>l.lat)),
-    maxLat: Math.max(...withCoords.map(l=>l.lat)),
-    minLng: Math.min(...withCoords.map(l=>l.lng)),
-    maxLng: Math.max(...withCoords.map(l=>l.lng)),
+    minLat: Math.min(...withCoordsForMark.map(l=>l.lat)),
+    maxLat: Math.max(...withCoordsForMark.map(l=>l.lat)),
+    minLng: Math.min(...withCoordsForMark.map(l=>l.lng)),
+    maxLng: Math.max(...withCoordsForMark.map(l=>l.lng)),
   };
   proj = computeProjection(bounds, LOGICAL, LOGICAL, 60, 1.0);
 
-  PTS = withCoords.map(loc => {
+  PTS = withCoordsForMark.map(loc => {
     const { x, y } = pixelOf(loc.lat, loc.lng);
     return { loc, x, y };
   });
