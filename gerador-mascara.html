@@ -418,18 +418,6 @@ function computeFitTransform(points, box, fillFraction){
   const boxCx = box.x + box.w/2, boxCy = box.y + box.h/2;
   return { scale, cx, cy, boxCx, boxCy };
 }
-// como computeFitTransform, mas desce o centro vertical o máximo que der
-// pra chegar perto do rótulo "CIRCUITO..." no rodapé sem encostar nele
-// (em vez de ficar centralizado na caixa toda). labelY é a baseline do
-// texto do rótulo (EVT_LABEL_Y); a margem de segurança soma a metade da
-// espessura da fita/pino (~15px) mais um respiro visual
-function computeFitTransformNearLabel(points, box, fillFraction, labelY){
-  const t = computeFitTransform(points, box, fillFraction);
-  const halfH = ((Math.max(...points.map(p=>p.y)) - Math.min(...points.map(p=>p.y))) || 1) * t.scale / 2;
-  const safeMargin = 15 + 40;
-  t.boxCy = labelY - safeMargin - halfH;
-  return t;
-}
 function applyFitTransform(points, t){
   return points.map(p => ({ ...p, x: t.boxCx + (p.x-t.cx)*t.scale, y: t.boxCy + (p.y-t.cy)*t.scale }));
 }
@@ -1102,14 +1090,14 @@ function generateNewEventMark(){
   for (let i = 1; i < closed.length; i++) rawLegs.push(buildLegPath(closed[i-1], closed[i]));
   const pts = [ { x: closed[0].x, y: closed[0].y } ];
   rawLegs.forEach(leg => leg.slice(1).forEach(p => pts.push(p)));
-  // 0.92 em vez de 0.82: com a Rua do Russel fora do traçado, os pontos
-  // que sobraram formam uma nuvem mais larga que alta — em 0.82 isso
-  // deixava muito espaço vazio em cima/embaixo (traçado "achatado"/
-  // horizontal dentro do quadro). computeFitTransformNearLabel ainda
-  // desce o centro o quanto der pra ficar perto do rótulo "CIRCUITO..."
-  // no rodapé, sem encostar nele — testado visualmente até não sobrar
-  // nenhum ponto cortado pelas bordas
-  const t = computeFitTransformNearLabel(pts, EVT_MAP_BOX, 0.92, EVT_LABEL_Y);
+  // sempre centralizado na caixa (chegou a testar empurrar pro rodapé
+  // perto do rótulo "CIRCUITO...", mas quebrou o formato stories do
+  // gerador de vídeo — voltou pra centralização simples nas duas
+  // ferramentas). 0.92 em vez de 0.82: com a Rua do Russel fora do
+  // traçado, os pontos que sobraram formam uma nuvem mais larga que alta
+  // — em 0.82 isso deixava muito espaço vazio em cima/embaixo (traçado
+  // "achatado"/horizontal dentro do quadro)
+  const t = computeFitTransform(pts, EVT_MAP_BOX, 0.92);
   evtMarkLegs = rawLegs.map(leg => applyFitTransform(leg, t));
   evtMarkPins = applyFitTransform(order, t);
   redrawEvent();

@@ -521,18 +521,6 @@ function computeFitTransform(points, box, fillFraction){
   const boxCx = box.x + box.w/2, boxCy = box.y + box.h/2;
   return { scale, cx, cy, boxCx, boxCy };
 }
-// como computeFitTransform, mas desce o centro vertical o máximo que der
-// pra chegar perto do rótulo "CIRCUITO..." no rodapé sem encostar nele
-// (em vez de ficar centralizado na caixa toda). labelY é a baseline do
-// texto do rótulo (EVT_LABEL_Y); a margem de segurança soma a metade da
-// espessura da fita/pino (~15px) mais um respiro visual
-function computeFitTransformNearLabel(points, box, fillFraction, labelY){
-  const t = computeFitTransform(points, box, fillFraction);
-  const halfH = ((Math.max(...points.map(p=>p.y)) - Math.min(...points.map(p=>p.y))) || 1) * t.scale / 2;
-  const safeMargin = 15 + 40;
-  t.boxCy = labelY - safeMargin - halfH;
-  return t;
-}
 function applyFitTransform(points, t){
   return points.map(p => ({ ...p, x: t.boxCx + (p.x-t.cx)*t.scale, y: t.boxCy + (p.y-t.cy)*t.scale }));
 }
@@ -924,7 +912,7 @@ function buildRandomMark(){
   // trechos — essas variam a cada troca (reta ou curva, sorteado em
   // buildLegPath), e enquadrar por elas faria os pinos "balançarem" de
   // quadro em quadro mesmo representando os mesmos endereços
-  const t = computeFitTransformNearLabel(order, MAP_BOX, 0.92, EVT_LABEL_Y);
+  const t = computeFitTransform(order, MAP_BOX, 0.92);
   const legs = rawLegs.map(leg => applyFitTransform(leg, t));
   const pins = applyFitTransform(order, t);
   return { legs, pins };
@@ -1301,15 +1289,14 @@ async function setupFromLocations(startNow = true){
   // PTS alimenta o traçado decorativo (cobrinha e "troca de marcas")
   PTS = withCoordsForMark.map(loc => ({ ...pixelOf(loc.lat, loc.lng), id: loc.id }));
   // cobrinha ("circuito vivo") usa o mesmo enquadramento do "troca de
-  // marcas" — mesma escala/zoom visual nos dois tipos de vídeo. 0.92 em
-  // vez de 0.82: com a Rua do Russel fora do traçado, os pontos que
-  // sobraram formam uma nuvem mais larga que alta — em 0.82 isso deixava
-  // muito espaço vazio em cima/embaixo (traçado "achatado"/horizontal
-  // dentro do quadro). computeFitTransformNearLabel ainda desce o centro
-  // o quanto der pra ficar perto do rótulo "CIRCUITO..." no rodapé, sem
-  // encostar nele — testado visualmente até não sobrar nenhum ponto
-  // cortado pelas bordas
-  const tourFit = computeFitTransformNearLabel(PTS, MAP_BOX, 0.92, EVT_LABEL_Y);
+  // marcas" — mesma escala/zoom visual nos dois tipos de vídeo, sempre
+  // centralizado na caixa (chegou a testar empurrar pro rodapé perto do
+  // rótulo, mas em formatos altos como stories sobrava vazio enorme em
+  // cima — voltou pra centralização simples). 0.92 em vez de 0.82: com a
+  // Rua do Russel fora do traçado, os pontos que sobraram formam uma
+  // nuvem mais larga que alta — em 0.82 isso deixava muito espaço vazio
+  // em cima/embaixo (traçado "achatado"/horizontal dentro do quadro)
+  const tourFit = computeFitTransform(PTS, MAP_BOX, 0.92);
   PTS_TOUR = applyFitTransform(PTS, tourFit);
 
   // numerado entre TODOS os endereços da planilha (não só os com coordenada
