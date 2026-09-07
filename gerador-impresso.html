@@ -306,7 +306,6 @@ const RIGHT_COL_W = 330;
 const LEFT_COL_W = LOGICAL_W - RIGHT_COL_W;
 const CONTENT_TOP = MARQUEE_H;
 const CONTENT_BOTTOM = LOGICAL_H - MARQUEE_H;
-const RIGHT_PAD = 40; // padding interno da coluna direita (texto/QR)
 const QR_SIZE = 108;
 const INFO_TEXT_SIZE = 18; // "acesse o mapa" e o endereço do site, mesmo tamanho
 const BELOW_CROP_H = 220; // reservado embaixo do grafismo pro "acesse o mapa" + QR
@@ -451,42 +450,85 @@ function legGradientAttr(a, b){
 // o "esticado" de antes preenchendo sozinho, precisa de mais linha pra
 // manter a mesma densidade visual
 const CROP_PASSES = 5;
+// conta quantas linhas (legs) têm pelo menos um ponto dentro da caixa de
+// recorte, pra uma janela candidata (offX/offY) — usado só pra ESCOLHER a
+// melhor entre várias tentativas aleatórias, não pro desenho de verdade
+function countLegsInBox(legs, offX, offY){
+  const tx = CROP_BOX.x - offX, ty = CROP_BOX.y - offY;
+  let count = 0;
+  legs.forEach(leg => {
+    for (let i = 0; i < leg.length; i++){
+      const x = leg[i].x + tx, y = leg[i].y + ty;
+      if (x >= CROP_BOX.x && x <= CROP_BOX.x+CROP_BOX.w && y >= CROP_BOX.y && y <= CROP_BOX.y+CROP_BOX.h){
+        count++; break;
+      }
+    }
+  });
+  return count;
+}
 function generateCropArtwork(){
   const withCoords = LOCATIONS.filter(l => l.lat != null && l.lng != null && !EXCLUDE_FROM_MARK.has(l.endereco));
   if (withCoords.length < 2) return;
-  const basePts = withCoords.map(l => { const p = project(l.lat, l.lng); return { x:p.x*4000, y:p.y*4000 }; });
-  const rawLegs = [];
-  const allPts = [];
-  for (let pass = 0; pass < CROP_PASSES; pass++){
-    const order = [...basePts].sort(() => Math.random()-0.5);
-    const closed = [...order, order[0]];
-    for (let i = 1; i < closed.length; i++){
-      const leg = buildLegPath(closed[i-1], closed[i]);
-      rawLegs.push(leg);
-      leg.forEach(p => allPts.push(p));
+  // bug real (confirmado): a escala "cover" abaixo garante que o traçado
+  // CABE na caixa de recorte, mas não garante densidade uniforme — como
+  // é sempre o mesmo conjunto de pontos (só a ordem embaralha) e a escala
+  // muda bastante conforme a proporção da caixa, uma janela aleatória
+  // podia cair inteira numa região rala/vazia do traçado. Testado: ~45%
+  // das gerações saíam com a folha em branco. Corrigido tentando várias
+  // combinações de traçado embaralhado + janela de recorte e ficando com
+  // a de maior densidade (countLegsInBox), em vez de aceitar a primeira
+  // sorteada — ver MIN_LEGS_IN_BOX/MAX_*_TRIES
+  const MIN_LEGS_IN_BOX = 25;
+  const MAX_PATTERN_TRIES = 6;
+  const MAX_OFFSET_TRIES = 25;
+  let best = null;
+
+  for (let patternTry = 0; patternTry < MAX_PATTERN_TRIES; patternTry++){
+    const basePts = withCoords.map(l => { const p = project(l.lat, l.lng); return { x:p.x*4000, y:p.y*4000 }; });
+    const rawLegs = [];
+    const allPts = [];
+    for (let pass = 0; pass < CROP_PASSES; pass++){
+      const order = [...basePts].sort(() => Math.random()-0.5);
+      const closed = [...order, order[0]];
+      for (let i = 1; i < closed.length; i++){
+        const leg = buildLegPath(closed[i-1], closed[i]);
+        rawLegs.push(leg);
+        leg.forEach(p => allPts.push(p));
+      }
     }
+    // escala ÚNICA (proporcional, sem distorcer nenhum ângulo — mesmo
+    // princípio da marca de verdade em gerador-marca.html/computeFitTransform)
+    // grande o bastante pra cobrir a caixa de recorte inteira em QUALQUER
+    // janela aleatória dentro dela (mesmo espírito "cover"/object-fit:cover,
+    // igual coverDrawParams usa pra foto). A versão anterior esticava X e Y
+    // *independentemente* pra preencher uma caixa bem mais alta que larga —
+    // isso forçava toda linha (não importa a ordem aleatória) a ficar quase
+    // vertical, fazendo os grafismos parecerem distorcidos e repetitivos
+    // entre si, bem diferente da variedade de ângulos da marca de verdade.
+    const xs = allPts.map(p=>p.x), ys = allPts.map(p=>p.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const w = (maxX-minX) || 1, h = (maxY-minY) || 1;
+    const targetW = CROP_BOX.w * CROP_OVERSCAN, targetH = CROP_BOX.h * CROP_OVERSCAN;
+    const uniformScale = Math.max(targetW/w, targetH/h);
+    const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
+    const scaledW = w*uniformScale, scaledH = h*uniformScale;
+    const boxCx = scaledW/2, boxCy = scaledH/2;
+    const legs = rawLegs.map(leg => leg.map(p => ({ x: boxCx + (p.x-cx)*uniformScale, y: boxCy + (p.y-cy)*uniformScale })));
+
+    for (let offsetTry = 0; offsetTry < MAX_OFFSET_TRIES; offsetTry++){
+      const offX = Math.random() * Math.max(0, scaledW - CROP_BOX.w);
+      const offY = Math.random() * Math.max(0, scaledH - CROP_BOX.h);
+      const score = countLegsInBox(legs, offX, offY);
+      if (!best || score > best.score) best = { legs, offX, offY, score };
+      if (best.score >= MIN_LEGS_IN_BOX) break;
+    }
+    if (best.score >= MIN_LEGS_IN_BOX) break;
   }
-  // escala ÚNICA (proporcional, sem distorcer nenhum ângulo — mesmo
-  // princípio da marca de verdade em gerador-marca.html/computeFitTransform)
-  // grande o bastante pra cobrir a caixa de recorte inteira em QUALQUER
-  // janela aleatória dentro dela (mesmo espírito "cover"/object-fit:cover,
-  // igual coverDrawParams usa pra foto). A versão anterior esticava X e Y
-  // *independentemente* pra preencher uma caixa bem mais alta que larga —
-  // isso forçava toda linha (não importa a ordem aleatória) a ficar quase
-  // vertical, fazendo os grafismos parecerem distorcidos e repetitivos
-  // entre si, bem diferente da variedade de ângulos da marca de verdade.
-  const xs = allPts.map(p=>p.x), ys = allPts.map(p=>p.y);
-  const minX = Math.min(...xs), maxX = Math.max(...xs);
-  const minY = Math.min(...ys), maxY = Math.max(...ys);
-  const w = (maxX-minX) || 1, h = (maxY-minY) || 1;
-  const targetW = CROP_BOX.w * CROP_OVERSCAN, targetH = CROP_BOX.h * CROP_OVERSCAN;
-  const uniformScale = Math.max(targetW/w, targetH/h);
-  const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
-  const scaledW = w*uniformScale, scaledH = h*uniformScale;
-  const boxCx = scaledW/2, boxCy = scaledH/2;
-  cropLegs = rawLegs.map(leg => leg.map(p => ({ x: boxCx + (p.x-cx)*uniformScale, y: boxCy + (p.y-cy)*uniformScale })));
-  cropOffsetX = Math.random() * Math.max(0, scaledW - CROP_BOX.w);
-  cropOffsetY = Math.random() * Math.max(0, scaledH - CROP_BOX.h);
+
+  cropLegs = best.legs;
+  cropOffsetX = best.offX;
+  cropOffsetY = best.offY;
 }
 function buildCropSVG(){
   gradientDefs = []; gradientCounter = 0;
@@ -621,7 +663,12 @@ function drawLeftColumnCanvas(cctx, loc){
 // usada pelo SVG (prévia/QR, que não depende de fonte nenhuma) e pelo
 // canvas (texto na exportação)
 function computeInfoLayout(){
-  const infoX = LEFT_COL_W + RIGHT_PAD;
+  // alinhado à borda esquerda do próprio recorte do grafismo (CROP_BOX.x),
+  // não mais com um respiro de 40px pra dentro dele — o texto da URL
+  // ("circuitodeateliesdocentro.com.br") é o mais largo dos dois e, com
+  // aquele respiro, sua ponta direita ficava a ~9px da borda da página
+  // (bug real, quase encostando); assim sobra bem mais margem à direita
+  const infoX = LEFT_COL_W;
   let infoY = CROP_BOX.y + CROP_BOX.h + 40;
   const line1Y = infoY;
   infoY += INFO_TEXT_SIZE * 1.35;
