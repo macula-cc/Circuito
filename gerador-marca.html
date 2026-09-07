@@ -215,18 +215,64 @@ const TITLE_LINE_GAP_V = TITLE_SIZE_V * 0.95; // entrelinha dentro do título (2
 // no artboard
 const SYMBOL_V_SIZE = 720;
 const SYMBOL_V_STROKE = 38;
-const GAP_V = -20; // distância real entre a ponta de baixo do símbolo e a tipografia (negativo aproxima, compensando a margem do fillFraction do traçado)
+// GAP_V: só usado pra estimar a altura do grupo inteiro (símbolo+texto) e
+// centralizar essa caixa no artboard ANTES de saber o traçado real — o
+// traçado é sorteado aleatoriamente a cada "gerar nova marca" e quase nunca
+// preenche a caixa (fillFraction 0.97) até a borda de verdade, então usar
+// esse valor pra POSICIONAR o texto de fato deixava uma folga real de até
+// ~100px entre o traçado e a tipografia (variava a cada sorteio). A posição
+// final de verdade é recalculada em recomputeVerticalTextLayout(), chamada
+// de dentro de generateCompleteMark() depois que o traçado real existe —
+// ver TEXT_TOP_V/TITLE_X_V abaixo, que só guardam uma estimativa inicial.
+const GAP_V = -20;
 const TEXT_BLOCK_H_V = (LABEL_SIZE_V*0.72) + LABEL_LINE_GAP_V + LABEL_GAP_V + TITLE_LINE_GAP_V + (TITLE_SIZE_V*0.25);
 const GROUP_H_V = SYMBOL_V_SIZE + GAP_V + TEXT_BLOCK_H_V;
 const GROUP_TOP_V = (LOGICAL - GROUP_H_V) / 2;
 const MARK_BOX_V = { x: (LOGICAL - SYMBOL_V_SIZE)/2, y: GROUP_TOP_V, w: SYMBOL_V_SIZE, h: SYMBOL_V_SIZE };
-const TEXT_TOP_V = MARK_BOX_V.y + SYMBOL_V_SIZE + GAP_V;
-const LABEL1_V_Y = TEXT_TOP_V + LABEL_SIZE_V*0.72;
-const LABEL2_V_Y = LABEL1_V_Y + LABEL_LINE_GAP_V;
-const TITLE1_V_Y = LABEL2_V_Y + LABEL_GAP_V;
-const TITLE2_V_Y = TITLE1_V_Y + TITLE_LINE_GAP_V;
-// alinhado à esquerda pela borda do símbolo (mesma posição x pras 4 linhas)
-const TITLE_X_V = MARK_BOX_V.x;
+// distância visual de verdade entre a ponta de baixo/esquerda do traçado
+// real e a tipografia — pequena de propósito, pra ficar bem próximo
+const TEXT_GAP_V = 14;
+// valores iniciais (estimativa, caixa teórica) — substituídos por
+// recomputeVerticalTextLayout() assim que o traçado real é gerado
+let TEXT_TOP_V = MARK_BOX_V.y + SYMBOL_V_SIZE + GAP_V;
+let LABEL1_V_Y = TEXT_TOP_V + LABEL_SIZE_V*0.72;
+let LABEL2_V_Y = LABEL1_V_Y + LABEL_LINE_GAP_V;
+let TITLE1_V_Y = LABEL2_V_Y + LABEL_GAP_V;
+let TITLE2_V_Y = TITLE1_V_Y + TITLE_LINE_GAP_V;
+// bloco de texto inteiro centralizado no centro horizontal real do
+// traçado (não o da caixa teórica) — mas cada linha continua alinhada
+// pela ESQUERDA a partir dessa mesma borda esquerda do bloco (rente à
+// esquerda, não centralizada linha a linha — "CIRCUITO DE" é bem mais
+// curta que "ATELIÊS DO CENTRO", centralizar cada linha separada ficaria
+// mais torto). TITLE_X_V é a borda esquerda do bloco, calculada a partir
+// do centro real do traçado menos a metade da linha mais larga
+let TITLE_X_V = MARK_BOX_V.x;
+// chamada depois que completeMarkLegs (traçado real, já com o fit
+// aplicado) existe — reposiciona o bloco de texto rente à ponta de baixo
+// de verdade do traçado daquela geração específica (vertical) e
+// centralizado (como bloco) no centro horizontal real dele (horizontal)
+// — um pino que sobre mais pra direita, embaixo, ficava longe do bloco de
+// texto quando ele começava lá na ponta esquerda extrema do traçado
+function recomputeVerticalTextLayout(legs){
+  const pts = legs.flat();
+  if (!pts.length) return;
+  const realMinX = Math.min(...pts.map(p => p.x));
+  const realMaxX = Math.max(...pts.map(p => p.x));
+  const realMaxY = Math.max(...pts.map(p => p.y));
+  const realCenterX = (realMinX+realMaxX)/2;
+  const blockW = Math.max(
+    estimateSansWidth(LABEL_LINE1_V, LABEL_SIZE_V),
+    estimateSansWidth(LABEL_LINE2_V, LABEL_SIZE_V),
+    estimateTextWidth(EVENT_TAGLINE, TITLE_SIZE_V),
+    estimateTextWidth(EVENT_DATES, TITLE_SIZE_V)
+  );
+  TITLE_X_V = realCenterX - blockW/2;
+  TEXT_TOP_V = realMaxY + TEXT_GAP_V;
+  LABEL1_V_Y = TEXT_TOP_V + LABEL_SIZE_V*0.72;
+  LABEL2_V_Y = LABEL1_V_Y + LABEL_LINE_GAP_V;
+  TITLE1_V_Y = LABEL2_V_Y + LABEL_GAP_V;
+  TITLE2_V_Y = TITLE1_V_Y + TITLE_LINE_GAP_V;
+}
 
 // horizontal: símbolo menor ao lado, mesmo núcleo tipográfico "cheio" (só a
 // vertical fica menor); composição inteira ampliada/centralizada no
@@ -711,6 +757,7 @@ function generateCompleteMark(){
   const t = computeFitTransform(pts, box, 0.97);
   completeMarkLegs = rawLegs.map(leg => applyFitTransform(leg, t));
   completeMarkPins = applyFitTransform(order, t).map((p,i) => ({ ...p, loc: order[i].loc }));
+  if (orientMarca === 'vertical') recomputeVerticalTextLayout(completeMarkLegs);
   draw();
 }
 document.getElementById('btn-shuffle').addEventListener('click', () => {
