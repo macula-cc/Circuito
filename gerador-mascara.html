@@ -85,6 +85,14 @@
       </div>
     </div>
 
+    <div class="field">
+      <label>Formato</label>
+      <div class="row-btns" id="formato-row">
+        <button class="btn active" id="formato-quadrado" data-formato="quadrado">quadrado</button>
+        <button class="btn" id="formato-feed" data-formato="feed">feed 4:5</button>
+      </div>
+    </div>
+
     <!-- Fundo: compartilhado entre os dois modos — "mapa" (só faz sentido no
          post do evento) fica escondido via JS quando o modo é artista -->
     <div class="field">
@@ -157,7 +165,16 @@
    dados
    ============================================================ */
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
-const LOGICAL = 1000;
+// LOGICAL_W nunca muda; LOGICAL_H varia por formato (1000 = quadrado 1:1,
+// 1250 = feed 4:5) — mesma convenção do gerador-video.html. postFormat e
+// tudo que depende da altura do artboard (PHOTO_BOX, EVT_MAP_BOX, etc.) é
+// recomputado em applyPostFormat(), chamada no boot() e ao trocar de
+// formato — ver mais abaixo, perto de onde svgEl/eventCanvas/canvasFrame
+// já existem (a função referencia esses elementos, mas só executa quando
+// chamada, não na hora que é definida)
+const LOGICAL_W = 1000;
+let LOGICAL_H = 1000;
+let postFormat = 'quadrado'; // quadrado | feed
 const SANS_DISPLAY = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const EVENT_TITLE = 'Circuito de Ateliês do Centro';
 const EVENT_EYEBROW = 'Ateliês abertos';
@@ -165,15 +182,14 @@ const EVENT_DATES = '18 – 19 de Setembro';
 
 // layout — post do artista: uma faixa de marquee em cima e outra embaixo
 // (sempre no mesmo cinza/preto, independente do tema de fundo escolhido —
-// mesmo princípio do .event-marquee/.map-dim do site), foto em sangria
-// total no meio, nome + endereço em Inter logo abaixo da foto
+// mesmo princípio do .event-marquee/.map-dim do site), foto no meio, nome +
+// endereço em Inter logo abaixo da foto. PHOTO_BOX/NAME_Y/ADDR_Y mudam por
+// formato — ver applyPostFormat()
 const MARQUEE_BAR_H = 80;
 const MARGIN = 44;
-const PHOTO_BOX = { x: 0, y: MARQUEE_BAR_H, w: LOGICAL, h: 620 };
+let PHOTO_BOX, NAME_Y, ADDR_Y;
 const NAME_SIZE = 76;
 const ADDR_SIZE = 27;
-const NAME_Y = PHOTO_BOX.y + PHOTO_BOX.h + 92;
-const ADDR_Y = NAME_Y + 48;
 // nome que não cabe numa linha só (ex: "Francisco 'Chiko' Guimarães") quebra
 // em até duas linhas, no MESMO tamanho de fonte (NAME_SIZE) — não encolhe,
 // só quebra — reaproveitando o mesmo espaço vertical reservado entre a foto
@@ -188,7 +204,14 @@ const NAME_WRAP_ADDR_GAP = 46; // última linha do nome → endereço
 // alta acima da baseline do que o endereço (27px) tem abaixo dela. Por
 // isso essa conta só fecha de verdade depois que as fontes carregam de
 // vez (ver computeNameWrapGap0(), chamada no boot() com métrica real de
-// ascent/descent — não dá pra confiar em medir com a fonte de fallback)
+// ascent/descent — não dá pra confiar em medir com a fonte de fallback).
+// o espaço foto→nome (NAME_WRAP_GAP0) é o MESMO nos dois formatos — sempre
+// calculado com a geometria do quadrado (foto de 620px), não a do formato
+// ativo no momento. No feed, a foto 4:3 é mais alta e o artboard também,
+// mas o espaço extra que sobra vira respiro embaixo do endereço, antes da
+// faixa debaixo — não um espaço maior entre foto e nome (ver PHOTO_BOX/
+// NAME_Y/ADDR_Y em applyPostFormat(), que só desloca o bloco todo pra
+// baixo, mantendo a mesma distância relativa à foto)
 let NAME_WRAP_GAP0 = 60; // valor inicial de segurança, substituído no boot()
 function computeNameWrapGap0(){
   // actualBoundingBoxAscent/Descent de um texto de exemplo REALISTA (não
@@ -201,7 +224,9 @@ function computeNameWrapGap0(){
   const nameAscent = ectx.measureText('Guimarães').actualBoundingBoxAscent;
   ectx.font = `400 ${ADDR_SIZE}px ${SANS_DISPLAY}`;
   const addrDescent = ectx.measureText('Praça XV de Novembro').actualBoundingBoxDescent;
-  const totalSpace = (LOGICAL - MARQUEE_BAR_H) - (PHOTO_BOX.y + PHOTO_BOX.h);
+  // geometria FIXA do quadrado (LOGICAL_H=LOGICAL_W, foto de 620px), não a
+  // do formato ativo — ver comentário acima
+  const totalSpace = (LOGICAL_W - MARQUEE_BAR_H) - (MARQUEE_BAR_H + 620);
   NAME_WRAP_GAP0 = (totalSpace - NAME_WRAP_LINE_GAP - NAME_WRAP_ADDR_GAP - addrDescent + nameAscent) / 2;
 }
 
@@ -213,8 +238,8 @@ const EVT_TITLE_L2 = EVENT_DATES;   // '18 – 19 de Setembro' (itálico)
 const EVT_TITLE_SIZE = 104;
 const EVT_TITLE_Y1 = 126;
 const EVT_TITLE_Y2 = 224;
-const EVT_TITLE_X = LOGICAL / 2; // centralizado no artboard
-const EVT_MAP_BOX = { x: 0, y: 0, w: LOGICAL, h: LOGICAL };
+const EVT_TITLE_X = LOGICAL_W / 2; // centralizado no artboard (largura não muda por formato)
+let EVT_MAP_BOX; // {x:0,y:0,w:LOGICAL_W,h:LOGICAL_H} — recomputado em applyPostFormat()
 const EVT_MARK_WIDTH = 30;
 const EVT_STATS_SIZE = 40;
 // infos secundárias: as duas linhas centralizadas no artboard — estatísticas
@@ -229,8 +254,8 @@ const EVT_LABEL_WEIGHT = 400;
 // altura de caixa)
 const EVT_LABEL_SIZE_FACTOR = 0.85;
 let EVT_LABEL_SIZE = 26;
-const EVT_LABEL_Y = 930; // mesma margem inferior que as estatísticas tinham antes
-const EVT_STATS_Y = EVT_LABEL_Y - 44; // acima do label
+let EVT_LABEL_Y = 930; // = LOGICAL_H - 70, recomputado em applyPostFormat()
+let EVT_STATS_Y = EVT_LABEL_Y - 44; // acima do label
 function computeEvtLabelSize(){
   ectx.font = `${EVT_STATS_SIZE}px 'Instrument Serif', Georgia, serif`;
   const serifCap = ectx.measureText('E').actualBoundingBoxAscent;
@@ -691,6 +716,29 @@ const ectx = eventCanvas.getContext('2d');
 const artistSelect = document.getElementById('artist-select');
 const statusEl = document.getElementById('status');
 const canvasFrame = document.getElementById('canvas-frame');
+
+// aplica o formato atual (postFormat) a tudo que depende da altura do
+// artboard: LOGICAL_H, PHOTO_BOX (foto do post do artista — em sangria
+// total no quadrado, 4:3 no feed) e EVT_MAP_BOX/EVT_LABEL_Y (post do
+// evento), além do próprio SVG/canvas/moldura na tela. Chamada uma vez
+// aqui embaixo (estado inicial) e de novo sempre que o botão de formato
+// muda (ver mais abaixo, perto de mode/bg)
+function applyPostFormat(){
+  LOGICAL_H = postFormat === 'feed' ? Math.round(LOGICAL_W * 5/4) : LOGICAL_W;
+  PHOTO_BOX = postFormat === 'feed'
+    ? { x: 0, y: MARQUEE_BAR_H, w: LOGICAL_W, h: Math.round(LOGICAL_W * 3/4) } // feed: foto em 4:3
+    : { x: 0, y: MARQUEE_BAR_H, w: LOGICAL_W, h: 620 }; // quadrado: sangria total, comportamento de sempre
+  NAME_Y = PHOTO_BOX.y + PHOTO_BOX.h + 92; // mesmo espaço foto→nome nos dois formatos
+  ADDR_Y = NAME_Y + 48;
+  EVT_MAP_BOX = { x: 0, y: 0, w: LOGICAL_W, h: LOGICAL_H };
+  EVT_LABEL_Y = LOGICAL_H - 70;
+  EVT_STATS_Y = EVT_LABEL_Y - 44;
+  svgEl.setAttribute('viewBox', `0 0 ${LOGICAL_W} ${LOGICAL_H}`);
+  eventCanvas.width = LOGICAL_W;
+  eventCanvas.height = LOGICAL_H;
+  canvasFrame.style.aspectRatio = `${LOGICAL_W} / ${LOGICAL_H}`;
+}
+applyPostFormat();
 const bgBtns = { mapa: document.getElementById('bg-mapa'), branco: document.getElementById('bg-branco'), cinza: document.getElementById('bg-cinza'), preto: document.getElementById('bg-preto') };
 const fillSolidoBtn = document.getElementById('fill-solido');
 const fillDegradeBtn = document.getElementById('fill-degrade');
@@ -733,6 +781,21 @@ function setMode(m){
   syncBgButtonsActive();
   if (m === 'artista') draw(); else redrawEvent();
 }
+
+/* ---- troca de formato ---- */
+const formatoQuadradoBtn = document.getElementById('formato-quadrado');
+const formatoFeedBtn = document.getElementById('formato-feed');
+document.getElementById('formato-row').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-formato]');
+  if (!btn || btn.dataset.formato === postFormat) return;
+  postFormat = btn.dataset.formato;
+  formatoQuadradoBtn.classList.toggle('active', postFormat === 'quadrado');
+  formatoFeedBtn.classList.toggle('active', postFormat === 'feed');
+  applyPostFormat();
+  // o mapa do post do evento precisa ser refeito no tamanho novo do artboard
+  if (LOCATIONS.length) await setupFromLocations();
+  if (mode === 'artista') draw(); else redrawEvent();
+});
 
 /* ---- cores/fundo (compartilhado) — "mapa" é só relevante no post do
    evento: mostra o mapa real em vez de uma cor chapada */
@@ -830,7 +893,7 @@ artistSelect.addEventListener('change', () => setArtist(parseInt(artistSelect.va
 function computeMarqueeLayout(h){
   const labelTxt = EVENT_TITLE.toUpperCase();
   const eyebrowTxt = EVENT_EYEBROW + ' ';
-  const available = LOGICAL - MARGIN*2;
+  const available = LOGICAL_W - MARGIN*2;
 
   function measure(lblSize, dtSize){
     ectx.letterSpacing = `${(lblSize*-0.025).toFixed(2)}px`; // .marquee-item: letter-spacing:-0.025em
@@ -868,7 +931,7 @@ function buildMarqueeBarSVG(y, h, opts){
   // fundo cinza (#d8d8d6) some contra um artboard cinza (mesmo tom) — nesse
   // caso o marquee vira branco pra manter contraste
   const marqueeBg = currentTheme === 'cinza' ? '#ffffff' : '#d8d8d6';
-  let s = `<rect x="0" y="${y.toFixed(2)}" width="${LOGICAL}" height="${h.toFixed(2)}" fill="${marqueeBg}"/>`;
+  let s = `<rect x="0" y="${y.toFixed(2)}" width="${LOGICAL_W}" height="${h.toFixed(2)}" fill="${marqueeBg}"/>`;
   if (skipText) return s; // exportação: o texto é desenhado depois, direto no canvas (ver drawMarqueeBarCanvas)
 
   const { labelTxt, eyebrowTxt, labelSize, dateSize, m } = computeMarqueeLayout(h);
@@ -914,7 +977,7 @@ function drawMarqueeBarCanvas(cctx, y, h){
 // linhas — sempre no MESMO tamanho de fonte (não encolhe), reposicionando
 // o endereço logo abaixo da última linha
 function computeNameLayout(name){
-  const availableW = LOGICAL - MARGIN*2;
+  const availableW = LOGICAL_W - MARGIN*2;
   ectx.font = `500 ${NAME_SIZE}px ${SANS_DISPLAY}`;
   if (ectx.measureText(name).width <= availableW){
     return { size: NAME_SIZE, lines: [name], baseline0: NAME_Y, lineGap: 0, addrY: ADDR_Y };
@@ -947,7 +1010,7 @@ function buildContentSVG(opts){
   const forExport = opts && opts.forExport;
   const theme = THEMES[currentTheme];
   let s = '';
-  s += `<rect x="0" y="0" width="${LOGICAL}" height="${LOGICAL}" fill="${theme.bg}"/>`;
+  s += `<rect x="0" y="0" width="${LOGICAL_W}" height="${LOGICAL_H}" fill="${theme.bg}"/>`;
 
   const hasPhoto = currentArtist && currentArtist.foto && photoOk;
   if (hasPhoto && forExport){
@@ -968,7 +1031,7 @@ function buildContentSVG(opts){
   }
 
   s += buildMarqueeBarSVG(0, MARQUEE_BAR_H, { skipText: forExport });
-  s += buildMarqueeBarSVG(LOGICAL - MARQUEE_BAR_H, MARQUEE_BAR_H, { skipText: forExport });
+  s += buildMarqueeBarSVG(LOGICAL_H - MARQUEE_BAR_H, MARQUEE_BAR_H, { skipText: forExport });
 
   if (!forExport){
     const nameLayout = computeNameLayout(currentArtist ? currentArtist.nome : '—');
@@ -1004,7 +1067,7 @@ function buildFullSVGString(scale){
   const s = scale || 1;
   const content = buildContentSVG({ forExport: true });
   return `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LOGICAL} ${LOGICAL}" width="${LOGICAL*s}" height="${LOGICAL*s}">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LOGICAL_W} ${LOGICAL_H}" width="${LOGICAL_W*s}" height="${LOGICAL_H*s}">` +
     content +
     `</svg>`;
 }
@@ -1015,8 +1078,8 @@ async function rasterizeSVG(scale){
     const img = new Image();
     img.onload = () => {
       const c = document.createElement('canvas');
-      c.width = LOGICAL * scale;
-      c.height = LOGICAL * scale;
+      c.width = LOGICAL_W * scale;
+      c.height = LOGICAL_H * scale;
       const cctx = c.getContext('2d');
       try{
         cctx.drawImage(img, 0, 0, c.width, c.height);
@@ -1045,7 +1108,7 @@ async function rasterizeSVG(scale){
         cctx.save();
         cctx.scale(scale, scale);
         drawMarqueeBarCanvas(cctx, 0, MARQUEE_BAR_H);
-        drawMarqueeBarCanvas(cctx, LOGICAL - MARQUEE_BAR_H, MARQUEE_BAR_H);
+        drawMarqueeBarCanvas(cctx, LOGICAL_H - MARQUEE_BAR_H, MARQUEE_BAR_H);
         if (!hasPhoto){
           cctx.fillStyle = '#ffffff';
           cctx.font = `48px ${SANS_DISPLAY}`;
@@ -1133,9 +1196,9 @@ function revealedFlatPoints(legs, dist){
 
 function drawEventFrame(ctx2d, dMark, markPath){
   const theme = THEMES[currentTheme];
-  ctx2d.clearRect(0, 0, LOGICAL, LOGICAL);
+  ctx2d.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
   ctx2d.fillStyle = theme.bg;
-  ctx2d.fillRect(0, 0, LOGICAL, LOGICAL);
+  ctx2d.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
 
   if (showMapEvt && evtBasemapCanvas){
     ctx2d.drawImage(evtBasemapCanvas, EVT_MAP_BOX.x, EVT_MAP_BOX.y, EVT_MAP_BOX.w, EVT_MAP_BOX.h);
@@ -1187,7 +1250,7 @@ function drawEventFrame(ctx2d, dMark, markPath){
     // invertida do texto por baixo dela
     if (flatRevealed.length >= 2){
       const off = document.createElement('canvas');
-      off.width = LOGICAL; off.height = LOGICAL;
+      off.width = LOGICAL_W; off.height = LOGICAL_H;
       const octx = off.getContext('2d');
       octx.fillStyle = theme.bg;
       octx.textAlign = 'center'; octx.textBaseline = 'alphabetic';
@@ -1203,7 +1266,7 @@ function drawEventFrame(ctx2d, dMark, markPath){
       octx.beginPath();
       flatRevealed.forEach((p, i) => { if (i === 0) octx.moveTo(p.x, p.y); else octx.lineTo(p.x, p.y); });
       octx.stroke();
-      ctx2d.drawImage(off, 0, 0, LOGICAL, LOGICAL);
+      ctx2d.drawImage(off, 0, 0, LOGICAL_W, LOGICAL_H);
     }
   }
 
@@ -1232,7 +1295,7 @@ function drawEventFrame(ctx2d, dMark, markPath){
   ctx2d.textAlign = 'center';
   ctx2d.fillStyle = theme.ink;
   ctx2d.font = `${EVT_LABEL_WEIGHT} ${EVT_LABEL_SIZE}px ${SANS_DISPLAY}`;
-  ctx2d.fillText(EVT_LABEL_L, LOGICAL/2, EVT_LABEL_Y);
+  ctx2d.fillText(EVT_LABEL_L, LOGICAL_W/2, EVT_LABEL_Y);
   ctx2d.textAlign = 'left';
 }
 
@@ -1264,7 +1327,7 @@ document.getElementById('btn-download-png').addEventListener('click', async () =
     } else {
       const scale = 3;
       const c = document.createElement('canvas');
-      c.width = LOGICAL*scale; c.height = LOGICAL*scale;
+      c.width = LOGICAL_W*scale; c.height = LOGICAL_H*scale;
       const cctx = c.getContext('2d');
       cctx.scale(scale, scale);
       const full = markPathForFrame();
@@ -1295,7 +1358,7 @@ document.getElementById('btn-download-pdf').addEventListener('click', async () =
     } else {
       const scale = 3;
       const c = document.createElement('canvas');
-      c.width = LOGICAL*scale; c.height = LOGICAL*scale;
+      c.width = LOGICAL_W*scale; c.height = LOGICAL_H*scale;
       const cctx = c.getContext('2d');
       cctx.scale(scale, scale);
       const full = markPathForFrame();
@@ -1303,8 +1366,8 @@ document.getElementById('btn-download-pdf').addEventListener('click', async () =
       dataUrl = c.toDataURL('image/png');
     }
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: 'px', format: [LOGICAL, LOGICAL] });
-    doc.addImage(dataUrl, 'PNG', 0, 0, LOGICAL, LOGICAL);
+    const doc = new jsPDF({ unit: 'px', format: [LOGICAL_W, LOGICAL_H] });
+    doc.addImage(dataUrl, 'PNG', 0, 0, LOGICAL_W, LOGICAL_H);
     doc.save(mode === 'artista' ? 'circuito-post-artista.pdf' : 'circuito-post-evento.pdf');
     setStatus('');
   } catch(err){
