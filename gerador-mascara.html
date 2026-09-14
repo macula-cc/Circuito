@@ -351,6 +351,13 @@ const CURATED_COORDS = {
   'Rua da Lapa 102': { lat: -22.9155886, lng: -43.1777324 }, // corrigido: geocodificação automática (com o sufixo "Centro" na busca) resolvia no Centro Histórico de Paraty, não no Centro do Rio — "Centro" bateu com o nome do bairro de lá
   'Av. Gomes Freire, 33': { lat: -22.9116751, lng: -43.1835037 }, // Ateliê 2050 LAPA — endereço novo, geocodado (trecho da Av. Gomes Freire na Lapa)
   'Rua Conde de Lages ,27': { lat: -22.9172024, lng: -43.1777996 }, // mesma coordenada de "Rua Conde de Lages 27" — variação de formatação na planilha (vírgula antes do número)
+  'Rua do Russel, 300 Edificio Lage': { lat: -22.9233172, lng: -43.1728138 }, // mesma coordenada de "Rua do Russel, 300" — erro de digitação na planilha juntou o nome do prédio (deveria estar em Local/Coletivo) ao endereço
+  'Av. Mem de Sá, 33': { lat: -22.9106465, lng: -43.1842689 }, // 2050 LAPA — célula de lat/lng corrompida pela planilha, geocodado e confirmado
+  'Rua Miguel Couto, 98': { lat: -22.900923, lng: -43.180354 }, // corrigido: célula corrompida pela planilha ("-22.900.923"/"-43.180.354")
+  'Rua do Senado 338': { lat: -22.9116961314177, lng: -43.1926349617462 }, // corrigido: célula bem corrompida pela planilha ("-22.911.696.131.417.700")
+  'Rua Camerino, 57': { lat: -22.9007393, lng: -43.1862836 }, // mesma coordenada do vizinho já curado "Rua Camerino, 59"
+  'R. Carlos Sampaio, 47': { lat: -22.9131142, lng: -43.1882705 }, // geocodado — confiança média, 2 candidatos ~250m diferentes dentro do Centro
+  'Avenida Beira Mar 262': { lat: -22.9108387, lng: -43.1696775 }, // geocodado — confiança média
   'Rua México 164': { lat: -22.9071644, lng: -43.1757713 },
   'Rua México 31': { lat: -22.9114856, lng: -43.1743552 },
   'Rua Pedro Ernesto 56': { lat: -22.8960326, lng: -43.1936254 },
@@ -371,6 +378,7 @@ const CURATED_COORDS = {
 // de código.
 const EXCLUDE_FROM_MARK = new Set([
   'Rua do Russel, 300',
+  'Rua do Russel, 300 Edificio Lage', // mesmo endereço — texto na planilha às vezes vem com o nome do prédio junto (erro de digitação, deveria estar em Local/Coletivo)
 ]);
 
 // muitos artistas colam o link de "Compartilhar" do Google Drive (que abre
