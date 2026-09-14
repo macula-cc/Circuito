@@ -160,11 +160,11 @@ function parseCoord(raw, min, max){
 // código (não é editável pela planilha).
 const CURATED_COORDS = {
   'Arco do Telles, 17 - Pça XV': { lat: -22.9027582, lng: -43.1746864 },
-  'Av. Churchill 94, 4o andar': { lat: -22.9095612, lng: -43.1717542 },
+  'Av. Churchill 94, 4o andar': { lat: -22.9079936, lng: -43.1703966 }, // corrigido: reaudit — batia exato com o prédio real (Ministério Público do Trabalho), ~220m do valor antigo
   'Av. Erasmo Braga 255, Sobreloja': { lat: -22.9056853, lng: -43.1744404 },
   'Av. Marechal Floriano 143': { lat: -22.9024075, lng: -43.1853374 },
   'Av. Nilo Peçanha 50, 2201': { lat: -22.9060475, lng: -43.1776024 },
-  'Av. Presidente Vargas 509/1603': { lat: -22.9004357, lng: -43.177257 },
+  'Av. Presidente Vargas 509/1603': { lat: -22.902087, lng: -43.180236 }, // corrigido: reaudit — batia exato com o prédio real (Edifício Montreal), ~360m do valor antigo
   'Av. Rio Branco 277': { lat: -22.9118133, lng: -43.1747917 },
   'Avenida Beira Mar 216': { lat: -22.9105342, lng: -43.1704502 },
   'Avenida Franklin Roosevelt 39': { lat: -22.9096441, lng: -43.1714199 },
@@ -184,7 +184,7 @@ const CURATED_COORDS = {
   'Rua do Passeio 2': { lat: -22.9125195, lng: -43.1754608 },
   'Rua do Rosário 104, 4º andar': { lat: -22.9026452, lng: -43.1777889 },
   'Rua do Russel, 300': { lat: -22.9233172, lng: -43.1728138 },
-  'Rua do Senado 227': { lat: -22.9107373, lng: -43.1891061 },
+  'Rua do Senado 227': { lat: -22.9091948, lng: -43.1846348 }, // corrigido: reaudit — match exato com o número da casa, ~490m do valor antigo
   'Rua dos invalidos 27, sobrado': { lat: -22.9090507, lng: -43.1856628 },
   'Rua dos Inválidos 08': { lat: -22.913504, lng: -43.1842394 },
   'Rua Luis de Camões 42': { lat: -22.9055693, lng: -43.1822654 },
@@ -202,7 +202,7 @@ const CURATED_COORDS = {
   'Rua do Senado 338': { lat: -22.9116961314177, lng: -43.1926349617462 }, // corrigido: célula bem corrompida pela planilha ("-22.911.696.131.417.700")
   'Rua Camerino, 57': { lat: -22.9007393, lng: -43.1862836 }, // mesma coordenada do vizinho já curado "Rua Camerino, 59"
   'R. Carlos Sampaio, 47': { lat: -22.9131142, lng: -43.1882705 }, // geocodado — confiança média, 2 candidatos ~250m diferentes dentro do Centro
-  'Avenida Beira Mar 262': { lat: -22.9108387, lng: -43.1696775 }, // geocodado — confiança média
+  'Avenida Beira Mar 262': { lat: -22.910610, lng: -43.170899 }, // corrigido: reclamação de morador (pino parecia ficar antes do 216, deveria vir depois) — interpolado a partir de números de porta REAIS mapeados no OpenStreetMap na mesma via (216, confirmado certo, e 280), não geocodificação de texto livre
   'Rua México 164': { lat: -22.9071644, lng: -43.1757713 },
   'Rua México 31': { lat: -22.9114856, lng: -43.1743552 },
   'Rua Pedro Ernesto 56': { lat: -22.8960326, lng: -43.1936254 },
