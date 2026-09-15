@@ -35,6 +35,7 @@
        idênticos ao visual de sempre caso o script não rode por algum motivo */
     --map-bg:#e9e9e9;
     --marker-core:#171717;
+    --marker-text:#fff;
     --marquee-idle-bg:#d8d8d6;
     --marquee-idle-rgb:216,216,214;
     --marquee-grad-start:#0a0a0a;
@@ -159,7 +160,7 @@
   .switcher button::before{ content:''; position:absolute; inset:2px; border-radius:999px;
                              background:var(--marker-core); filter:blur(2px); z-index:-1;
                              opacity:0; transition:opacity 0.2s ease; }
-  .switcher button.active{ color:var(--paper); }
+  .switcher button.active{ color:var(--marker-text); }
   .switcher button.active::before{ opacity:1; }
   .switcher button:not(.active):hover{ background:rgba(255,255,255,0.35); }
 
@@ -189,7 +190,7 @@
   .sort-switch button::before{ content:''; position:absolute; inset:2px; border-radius:999px;
                                 background:var(--marker-core); filter:blur(2px); z-index:-1;
                                 opacity:0; transition:opacity 0.2s ease; }
-  .sort-switch button.active{ color:var(--paper); }
+  .sort-switch button.active{ color:var(--marker-text); }
   .sort-switch button.active::before{ opacity:1; }
   .sort-switch button:not(.active):hover{ background:rgba(255,255,255,0.35); }
 
@@ -214,7 +215,7 @@
      no hover/active. */
   .pin{ width:24px; height:24px; border-radius:50%; position:relative;
         display:flex; align-items:center; justify-content:center;
-        font-family:var(--mono); font-size:0.6rem; font-weight:500; color:var(--paper); letter-spacing:0.01em;
+        font-family:var(--mono); font-size:0.6rem; font-weight:500; color:var(--marker-text); letter-spacing:0.01em;
         transition:transform 0.18s cubic-bezier(.4,0,.2,1), box-shadow 0.18s ease;
         transform:scale(1); }
   .pin::before{ content:''; position:absolute; inset:2px; border-radius:50%;
@@ -550,6 +551,9 @@ window.__FORCE_EVENT_THEME__ = true;
     // mesma referência do still-life, de volta com azul como cor
     // principal (fundo) e vermelho só nos marcadores — mesmos hex de antes
     { name: 'Azul/vermelho', paper: '#0033FF', ink: '#EAF2FB', accent: '#E8442C' },
+    // inspirada numa capa "Apple Music Fitness" (fundo cinza claro,
+    // glow verde bem saturado) — placeholder só pra teste
+    { name: 'Cinza/verde neon', paper: '#D9D9DB', ink: '#222222', accent: '#39FF14' },
   ];
   const DEFAULT_PALETTE = { name: 'Padrão P&B', paper: '#ffffff', ink: '#111111' };
 
@@ -581,13 +585,30 @@ window.__FORCE_EVENT_THEME__ = true;
     return '#' + [r,g,bl].map(v => v.toString(16).padStart(2,'0')).join('');
   }
   function rgbStr(hex){ const c = hexToRgb(hex); return c.r+','+c.g+','+c.b; }
+  // contraste WCAG — pra escolher automaticamente entre ink/paper qual dá
+  // mais leitura em cima da cor do marcador. Sem isso, o texto dos
+  // pins/switcher sempre usava --paper (certo quando o núcleo do marcador
+  // é escuro, como no P&B padrão), mas quebra quando uma paleta usa
+  // "accent" claro/saturado como núcleo (ex: verde neon) — paper e o
+  // núcleo podem ficar com brilho parecido e o número do pin some.
+  function relLum(hex){
+    const c = hexToRgb(hex);
+    const chan = v => { const n = v/255; return n <= 0.03928 ? n/12.92 : Math.pow((n+0.055)/1.055, 2.4); };
+    return 0.2126*chan(c.r) + 0.7152*chan(c.g) + 0.0722*chan(c.b);
+  }
+  function contrastRatio(hexA, hexB){
+    const la = relLum(hexA), lb = relLum(hexB);
+    const lighter = Math.max(la,lb), darker = Math.min(la,lb);
+    return (lighter+0.05)/(darker+0.05);
+  }
 
   const ink = palette.ink, paper = palette.paper;
   const accent = palette.accent || ink;
-  const mapBg = mix(ink, paper, 0.91);
+  const mapBg = mix(ink, paper, 216/238);
   const marqueeIdleBg = mix(ink, paper, 0.84);
   const markerCore = palette.accent ? accent : mix(ink, paper, 0.03);
   const marqueeGradStart = palette.accent ? accent : mix(ink, '#000000', 0.06);
+  const markerText = contrastRatio(ink, markerCore) >= contrastRatio(paper, markerCore) ? ink : paper;
 
   const root = document.documentElement.style;
   root.setProperty('--ink', ink);
@@ -596,6 +617,7 @@ window.__FORCE_EVENT_THEME__ = true;
   root.setProperty('--hover', mix(ink, paper, 0.94));
   root.setProperty('--map-bg', mapBg);
   root.setProperty('--marker-core', markerCore);
+  root.setProperty('--marker-text', markerText);
   root.setProperty('--marquee-idle-bg', marqueeIdleBg);
   root.setProperty('--marquee-idle-rgb', rgbStr(marqueeIdleBg));
   root.setProperty('--marquee-grad-start', marqueeGradStart);
@@ -608,14 +630,14 @@ window.__FORCE_EVENT_THEME__ = true;
     snakeGradStart: marqueeGradStart,
     snakeGradEnd: marqueeIdleBg,
     mono: {
-      background: mix(ink, paper, 0.92),
-      water: mix(ink, paper, 0.97),
-      landuse: mix(ink, paper, 0.92),
-      building: mix(ink, paper, 0.92),
-      buildingOutline: mix(ink, paper, 0.92),
+      background: mix(ink, paper, 219/238),
+      water: mix(ink, paper, 231/238),
+      landuse: mix(ink, paper, 219/238),
+      building: mix(ink, paper, 219/238),
+      buildingOutline: mix(ink, paper, 219/238),
       road: paper,
       roadCasing: paper,
-      boundary: mix(ink, paper, 0.79),
+      boundary: mix(ink, paper, 187/238),
       text: ink,
       textHalo: paper
     }
