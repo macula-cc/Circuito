@@ -114,9 +114,19 @@
   .event-marquee.interacted{ background:linear-gradient(to right, #050505, #d8d8d6); }
   html.evento-hoje .event-marquee.interacted{ background:linear-gradient(to right, #39FF14, #d8d8d6); }
   .marquee-layer{ display:flex; align-items:center; overflow:hidden; }
+  /* animation-play-state:paused até as fontes (Inter/Instrument Serif,
+     carregadas via <link> no <head>, font-display:swap) terminarem de
+     carregar de verdade — ver "fonts-ready" no JS. Sem isso, a rolagem
+     começa medindo a largura com a fonte de fallback do sistema; quando a
+     webfont troca no meio da animação, width:max-content reflui e muda a
+     largura do segmento em ~20% (medido), o que desloca o ponto onde
+     translateX(-50%) fecha o loop — trava/corta o texto visivelmente.
+     Mais comum no celular por causa de rede mais lenta/variável. */
   .marquee-track{ display:flex; align-items:baseline; width:max-content;
                    white-space:nowrap; color:#111111; transition:color 0.6s ease;
-                   animation:marquee-scroll 180s linear infinite; }
+                   animation:marquee-scroll 180s linear infinite;
+                   animation-play-state:paused; }
+  html.fonts-ready .marquee-track{ animation-play-state:running; }
   .event-marquee.interacted .marquee-track{ color:#fff; }
   html.evento-hoje .event-marquee.interacted .marquee-track{ color:#111111; }
   .marquee-seg{ display:flex; align-items:baseline; }
@@ -725,6 +735,15 @@ function setupMarquee(){
   track.appendChild(seg2);
 }
 setupMarquee();
+
+// só libera a rolagem do marquee (ver animation-play-state em .marquee-track)
+// depois que as fontes terminarem de carregar de verdade — com um teto de
+// 1.5s pra não travar parado pra sempre no caso raro de document.fonts.ready
+// nunca resolver (ex: navegador sem suporte à Font Loading API)
+Promise.race([
+  document.fonts ? document.fonts.ready : Promise.resolve(),
+  new Promise(r => setTimeout(r, 1500))
+]).then(() => document.documentElement.classList.add('fonts-ready'));
 
 /* ============================================================
    DATA SOURCE
