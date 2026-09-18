@@ -351,12 +351,11 @@
             transition:opacity 0.25s ease; z-index:900; }
   .overlay.open{ opacity:1; pointer-events:auto; }
 
+  /* fundo branco chapado (não mais vidro translúcido) — mesmo motivo do
+     .lightbox-modal: garante leitura independente do que estiver no mapa */
   .drawer{ position:fixed; z-index:950; display:flex; flex-direction:column;
            transition:transform 0.35s cubic-bezier(.4,0,.2,1);
-           background:rgba(255,255,255,0.35);
-           backdrop-filter:blur(32px) saturate(180%);
-           -webkit-backdrop-filter:blur(32px) saturate(180%);
-           border:1px solid rgba(255,255,255,0.6);
+           background:#fff;
            border-radius:10px;
            box-shadow:0 24px 70px rgba(0,0,0,0.25); }
   @media (min-width:781px){
@@ -419,9 +418,17 @@
   .artist-room{ font-family:var(--sans-display); font-size:0.75rem; color:var(--gray); margin-top:0.3rem; }
   .artist-room .artist-obs{ border:1px solid var(--line); padding:0.05rem 0.3rem; }
   .day-badges{ display:flex; gap:0.35rem; margin-top:0.45rem; flex-wrap:wrap; }
-  .day-pill{ font-family:var(--sans-display); font-size:0.68rem; padding:0.15rem 0.45rem; border-radius:3px; border:1px solid transparent; }
-  .day-pill.present{ background:#DFF3E3; color:#1F6B33; border-color:#B9E0C2; }
-  .day-pill.absent{ background:#FBE2E0; color:#9A3324; border-color:#F0C4C0; }
+  /* mesmo estilo/técnica dos pins (ver .pin::before): núcleo sólido menor
+     (inset:1px) desfocado, dando uma borda esfumada em vez de borda dura
+     — verde quando presente, preto quando não, mesmas cores/contraste. */
+  .day-pill{ font-family:var(--sans-display); font-size:0.68rem; font-weight:500;
+             padding:0.15rem 0.45rem; border-radius:3px; position:relative; }
+  .day-pill::before{ content:''; position:absolute; inset:1px; border-radius:2px;
+                      filter:blur(2px); z-index:-1; }
+  .day-pill.present::before{ background:#39FF14; }
+  .day-pill.present{ color:#173318; }
+  .day-pill.absent::before{ background:#171717; }
+  .day-pill.absent{ color:#fff; }
   .photo-note{ font-family:var(--sans-display); font-size:0.75rem; color:var(--gray); font-style:italic; margin-top:0.9rem; grid-column:1 / -1; }
 
   .map-error{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -472,6 +479,10 @@
   .lightbox-caption .lb-name{ font-family:var(--sans-display); font-weight:400; font-size:1.57rem;
                                letter-spacing:-0.02em; line-height:1.2; color:var(--ink); margin:0 0 0.4rem; }
   .lightbox-caption .lb-room{ font-family:var(--sans-display); font-size:0.83rem; color:var(--gray); margin-bottom:0.5rem; }
+  /* label + chips numa linha só, alinhados à esquerda */
+  .lb-days-row{ display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; }
+  .lb-days-row .day-badges{ margin-top:0; }
+  .lb-days-label{ font-family:var(--sans-display); font-size:0.83rem; color:var(--gray); }
   .lightbox-caption .lb-bio{ font-family:var(--sans); font-size:0.97rem; line-height:1.55; color:#333; margin:0.8rem 0 0; }
   /* centralizado em toda a margem vazia do topo — lightbox-head (1.8rem)
      + padding-top do lightbox-body (1.6rem) — até onde a imagem começa,
@@ -620,7 +631,10 @@
       <div class="lightbox-caption" id="lightbox-caption">
         <p class="lb-name" id="lightbox-name"></p>
         <div class="lb-room" id="lightbox-room"></div>
-        <div class="day-badges" id="lightbox-days" style="justify-content:center;"></div>
+        <div class="lb-days-row">
+          <span class="lb-days-label">Ateliê aberto:</span>
+          <div class="day-badges" id="lightbox-days"></div>
+        </div>
         <p class="lb-bio" id="lightbox-bio"></p>
       </div>
     </div>
