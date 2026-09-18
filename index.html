@@ -71,8 +71,6 @@
   .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(216,216,214,0.90);
             pointer-events:none; transition:opacity 0.6s ease; }
   .map-dim.hidden{ opacity:0; }
-  /* mesmo cinza escuro do marquee no modo noturno (ver acima) */
-  html.mapa-noturno .map-dim{ background:rgba(69,69,72,0.90); }
 
   /* "cobrona" decorativa: mesmo princípio de animação do "circuito vivo"
      do gerador de vídeo (desenha progressivamente, depois apaga, recomeça
@@ -115,18 +113,6 @@
                    background:#d8d8d6; }
   .event-marquee.interacted{ background:linear-gradient(to right, #050505, #d8d8d6); }
   html.evento-hoje .event-marquee.interacted{ background:linear-gradient(to right, #39FF14, #d8d8d6); }
-  /* modo noturno do mapa (ver .mapa-noturno, script no <head>): o cinza
-     claro do marquee (fundo inicial, ponta clara do degradê e o overlay
-     .map-dim, que segue o mesmo tom) fica escuro também, senão a faixa
-     brilha destoando do mapa escuro por baixo. Texto do estado inicial
-     precisa virar claro aqui (preto sumiria nesse fundo escuro); no
-     degradê pós-interação o texto já era branco (ou preto em cima do
-     verde, ver regra de .evento-hoje acima) e continua igual, sem
-     precisar de regra nova — já contrasta bem com esse cinza escuro também. */
-  html.mapa-noturno .event-marquee{ background:#454548; }
-  html.mapa-noturno .marquee-track{ color:#EDEDED; }
-  html.mapa-noturno .event-marquee.interacted{ background:linear-gradient(to right, #050505, #454548); }
-  html.mapa-noturno.evento-hoje .event-marquee.interacted{ background:linear-gradient(to right, #39FF14, #454548); }
   .marquee-layer{ display:flex; align-items:center; overflow:hidden; }
   /* animation-play-state:paused até as fontes (Inter/Instrument Serif,
      carregadas via <link> no <head>, font-display:swap) terminarem de
@@ -179,9 +165,6 @@
   .legend-dot::before{ content:''; position:absolute; inset:1px; border-radius:50%; filter:blur(1px); z-index:-1; }
   .legend-dot.aberto::before{ background:#39FF14; }
   .legend-dot.fechado::before{ background:#171717; }
-  /* mesmo tom do .pin.fechado no modo noturno — senão a legenda mostraria
-     preto enquanto os pins de verdade no mapa já estão em cinza claro */
-  html.mapa-noturno .legend-dot.fechado::before{ background:#D0D0D2; }
 
   @media (max-width:640px){
     .map-legend{ top:52px; gap:0.5rem; padding:0.3rem 0.6rem; font-size:0.64rem; }
@@ -274,15 +257,11 @@
   /* cor com significado (ver .day-pill), não decorativa: verde quando o
      espaço tem pelo menos um artista presente (hoje, se for dia 18 ou 19;
      em qualquer um dos dois dias fora dessa janela — ver isLocationOpenNow,
-     JS), preto/cinza quando não. No modo noturno (ver .mapa-noturno,
-     script no <head>) o "fechado" vira cinza claro em vez de preto, senão
-     some no mapa escuro. */
+     JS), preto quando não. */
   .pin.fechado::before{ background:#171717; }
   .pin.fechado{ color:#fff; }
   .pin.aberto::before{ background:#39FF14; }
   .pin.aberto{ color:#173318; }
-  html.mapa-noturno .pin.fechado::before{ background:#D0D0D2; }
-  html.mapa-noturno .pin.fechado{ color:#1C1C1E; }
 
   /* transit stations (metrô/VLT): blue circular badge with letter — click
      to see the name and type in a popup. Two distinct blue tones (not a
@@ -592,30 +571,22 @@
 </style>
 
 <script>
-// ---------------- Mapa dia/noite ----------------
-// Roda cedo (aqui no <head>, antes do body pintar) pra não piscar o mapa
-// claro antes de trocar pro escuro. Só afeta o MAPA (cores do terreno e
-// dos pins, ver MONO_LIGHT/MONO_DARK e .pin mais abaixo) — a lista e o
-// "sobre" continuam sempre no branco/preto de sempre, sem variação
-// nenhuma. Ativa o modo noturno das 18h às 6h, em horário do Rio (não no
-// fuso do aparelho do visitante).
+// ---------------- Dia do evento (Rio) ----------------
+// Roda cedo (aqui no <head>, antes do body pintar). Modo noturno do mapa
+// foi removido — fica sempre no claro, não importa a hora. Só resta
+// decidir o dia do evento de verdade (18 ou 19/09/2026, não só "dia 18 do
+// mês atual, seja lá qual for"), usado pro pin verde/preto (ver
+// isLocationOpenNow, JS principal), a cor da cobrona (ver
+// heroStrokeLegsInRange) e o fundo do marquee no estado inicial (ver
+// .evento-hoje .event-marquee).
 (function(){
   const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', hour12:false
+    timeZone: 'America/Sao_Paulo', year:'numeric', month:'2-digit', day:'2-digit'
   }).formatToParts(new Date());
   const get = t => (parts.find(p => p.type === t) || {}).value;
-  const hour = parseInt(get('hour'), 10);
-  const isDark = hour >= 18 || hour < 6;
-  // dia do evento de verdade (18 ou 19/09/2026, não só "dia 18 do mês
-  // atual, seja lá qual for") — usado pra decidir o pin verde/preto (ver
-  // isLocationOpenNow, JS principal), a cor da cobrona (ver
-  // heroStrokeLegsInRange) e o fundo do marquee no estado inicial (ver
-  // .evento-hoje .event-marquee)
   const isEventDay = get('year') === '2026' && get('month') === '09' && (get('day') === '18' || get('day') === '19');
-  window.RIO_NOW = { day: get('day'), isDark, isEventDay };
-  document.documentElement.classList.toggle('mapa-noturno', isDark);
+  window.RIO_NOW = { day: get('day'), isEventDay };
   document.documentElement.classList.toggle('evento-hoje', isEventDay);
-  document.documentElement.style.setProperty('--map-bg', isDark ? '#333335' : '#C8C8CA');
 })();
 </script>
 
@@ -1113,19 +1084,12 @@ function addStationMarkers(){
 // customiza cores camada por camada — só é possível porque o MapLibre é
 // vetorial (cada feição chega com seu próprio tipo/nome, ao contrário do
 // tile raster, que a gente só via como pixels prontos e tinha que filtrar
-// por aproximação). Dois conjuntos fixos (claro/escuro, ver
-// window.RIO_NOW.isDark, script no <head>) — sem paleta variável.
-const MONO_LIGHT = {
+// por aproximação). Fixo — modo noturno foi removido, sempre claro.
+const MONO_COLORS = {
   background: '#CACACC', water: '#D4D4D6', landuse: '#CACACC', building: '#CACACC',
   buildingOutline: '#CACACC', road: '#D9D9DB', roadCasing: '#D9D9DB',
   boundary: '#B2B2B3', text: '#222222', textHalo: '#D9D9DB'
 };
-const MONO_DARK = {
-  background: '#333335', water: '#2A2A2C', landuse: '#333335', building: '#333335',
-  buildingOutline: '#333335', road: '#161618', roadCasing: '#161618',
-  boundary: '#47474B', text: '#D4D4D6', textHalo: '#333335'
-};
-const MONO_COLORS = window.RIO_NOW.isDark ? MONO_DARK : MONO_LIGHT;
 function applyMonochromeStyle(){
   const layers = map.getStyle().layers || [];
   let buildingSource = null, buildingSourceLayer = null;
