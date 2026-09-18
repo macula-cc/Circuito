@@ -571,9 +571,12 @@
   const get = t => (parts.find(p => p.type === t) || {}).value;
   const hour = parseInt(get('hour'), 10);
   const isDark = hour >= 18 || hour < 6;
-  // dia do mês (Rio) exposto pra decidir o pin verde/preto — ver
-  // isLocationOpenNow() mais abaixo, no JS principal
-  window.RIO_NOW = { day: get('day'), isDark };
+  // dia do evento de verdade (18 ou 19/09/2026, não só "dia 18 do mês
+  // atual, seja lá qual for") — usado pra decidir o pin verde/preto (ver
+  // isLocationOpenNow, JS principal) e a cor da cobrona no hero (ver
+  // heroStrokeLegsInRange)
+  const isEventDay = get('year') === '2026' && get('month') === '09' && (get('day') === '18' || get('day') === '19');
+  window.RIO_NOW = { day: get('day'), isDark, isEventDay };
   document.documentElement.classList.toggle('mapa-noturno', isDark);
   document.documentElement.style.setProperty('--map-bg', isDark ? '#2E2E30' : '#C8C8CA');
 })();
@@ -933,9 +936,11 @@ function pinLabel(loc){
 // qualquer um dos dois dias, se alguém abrir o site fora dessa janela
 // (senão todo pino apareceria preto o resto do ano)
 function isLocationOpenNow(loc){
-  const day = window.RIO_NOW && window.RIO_NOW.day;
-  if (day === '18') return loc.artistas.some(a => a.dia18);
-  if (day === '19') return loc.artistas.some(a => a.dia19);
+  const now = window.RIO_NOW;
+  if (now && now.isEventDay){
+    if (now.day === '18') return loc.artistas.some(a => a.dia18);
+    if (now.day === '19') return loc.artistas.some(a => a.dia19);
+  }
   return loc.artistas.some(a => a.dia18 || a.dia19);
 }
 
@@ -1381,7 +1386,10 @@ function heroStrokeLegsInRange(dStart, dEnd){
       if (sub.length >= 2){
         const a = leg[0], b = leg[leg.length-1];
         const grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-        grad.addColorStop(0, '#0a0a0a');
+        // nos dias do evento, a ponta escura vira verde-limão (mesmo tom
+        // dos pins/legenda) — só isso muda; a ponta clara e o marquee
+        // continuam exatamente como sempre, sem cor nenhuma
+        grad.addColorStop(0, window.RIO_NOW.isEventDay ? '#39FF14' : '#0a0a0a');
         grad.addColorStop(1, '#d8d8d6');
         ctx.lineWidth = heroSnakeWidth;
         ctx.lineCap = 'round';
