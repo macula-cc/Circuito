@@ -63,9 +63,10 @@
      JS), camada por camada, em vez de um filtro aproximado por cima do raster */
   .maplibregl-map{ background:var(--map-bg); font-family:var(--sans); }
 
-  /* mesmo cinza do "poster" (index-teste2), levemente transparente
-     (10%) — dá pra ver o mapa de leve por baixo (ruas, quarteirões, pontos)
-     em vez de esconder tudo. Sem blur: o mapa aparece nítido, só suave.
+  /* cinza bem claro, levemente transparente (10%) — dá pra ver o mapa de
+     leve por baixo (ruas, quarteirões, pontos) em vez de esconder tudo.
+     Sem blur: o mapa aparece nítido, só suave. Não é branco puro — mesmo
+     tom do fundo inicial do .event-marquee, pra combinar as duas faixas.
      Some no primeiro toque, junto com a marca. */
   .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(216,216,214,0.90);
             pointer-events:none; transition:opacity 0.6s ease; }
@@ -92,20 +93,24 @@
      faixa full-bleed no topo com o nome/data/edição se repetindo em
      scroll horizontal contínuo — substitui o hero-title grande centralizado
      usado antes. Fundo em degradê preto->cinza bem claro (nunca chega no
-     branco puro, senão o texto branco sumiria de vez na ponta clara) FIXO
-     na faixa (não anda junto com o texto). Texto sempre branco sólido, sem
-     mix-blend-mode nem mask-image — as duas técnicas testadas pra inverter
-     a cor automaticamente deixavam o texto com aliasing pior (percebido
-     como "pixelado", sobretudo em telas retina); cor sólida lisa garante a
-     mesma qualidade de renderização do resto do site.
+     branco puro na PONTA CLARA DO DEGRADÊ, senão o texto branco sumiria
+     de vez ali) FIXO na faixa (não anda junto com o texto). Texto sempre
+     branco sólido, sem mix-blend-mode nem mask-image — as duas técnicas
+     testadas pra inverter a cor automaticamente deixavam o texto com
+     aliasing pior (percebido como "pixelado", sobretudo em telas retina);
+     cor sólida lisa garante a mesma qualidade de renderização do resto do
+     site.
      Antes da 1ª interação, fundo cinza chapado (mesmo tom do .map-dim, sem
-     transparência) com texto preto, combinando com o overlay por baixo da
-     marca; depois que a marca some (shrinkHero), volta pro degradê
-     preto->cinza com texto branco de sempre (.interacted). */
+     transparência) com texto preto, sempre — nos dias do evento ou não.
+     Só depois que a marca some (shrinkHero) e vira o degradê (.interacted)
+     é que muda: nos dias do evento a ponta escura vira verde-limão (mesmo
+     tom dos pins/cobrinha) em vez de preto; fora do evento continua preto
+     de sempre. Texto branco de sempre nesse estado, nos dois casos. */
   .event-marquee{ position:absolute; top:0; left:0; right:0; z-index:220;
                    padding:6px 0; overflow:hidden; isolation:isolate;
                    background:#d8d8d6; }
   .event-marquee.interacted{ background:linear-gradient(to right, #050505, #d8d8d6); }
+  html.evento-hoje .event-marquee.interacted{ background:linear-gradient(to right, #39FF14, #d8d8d6); }
   .marquee-layer{ display:flex; align-items:center; overflow:hidden; }
   .marquee-track{ display:flex; align-items:baseline; width:max-content;
                    white-space:nowrap; color:#111111; transition:color 0.6s ease;
@@ -573,11 +578,13 @@
   const isDark = hour >= 18 || hour < 6;
   // dia do evento de verdade (18 ou 19/09/2026, não só "dia 18 do mês
   // atual, seja lá qual for") — usado pra decidir o pin verde/preto (ver
-  // isLocationOpenNow, JS principal) e a cor da cobrona no hero (ver
-  // heroStrokeLegsInRange)
+  // isLocationOpenNow, JS principal), a cor da cobrona (ver
+  // heroStrokeLegsInRange) e o fundo do marquee no estado inicial (ver
+  // .evento-hoje .event-marquee)
   const isEventDay = get('year') === '2026' && get('month') === '09' && (get('day') === '18' || get('day') === '19');
   window.RIO_NOW = { day: get('day'), isDark, isEventDay };
   document.documentElement.classList.toggle('mapa-noturno', isDark);
+  document.documentElement.classList.toggle('evento-hoje', isEventDay);
   document.documentElement.style.setProperty('--map-bg', isDark ? '#2E2E30' : '#C8C8CA');
 })();
 </script>
@@ -1319,10 +1326,14 @@ function buildHeroSnakeLegs(){
     .filter(l => l.lat != null && l.lng != null)
     .map(l => map.project([l.lng, l.lat]));
   if (rawPts.length < 2) return false;
+  // no mobile a caixa ocupa quase a tela toda (menos margem reservada à
+  // esquerda) — no desktop tem mais texto/UI disputando espaço, então
+  // mantém a caixa mais estreita, alinhada à direita
+  const isMobileHero = window.innerWidth <= 780;
   const box = {
-    x: window.innerWidth * 0.30,
+    x: window.innerWidth * (isMobileHero ? 0.06 : 0.30),
     y: window.innerHeight * 0.02,
-    w: window.innerWidth * 0.68,
+    w: window.innerWidth * (isMobileHero ? 0.92 : 0.68),
     h: window.innerHeight * 0.96
   };
   // fillFraction > 1 de propósito: estoura pra fora da caixa (e da própria
