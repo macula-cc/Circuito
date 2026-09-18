@@ -30,6 +30,11 @@
     --gray: #6b6b6b;
     --hover: #f0f0f0;
     --paper:#fff;
+    /* fundo do mapa: claro de dia, escuro a partir das 18h (horário do
+       Rio) — ver script no <head>, que sobrescreve isso cedo, antes do
+       body pintar. Só afeta o mapa; o resto do site (lista, sobre) nunca
+       muda de cor. */
+    --map-bg:#C8C8CA;
   }
   *{ box-sizing:border-box; }
   html, body{ height:100%; overflow:hidden; }
@@ -52,11 +57,11 @@
      uma cortina revelando a página preta que já está por baixo o tempo
      todo (ver .about-page), em vez de um overlay que aparece por cima */
   .hero.lifted{ transform:translateY(-100%); }
-  #map{ position:absolute; inset:0; width:100%; height:100%; background:#e9e9e9; z-index:1; isolation:isolate; }
+  #map{ position:absolute; inset:0; width:100%; height:100%; background:var(--map-bg); z-index:1; isolation:isolate; }
   /* MapLibre é vetorial — não tem mais tile-pane pra filtrar via CSS; as
      cores de água/terra são definidas direto no estilo (ver applyMonochromeStyle,
      JS), camada por camada, em vez de um filtro aproximado por cima do raster */
-  .maplibregl-map{ background:#e9e9e9; font-family:var(--sans); }
+  .maplibregl-map{ background:var(--map-bg); font-family:var(--sans); }
 
   /* mesmo cinza do "poster" (index-teste2), levemente transparente
      (10%) — dá pra ver o mapa de leve por baixo (ruas, quarteirões, pontos)
@@ -198,13 +203,25 @@
      no hover/active. */
   .pin{ width:24px; height:24px; border-radius:50%; position:relative;
         display:flex; align-items:center; justify-content:center;
-        font-family:var(--mono); font-size:0.6rem; font-weight:500; color:#fff; letter-spacing:0.01em;
+        font-family:var(--mono); font-size:0.6rem; font-weight:500; letter-spacing:0.01em;
         transition:transform 0.18s cubic-bezier(.4,0,.2,1), box-shadow 0.18s ease;
         transform:scale(1); }
   .pin::before{ content:''; position:absolute; inset:2px; border-radius:50%;
-                background:#171717; filter:blur(2px); z-index:-1; }
+                filter:blur(2px); z-index:-1; }
   .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.18); box-shadow:0 4px 16px rgba(0,0,0,0.35); }
   .pin.active{ transform:scale(1.18); box-shadow:0 0 0 3px rgba(0,0,0,0.18); }
+  /* cor com significado (ver .day-pill), não decorativa: verde quando o
+     espaço tem pelo menos um artista presente (hoje, se for dia 18 ou 19;
+     em qualquer um dos dois dias fora dessa janela — ver isLocationOpenNow,
+     JS), preto/cinza quando não. No modo noturno (ver .mapa-noturno,
+     script no <head>) o "fechado" vira cinza claro em vez de preto, senão
+     some no mapa escuro. */
+  .pin.fechado::before{ background:#171717; }
+  .pin.fechado{ color:#fff; }
+  .pin.aberto::before{ background:#39FF14; }
+  .pin.aberto{ color:#173318; }
+  html.mapa-noturno .pin.fechado::before{ background:#D0D0D2; }
+  html.mapa-noturno .pin.fechado{ color:#1C1C1E; }
 
   /* transit stations (metrô/VLT): blue circular badge with letter — click
      to see the name and type in a popup. Two distinct blue tones (not a
@@ -229,11 +246,11 @@
      licença, não só estética) — texto/fundo mais fracos que o padrão do
      MapLibre, e a versão completa também aparece no "Sobre" */
   .maplibregl-ctrl-group{ border-radius:0 !important; box-shadow:none !important; border:1px solid var(--line) !important; }
-  .maplibregl-ctrl-group button{ background:#fff !important; color:#111 !important; font-family:var(--sans-display) !important; }
+  .maplibregl-ctrl-group button{ background:var(--paper) !important; color:var(--ink) !important; font-family:var(--sans-display) !important; }
   .maplibregl-ctrl-attrib{ font-family:var(--sans-display); font-size:0.68rem !important; background:rgba(255,255,255,0.75) !important; }
   .locate-control-btn{ width:29px; height:29px; display:flex; align-items:center; justify-content:center;
-                        background:#fff; border:1px solid var(--line); border-top:none; cursor:pointer;
-                        font-size:1rem; color:#111; }
+                        background:var(--paper); border:1px solid var(--line); border-top:none; cursor:pointer;
+                        font-size:1rem; color:var(--ink); }
 
   .user-dot{ position:relative; width:14px; height:14px; border-radius:50%; background:#3B82F6; border:2px solid #fff;
              box-shadow:0 0 0 4px rgba(59,130,246,0.28); }
@@ -251,11 +268,11 @@
      abre, e de volta pra baixo quando fecha, cobrindo/revelando a lista
      sem precisar trocar de display — dá pra ir de lista pra sobre e
      voltar com uma transição suave em vez de um corte seco. */
-  .list-page{ position:fixed; inset:0; background:#ffffff;
+  .list-page{ position:fixed; inset:0; background:var(--paper);
               overflow-y:auto; -webkit-overflow-scrolling:touch; }
   .list-page .list-close{ position:fixed;
              top:calc(1.6rem + env(safe-area-inset-top)); right:calc(1.6rem + env(safe-area-inset-right));
-             background:rgba(0,0,0,0.08); color:#111; z-index:2; }
+             background:rgba(0,0,0,0.08); color:var(--ink); z-index:2; }
   .list-page .list-close:hover{ background:rgba(0,0,0,0.16); }
 
   /* padding-bottom generoso pra o último item da lista não ficar embaixo
@@ -419,11 +436,10 @@
                      calc(1rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left)); }
   .lightbox.open{ opacity:1; pointer-events:auto; }
 
+  /* fundo branco chapado (não mais vidro translúcido) — garante leitura
+     do nome/bio independente do que estiver por baixo no mapa */
   .lightbox-modal{ position:relative; width:100%; height:100%;
-                    background:rgba(255,255,255,0.35);
-                    backdrop-filter:blur(32px) saturate(180%);
-                    -webkit-backdrop-filter:blur(32px) saturate(180%);
-                    border:1px solid rgba(255,255,255,0.6);
+                    background:#fff;
                     border-radius:10px;
                     box-shadow:0 24px 70px rgba(0,0,0,0.25);
                     display:flex; flex-direction:column;
@@ -451,10 +467,12 @@
                           align-items:center; justify-content:center;
                           font-family:var(--sans-display); font-size:1.21rem; color:var(--gray); border:1px solid rgba(0,0,0,0.12); }
   .lightbox-placeholder.show{ display:flex; }
-  .lightbox-caption{ max-width:520px; margin-top:1.4rem; text-align:center; }
-  .lightbox-caption .lb-name{ font-family:var(--serif); font-size:1.32rem; color:var(--ink); margin:0 0 0.4rem; }
+  .lightbox-caption{ max-width:520px; width:100%; margin-top:1.4rem; text-align:left; }
+  /* mesmo tamanho/família do nome do espaço no drawer (.drawer-title) */
+  .lightbox-caption .lb-name{ font-family:var(--sans-display); font-weight:400; font-size:1.57rem;
+                               letter-spacing:-0.02em; line-height:1.2; color:var(--ink); margin:0 0 0.4rem; }
   .lightbox-caption .lb-room{ font-family:var(--sans-display); font-size:0.83rem; color:var(--gray); margin-bottom:0.5rem; }
-  .lightbox-caption .lb-bio{ font-family:var(--sans); font-size:0.97rem; line-height:1.55; color:var(--gray); margin:0.8rem 0 0; }
+  .lightbox-caption .lb-bio{ font-family:var(--sans); font-size:0.97rem; line-height:1.55; color:#333; margin:0.8rem 0 0; }
   /* centralizado em toda a margem vazia do topo — lightbox-head (1.8rem)
      + padding-top do lightbox-body (1.6rem) — até onde a imagem começa,
      não só na faixa estreita do lightbox-head */
@@ -500,6 +518,29 @@
     .about-grid{ grid-template-columns:1fr; gap:1.8rem; }
   }
 </style>
+
+<script>
+// ---------------- Mapa dia/noite ----------------
+// Roda cedo (aqui no <head>, antes do body pintar) pra não piscar o mapa
+// claro antes de trocar pro escuro. Só afeta o MAPA (cores do terreno e
+// dos pins, ver MONO_LIGHT/MONO_DARK e .pin mais abaixo) — a lista e o
+// "sobre" continuam sempre no branco/preto de sempre, sem variação
+// nenhuma. Ativa o modo noturno das 18h às 6h, em horário do Rio (não no
+// fuso do aparelho do visitante).
+(function(){
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', hour12:false
+  }).formatToParts(new Date());
+  const get = t => (parts.find(p => p.type === t) || {}).value;
+  const hour = parseInt(get('hour'), 10);
+  const isDark = hour >= 18 || hour < 6;
+  // dia do mês (Rio) exposto pra decidir o pin verde/preto — ver
+  // isLocationOpenNow() mais abaixo, no JS principal
+  window.RIO_NOW = { day: get('day'), isDark };
+  document.documentElement.classList.toggle('mapa-noturno', isDark);
+  document.documentElement.style.setProperty('--map-bg', isDark ? '#2E2E30' : '#C8C8CA');
+})();
+</script>
 
 </head>
 <body>
@@ -842,13 +883,24 @@ function pinLabel(loc){
   return n ? String(n).padStart(2, '0') : '?';
 }
 
+// pin verde quando o espaço tem pelo menos um artista presente — no dia
+// de hoje especificamente, se hoje for 18 ou 19/09 (horário do Rio); em
+// qualquer um dos dois dias, se alguém abrir o site fora dessa janela
+// (senão todo pino apareceria preto o resto do ano)
+function isLocationOpenNow(loc){
+  const day = window.RIO_NOW && window.RIO_NOW.day;
+  if (day === '18') return loc.artistas.some(a => a.dia18);
+  if (day === '19') return loc.artistas.some(a => a.dia19);
+  return loc.artistas.some(a => a.dia18 || a.dia19);
+}
+
 // ---------------- map (isolated in try/catch so a load failure doesn't break the rest) ----------------
 let map = null;
 const markers = {};
-function makePinEl(label, active){
+function makePinEl(label, active, aberto){
   const el = document.createElement('div');
   el.className = 'pin-hit';
-  el.innerHTML = `<div class="pin${active?' active':''}">${label}</div>`;
+  el.innerHTML = `<div class="pin${active?' active':''} ${aberto?'aberto':'fechado'}">${label}</div>`;
   return el;
 }
 
@@ -921,7 +973,7 @@ function syncAllMarkers(){
     if (markers[loc.id]){
       markers[loc.id].setLngLat(pos);
     } else {
-      const el = makePinEl(pinLabel(loc), false);
+      const el = makePinEl(pinLabel(loc), false, isLocationOpenNow(loc));
       el.addEventListener('click', () => { focusMapOnLocation(loc); openDrawer(loc.id); });
       const marker = new maplibregl.Marker({ element: el, anchor:'center' }).setLngLat(pos).addTo(map);
       markers[loc.id] = marker;
@@ -962,27 +1014,22 @@ function addStationMarkers(){
   });
 }
 
-// customiza cores camada por camada — água quase branca, resto em tons de
-// cinza — só é possível porque o MapLibre é vetorial (cada feição chega
-// com seu próprio tipo/nome, ao contrário do tile raster, que a gente só
-// via como pixels prontos e tinha que filtrar por aproximação). Estética
-// "xerox de linha": preenchimentos claros/quase brancos, ruas brancas se
-// destacando do cinza dos quarteirões, contorno de prédio invisível.
-// TESTE: paleta azul/laranja, aproximada de um mapa turístico de referência
-// (fundo azul-acinzentado bem claro, ruas/contornos em azul-marinho escuro,
-// pontos em laranja — ver .pin no CSS)
-const MONO_COLORS = {
-  background: '#ececec',    // cinza claro dos quarteirões
-  water: '#f8f8f8',         // quase branco, só pra diferenciar da terra
-  landuse: '#ececec',       // mesmo cinza dos quarteirões
-  building: '#ececec',      // preenchimento igual ao quarteirão — prédio não se destaca
-  buildingOutline: '#ececec', // igual ao preenchimento — contorno some de vez
-  road: '#ffffff',          // ruas brancas, se destacando do cinza dos quarteirões
-  roadCasing: '#ffffff',
-  boundary: '#cccccc',
-  text: '#111111',
-  textHalo: '#ffffff'
+// customiza cores camada por camada — só é possível porque o MapLibre é
+// vetorial (cada feição chega com seu próprio tipo/nome, ao contrário do
+// tile raster, que a gente só via como pixels prontos e tinha que filtrar
+// por aproximação). Dois conjuntos fixos (claro/escuro, ver
+// window.RIO_NOW.isDark, script no <head>) — sem paleta variável.
+const MONO_LIGHT = {
+  background: '#CACACC', water: '#D4D4D6', landuse: '#CACACC', building: '#CACACC',
+  buildingOutline: '#CACACC', road: '#D9D9DB', roadCasing: '#D9D9DB',
+  boundary: '#B2B2B3', text: '#222222', textHalo: '#D9D9DB'
 };
+const MONO_DARK = {
+  background: '#242426', water: '#1E1E20', landuse: '#242426', building: '#242426',
+  buildingOutline: '#242426', road: '#7A7A7C', roadCasing: '#7A7A7C',
+  boundary: '#3A3A3C', text: '#D4D4D6', textHalo: '#242426'
+};
+const MONO_COLORS = window.RIO_NOW.isDark ? MONO_DARK : MONO_LIGHT;
 function applyMonochromeStyle(){
   const layers = map.getStyle().layers || [];
   let buildingSource = null, buildingSourceLayer = null;
@@ -1006,8 +1053,25 @@ function applyMonochromeStyle(){
       } else if (layer.type === 'background'){
         map.setPaintProperty(layer.id, 'background-color', MONO_COLORS.background);
       } else if (layer.type === 'fill'){
+        // camadas com "fill-pattern" (ex: hachurado de área de pedestre,
+        // zona úmida) pintam uma textura de sprite por cima — não dá pra
+        // recolorir com fill-color, então em vez de deixar o hachurado
+        // sempre branco/cinza aparecendo por cima de qualquer paleta, some
+        // com a camada inteira
+        if (map.getPaintProperty(layer.id, 'fill-pattern')){
+          map.setLayoutProperty(layer.id, 'visibility', 'none');
+          return;
+        }
         const color = isWater ? MONO_COLORS.water : (isBuilding ? MONO_COLORS.building : MONO_COLORS.landuse);
         map.setPaintProperty(layer.id, 'fill-color', color);
+        // algumas camadas de preenchimento (prédio, parque) trazem um
+        // "fill-outline-color" próprio no estilo-base, fixo, sem ligação
+        // com fill-color — sem isso, cada prédio ficava com um contorno
+        // claro/esbranquiçado por cima de qualquer paleta. Iguala ao
+        // preenchimento pra ficar invisível, como o resto do "xerox".
+        if (map.getPaintProperty(layer.id, 'fill-outline-color') !== undefined){
+          map.setPaintProperty(layer.id, 'fill-outline-color', color);
+        }
       } else if (layer.type === 'line'){
         let color = MONO_COLORS.landuse; // linhas genéricas (contorno de parque etc.)
         if (isWater) color = MONO_COLORS.water;
