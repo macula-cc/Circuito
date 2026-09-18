@@ -71,6 +71,8 @@
   .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(216,216,214,0.90);
             pointer-events:none; transition:opacity 0.6s ease; }
   .map-dim.hidden{ opacity:0; }
+  /* mesmo cinza escuro do marquee no modo noturno (ver acima) */
+  html.mapa-noturno .map-dim{ background:rgba(69,69,72,0.90); }
 
   /* "cobrona" decorativa: mesmo princípio de animação do "circuito vivo"
      do gerador de vídeo (desenha progressivamente, depois apaga, recomeça
@@ -113,6 +115,18 @@
                    background:#d8d8d6; }
   .event-marquee.interacted{ background:linear-gradient(to right, #050505, #d8d8d6); }
   html.evento-hoje .event-marquee.interacted{ background:linear-gradient(to right, #39FF14, #d8d8d6); }
+  /* modo noturno do mapa (ver .mapa-noturno, script no <head>): o cinza
+     claro do marquee (fundo inicial, ponta clara do degradê e o overlay
+     .map-dim, que segue o mesmo tom) fica escuro também, senão a faixa
+     brilha destoando do mapa escuro por baixo. Texto do estado inicial
+     precisa virar claro aqui (preto sumiria nesse fundo escuro); no
+     degradê pós-interação o texto já era branco (ou preto em cima do
+     verde, ver regra de .evento-hoje acima) e continua igual, sem
+     precisar de regra nova — já contrasta bem com esse cinza escuro também. */
+  html.mapa-noturno .event-marquee{ background:#454548; }
+  html.mapa-noturno .marquee-track{ color:#EDEDED; }
+  html.mapa-noturno .event-marquee.interacted{ background:linear-gradient(to right, #050505, #454548); }
+  html.mapa-noturno.evento-hoje .event-marquee.interacted{ background:linear-gradient(to right, #39FF14, #454548); }
   .marquee-layer{ display:flex; align-items:center; overflow:hidden; }
   /* animation-play-state:paused até as fontes (Inter/Instrument Serif,
      carregadas via <link> no <head>, font-display:swap) terminarem de
@@ -165,6 +179,9 @@
   .legend-dot::before{ content:''; position:absolute; inset:1px; border-radius:50%; filter:blur(1px); z-index:-1; }
   .legend-dot.aberto::before{ background:#39FF14; }
   .legend-dot.fechado::before{ background:#171717; }
+  /* mesmo tom do .pin.fechado no modo noturno — senão a legenda mostraria
+     preto enquanto os pins de verdade no mapa já estão em cinza claro */
+  html.mapa-noturno .legend-dot.fechado::before{ background:#D0D0D2; }
 
   @media (max-width:640px){
     .map-legend{ top:52px; gap:0.5rem; padding:0.3rem 0.6rem; font-size:0.64rem; }
@@ -598,7 +615,7 @@
   window.RIO_NOW = { day: get('day'), isDark, isEventDay };
   document.documentElement.classList.toggle('mapa-noturno', isDark);
   document.documentElement.classList.toggle('evento-hoje', isEventDay);
-  document.documentElement.style.setProperty('--map-bg', isDark ? '#2E2E30' : '#C8C8CA');
+  document.documentElement.style.setProperty('--map-bg', isDark ? '#333335' : '#C8C8CA');
 })();
 </script>
 
@@ -1104,9 +1121,9 @@ const MONO_LIGHT = {
   boundary: '#B2B2B3', text: '#222222', textHalo: '#D9D9DB'
 };
 const MONO_DARK = {
-  background: '#242426', water: '#1E1E20', landuse: '#242426', building: '#242426',
-  buildingOutline: '#242426', road: '#7A7A7C', roadCasing: '#7A7A7C',
-  boundary: '#3A3A3C', text: '#D4D4D6', textHalo: '#242426'
+  background: '#333335', water: '#2A2A2C', landuse: '#333335', building: '#333335',
+  buildingOutline: '#333335', road: '#161618', roadCasing: '#161618',
+  boundary: '#47474B', text: '#D4D4D6', textHalo: '#333335'
 };
 const MONO_COLORS = window.RIO_NOW.isDark ? MONO_DARK : MONO_LIGHT;
 function applyMonochromeStyle(){
