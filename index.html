@@ -94,18 +94,20 @@
      scroll horizontal contínuo — substitui o hero-title grande centralizado
      usado antes. Fundo em degradê preto->cinza bem claro (nunca chega no
      branco puro na PONTA CLARA DO DEGRADÊ, senão o texto branco sumiria
-     de vez ali) FIXO na faixa (não anda junto com o texto). Texto sempre
-     branco sólido, sem mix-blend-mode nem mask-image — as duas técnicas
-     testadas pra inverter a cor automaticamente deixavam o texto com
-     aliasing pior (percebido como "pixelado", sobretudo em telas retina);
-     cor sólida lisa garante a mesma qualidade de renderização do resto do
-     site.
+     de vez ali) FIXO na faixa (não anda junto com o texto). Texto branco
+     sólido nesse estado (fora dos dias do evento), sem mix-blend-mode nem
+     mask-image — as duas técnicas testadas pra inverter a cor
+     automaticamente deixavam o texto com aliasing pior (percebido como
+     "pixelado", sobretudo em telas retina); cor sólida lisa garante a
+     mesma qualidade de renderização do resto do site.
      Antes da 1ª interação, fundo cinza chapado (mesmo tom do .map-dim, sem
      transparência) com texto preto, sempre — nos dias do evento ou não.
      Só depois que a marca some (shrinkHero) e vira o degradê (.interacted)
      é que muda: nos dias do evento a ponta escura vira verde-limão (mesmo
-     tom dos pins/cobrinha) em vez de preto; fora do evento continua preto
-     de sempre. Texto branco de sempre nesse estado, nos dois casos. */
+     tom dos pins/cobrinha) em vez de preto — e o texto continua PRETO
+     também (não branco, que sumiria em cima do verde); fora do evento
+     continua o degradê preto->cinza de sempre, com texto branco de sempre
+     (branco não sumiria ali, é só o verde que exigia trocar o texto). */
   .event-marquee{ position:absolute; top:0; left:0; right:0; z-index:220;
                    padding:6px 0; overflow:hidden; isolation:isolate;
                    background:#d8d8d6; }
@@ -116,6 +118,7 @@
                    white-space:nowrap; color:#111111; transition:color 0.6s ease;
                    animation:marquee-scroll 180s linear infinite; }
   .event-marquee.interacted .marquee-track{ color:#fff; }
+  html.evento-hoje .event-marquee.interacted .marquee-track{ color:#111111; }
   .marquee-seg{ display:flex; align-items:baseline; }
   /* mesma tipografia/peso do resto do site pra rótulo em caixa alta (ver
      .list-title/.about-title): sans 350, letter-spacing -0.025em */
