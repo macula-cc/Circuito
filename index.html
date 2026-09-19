@@ -1041,7 +1041,19 @@ function syncAllMarkers(){
       markers[loc.id].setLngLat(pos);
     } else {
       const el = makePinEl(pinLabel(loc), false, isLocationOpenNow(loc));
-      el.addEventListener('click', () => { focusMapOnLocation(loc); openDrawer(loc.id); });
+      el.addEventListener('click', () => {
+        // evento no Google Analytics (gtag já configurado no <head>) — dá
+        // pra ver no GA4 quantos cliques cada ponto do mapa recebeu,
+        // filtrando por pin_numero/endereco/local
+        if (typeof gtag === 'function'){
+          gtag('event', 'map_pin_click', {
+            pin_numero: pinLabel(loc),
+            endereco: loc.endereco,
+            local: loc.local || ''
+          });
+        }
+        focusMapOnLocation(loc); openDrawer(loc.id);
+      });
       const marker = new maplibregl.Marker({ element: el, anchor:'center' }).setLngLat(pos).addTo(map);
       markers[loc.id] = marker;
     }
