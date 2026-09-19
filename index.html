@@ -2037,7 +2037,18 @@ function renderRowsByArtista(){
       <span class="row-sub">${entry.loc.local || entry.loc.endereco}</span>
     `;
     if (entry.foto) btn.querySelector('.row-photo').style.backgroundImage = `url('${entry.foto}')`;
-    btn.addEventListener('click', () => goToLocation(entry.loc));
+    btn.addEventListener('click', () => {
+      // mesmo evento do clique nos pins (ver map_pin_click) — dá pra ver
+      // no GA4 quais artistas recebem mais cliques na lista "por artista"
+      if (typeof gtag === 'function'){
+        gtag('event', 'artist_row_click', {
+          artista: entry.nome,
+          endereco: entry.loc.endereco,
+          local: entry.loc.local || ''
+        });
+      }
+      goToLocation(entry.loc);
+    });
     rowsEl.appendChild(btn);
   });
 }
