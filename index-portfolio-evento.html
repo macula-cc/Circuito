@@ -579,12 +579,17 @@
 // isLocationOpenNow, JS principal), a cor da cobrona (ver
 // heroStrokeLegsInRange) e o fundo do marquee no estado inicial (ver
 // .evento-hoje .event-marquee).
+//
+// ARQUIVO DE REGISTRO/PORTFÓLIO — isEventDay forçado true (não checa a
+// data de verdade), pra guardar como ficava o visual "aceso" do site nos
+// dias do evento, mesmo depois que ele passou. Não é o index.html
+// publicado — ver index.html pro comportamento real (sempre P&B agora).
 (function(){
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Sao_Paulo', year:'numeric', month:'2-digit', day:'2-digit'
   }).formatToParts(new Date());
   const get = t => (parts.find(p => p.type === t) || {}).value;
-  const isEventDay = get('year') === '2026' && get('month') === '09' && (get('day') === '18' || get('day') === '19');
+  const isEventDay = true; // FORÇADO — registro de portfólio, ver comentário acima
   window.RIO_NOW = { day: get('day'), isEventDay };
   document.documentElement.classList.toggle('evento-hoje', isEventDay);
 })();
@@ -948,18 +953,17 @@ function pinLabel(loc){
   return n ? String(n).padStart(2, '0') : '?';
 }
 
-// pin verde quando o espaço tem pelo menos um artista presente no dia de
-// hoje, só durante os dias do evento (18-19/09, horário do Rio). Fora
-// dessa janela — como agora, com o evento já encerrado — fica sempre
-// preto (não mostra mais "aberto em qualquer um dos dois dias", que só
-// fazia sentido como fallback de teste ANTES do evento acontecer).
+// pin verde quando o espaço tem pelo menos um artista presente — no dia
+// de hoje especificamente, se hoje for 18 ou 19/09 (horário do Rio); em
+// qualquer um dos dois dias, se alguém abrir o site fora dessa janela
+// (senão todo pino apareceria preto o resto do ano)
 function isLocationOpenNow(loc){
   const now = window.RIO_NOW;
   if (now && now.isEventDay){
     if (now.day === '18') return loc.artistas.some(a => a.dia18);
     if (now.day === '19') return loc.artistas.some(a => a.dia19);
   }
-  return false;
+  return loc.artistas.some(a => a.dia18 || a.dia19);
 }
 
 // ---------------- map (isolated in try/catch so a load failure doesn't break the rest) ----------------
