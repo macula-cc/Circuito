@@ -6,13 +6,17 @@
 <title>Gerador de Marca — Circuito de Ateliês do Centro</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@350&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
   :root{
     --serif: 'Instrument Serif', Georgia, 'Iowan Old Style', 'Times New Roman', ui-serif, serif;
     --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    /* Inter — usada na UI da ferramenta (títulos, controles). O serif
+       (Instrument Serif) fica só onde a própria marca/arte gerada mostra
+       "Ateliês abertos" e as datas — não na interface da ferramenta. */
+    --sans-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --ink:#111; --line: rgba(0,0,0,0.15); --gray:#6b6b6b; --hover:#f0f0f0; --paper:#fff;
   }
@@ -23,8 +27,13 @@
 
   .nav{ display:flex; gap:2px; font-family:var(--mono); font-size:0.75rem;
         background:#f4f4f4; border:1px solid var(--line); border-radius:999px; padding:3px; width:max-content; margin-bottom:1.6rem; }
-  .nav a{ padding:0.5rem 0.9rem; border-radius:999px; color:var(--gray); }
-  .nav a.active{ background:#111; color:#fff; }
+  .nav a{ padding:0.5rem 0.9rem; border-radius:999px; color:var(--gray); position:relative; z-index:0; }
+  /* núcleo sólido desfocado atrás do texto — mesma técnica dos pins do
+     site principal (ver .pin::before, index.html) — em vez de fundo
+     chapado com borda dura */
+  .nav a.active::before{ content:''; position:absolute; inset:0; border-radius:999px;
+                          background:#111; filter:blur(1.5px); z-index:-1; }
+  .nav a.active{ color:#fff; }
   .nav a:not(.active):hover{ background:var(--hover); color:var(--ink); }
 
   .wrap{ display:grid; grid-template-columns:400px 1fr; min-height:100vh; }
@@ -34,7 +43,7 @@
           overflow-y:auto; max-height:100vh; }
   @media (max-width:900px){ .panel{ border-right:none; border-bottom:1px solid var(--line); max-height:none; } }
 
-  h1{ font-family:var(--serif); font-weight:400; font-size:2.1rem; line-height:1.05; margin:0 0 0.2rem; }
+  h1{ font-family:var(--sans-display); font-weight:400; font-size:2.1rem; line-height:1.05; margin:0 0 0.2rem; }
   .sub{ font-family:var(--mono); font-size:0.79rem; color:var(--gray); margin-bottom:1.6rem; }
 
   .field{ margin-bottom:1.6rem; }
@@ -42,11 +51,21 @@
                 letter-spacing:0.04em; color:var(--gray); margin-bottom:0.5rem; }
 
   .row-btns{ display:flex; gap:0.5rem; flex-wrap:wrap; }
-  .btn{ font-family:var(--mono); font-size:0.79rem; background:#fff; color:var(--ink); border:1px solid var(--ink);
-        padding:0.6rem 0.9rem; cursor:pointer; border-radius:0; transition:background 0.15s ease, color 0.15s ease; }
-  .btn:hover{ background:var(--ink); color:#fff; }
-  .btn.active{ background:var(--ink); color:#fff; }
-  .btn.primary{ background:var(--ink); color:#fff; flex:1; padding:0.85rem; font-size:0.83rem; }
+  /* cantos arredondados + o mesmo núcleo desfocado dos pins do site
+     principal (ver .pin::before, index.html): sem borda — o preenchimento
+     (cinza parado, preto quando ativo/hover) é o próprio ::before desfocado
+     por trás do texto. */
+  .btn{ position:relative; z-index:0; font-family:var(--mono); font-size:0.79rem; color:var(--ink);
+        background:none; border:none;
+        padding:0.6rem 0.9rem; cursor:pointer; border-radius:8px; transition:color 0.15s ease; }
+  .btn::before{ content:''; position:absolute; inset:0; border-radius:8px;
+                background:#e4e4e4; filter:blur(3px); z-index:-1; transition:background 0.15s ease; }
+  .btn:hover{ color:#fff; }
+  .btn:hover::before{ background:var(--ink); }
+  .btn.active{ color:#fff; }
+  .btn.active::before{ background:var(--ink); }
+  .btn.primary{ color:#fff; flex:1; padding:0.85rem; font-size:0.83rem; }
+  .btn.primary::before{ background:var(--ink); }
   .btn.primary:hover{ opacity:0.8; }
   .btn:disabled{ opacity:0.35; cursor:default; pointer-events:none; }
 
