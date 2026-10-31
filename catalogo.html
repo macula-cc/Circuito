@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="pt-BR" class="js">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!-- versão em teste: tirar o noindex quando este arquivo virar o index.html -->
+<meta name="robots" content="noindex">
+<meta name="format-detection" content="telephone=no, address=no, email=no, date=no">
+<title>Artistas — Circuito de Ateliês do Centro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#111; --paper:#fff; --gray:#d8d8d6; --mid:#6b6b6b; --green:#39FF14;
+    --pad:clamp(12px, 2.2vw, 32px);
+    --body:clamp(1.06rem, .86rem + 1.05vw, 1.95rem);
+    --bio:clamp(1.02rem, .9rem + .6vw, 1.5rem);
+    --hero-h:clamp(250px, 46vh, 560px);
+    --a-hero-h:clamp(320px, 62vh, 740px);
+    --thumb-w:clamp(56px, 9vw, 150px);
+    --thumb-h:calc(var(--thumb-w) * .72);
+    --ease:cubic-bezier(.22,.8,.2,1);
+    --sans:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans); font-weight:380; letter-spacing:-.012em; }
+  body.artist-open{ overflow:hidden; }
+  a{ color:inherit; text-decoration:none; }
+  button{ font:inherit; color:inherit; }
+
+  /* ---------- hero ---------- */
+  .hero{ position:relative; height:var(--hero-h); background:var(--gray); }
+  #heroCanvas{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+  .fly{ position:absolute; left:var(--pad); top:calc(var(--pad) * .8); z-index:3; font-size:var(--body); line-height:1.22;
+        text-transform:uppercase; white-space:nowrap; will-change:transform; }
+  .fly span{ display:block; animation:flyIn .9s .15s var(--ease) both; }
+  @keyframes flyIn{ from{ opacity:0; transform:translateY(10px); } }
+
+  /* ---------- texto de abertura ---------- */
+  .js .intro{ height:0; overflow:hidden; }
+  .intro p{ margin:0; padding:var(--pad) var(--pad) calc(var(--pad) * 1.1); font-size:var(--body); line-height:1.22; max-width:1180px; }
+  .intro .lead{ visibility:hidden; }
+  .intro.done .lead{ visibility:visible; }
+  .w{ display:inline-block; opacity:0; transform:translateY(.5em); transition:opacity .8s var(--ease), transform .8s var(--ease); }
+  .intro.go .w{ opacity:1; transform:none; }
+
+  /* ---------- lista ---------- */
+  .big{ margin:0; padding:calc(var(--pad) * .6) var(--pad) 0; font-weight:350; line-height:.8; letter-spacing:-.045em;
+        text-transform:uppercase; white-space:nowrap; overflow:hidden; }
+  .big span{ display:inline-block; }
+  .list{ list-style:none; margin:calc(var(--pad) * .9) 0 0; padding:0 var(--pad); min-height:40vh; }
+  .row{ display:flex; align-items:center; gap:var(--pad); padding:calc(var(--thumb-h) * .13) 0;
+        opacity:0; transform:translateY(16px); transition:opacity .7s var(--ease), transform .7s var(--ease); }
+  .row.in{ opacity:1; transform:none; }
+  .row-link{ flex:1; min-width:0; display:flex; align-items:center; gap:clamp(10px, 1.6vw, 24px); }
+  .thumb{ position:relative; flex:none; width:var(--thumb-w); height:var(--thumb-h); background:var(--gray); overflow:hidden;
+          transition:width .6s var(--ease), height .6s var(--ease); }
+  .thumb i{ position:absolute; inset:0; background:center / cover no-repeat; opacity:0; transition:opacity .6s ease; }
+  .thumb.loaded i{ opacity:1; }
+  @media (hover:hover){
+    .row:hover .thumb, .row:focus-within .thumb{ width:calc(var(--thumb-w) * 2.6); height:calc(var(--thumb-h) * 2.6); }
+  }
+  .name{ font-size:clamp(1.2rem, .7rem + 2.1vw, 3rem); line-height:1.05; letter-spacing:-.03em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ig{ flex:none; font-size:clamp(.8rem, .62rem + .75vw, 1.25rem); white-space:nowrap; }
+  .ig:hover{ text-decoration:underline; text-underline-offset:3px; }
+  .msg{ padding:var(--pad); font-size:var(--body); color:var(--mid); }
+  .msg a{ text-decoration:underline; text-underline-offset:3px; color:var(--ink); }
+
+  .foot{ display:grid; grid-template-columns:1fr 1fr; gap:var(--pad); padding:calc(var(--pad) * 4) var(--pad) calc(var(--pad) * 1.5 + env(safe-area-inset-bottom));
+         font-size:clamp(.72rem, .6rem + .35vw, .95rem); line-height:1.28; }
+  .foot p{ margin:0 0 .9em; }
+  .foot a{ text-decoration:underline; text-underline-offset:2px; }
+  @media (max-width:520px){ .foot{ grid-template-columns:1fr; } }
+
+  /* ---------- página do artista ---------- */
+  .artist{ position:fixed; inset:0; z-index:50; background:var(--paper); overflow-y:auto; overscroll-behavior:contain;
+           visibility:hidden; opacity:0; pointer-events:none; }
+  .artist{ outline:none; }
+  .artist.open{ visibility:visible; pointer-events:auto; }
+  .a-hero{ position:relative; height:var(--a-hero-h); background:var(--green); overflow:hidden; }
+  .a-photo{ position:absolute; inset:0; background:center / cover no-repeat; }
+  .a-hero.has-photo::after{ content:''; position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,.5), rgba(0,0,0,0) 55%); }
+  .a-hero.hide-photo .a-photo, .a-hero.hide-photo::after{ opacity:0; }
+  .a-name{ position:absolute; left:var(--pad); right:var(--pad); bottom:calc(var(--pad) * .35); margin:0; z-index:2;
+           font-weight:350; letter-spacing:-.05em; line-height:.95; overflow:hidden; padding-bottom:.08em; }
+  .a-name span{ display:block; transform:translateY(110%); }
+  .a-hero.has-photo .a-name{ color:#fff; }
+  .artist.revealed .a-name span{ transform:none; transition:transform 1s var(--ease); }
+  .a-close{ position:absolute; top:var(--pad); right:var(--pad); z-index:3; width:clamp(32px, 3.2vw, 46px); aspect-ratio:1; border-radius:50%;
+            border:0; background:var(--gray); cursor:pointer; display:grid; place-items:center; transition:transform .4s var(--ease), background .2s; }
+  .a-close::before, .a-close::after{ content:''; position:absolute; width:38%; height:1.5px; background:var(--ink); border-radius:2px; }
+  .a-close::before{ transform:rotate(45deg); } .a-close::after{ transform:rotate(-45deg); }
+  .a-close:hover{ transform:scale(1.12); background:#fff; }
+  .a-meta{ padding:var(--pad) var(--pad) calc(var(--pad) * 4); }
+  .a-meta > *{ opacity:0; transform:translateY(18px); }
+  .artist.revealed .a-meta > *{ opacity:1; transform:none; transition:opacity .8s var(--ease), transform .8s var(--ease); }
+  .artist.revealed .a-meta > :nth-child(2){ transition-delay:.12s; }
+  .a-igs{ display:flex; flex-wrap:wrap; gap:0 1.1em; font-size:var(--body); }
+  .a-igs a{ text-decoration:underline; text-underline-offset:4px; text-decoration-thickness:1px; }
+  .a-bio{ margin:calc(var(--pad) * 1.3) 0 0; font-size:var(--bio); line-height:1.28; max-width:46em; }
+  .a-bio p{ margin:0 0 1em; }
+  .a-bio.empty{ color:var(--mid); }
+  .morph{ position:fixed; z-index:60; background:var(--green) center / cover no-repeat; pointer-events:none; }
+
+  @media (prefers-reduced-motion:reduce){
+    .row{ opacity:1; transform:none; transition:none; }
+    .w{ opacity:1; transform:none; transition:none; }
+    .fly span{ animation:none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero" id="hero">
+  <canvas id="heroCanvas"></canvas>
+  <div class="fly" id="fly"><span>Circuito de Ateliês do Centro</span></div>
+</header>
+
+<section class="intro" id="intro">
+  <p id="introP"><span class="pre">O </span><span class="lead">CIRCUITO DE ATELIÊS DO CENTRO</span><span class="rest"> nasce da articulação de uma rede de artistas que compartilham o desejo de fortalecer a cena artística contemporânea do Centro do Rio de Janeiro e ampliar as possibilidades de encontro entre arte, cidade e público. Em uma região historicamente marcada pela diversidade cultural e pela efervescência de sua produção artística, o projeto volta o olhar para os lugares onde a arte acontece antes de chegar às exposições: os ateliês, como espaços de pesquisa, experimentação e criação, onde obras, ideias e processos ganham forma.</span></p>
+</section>
+
+<main>
+  <h2 class="big" id="big"><span>Artistas</span></h2>
+  <ul class="list" id="list"></ul>
+</main>
+
+<footer class="foot">
+  <div>
+    <p>Idealização e Produção Executiva:<br>Fernanda Sattamini<br><a href="https://instagram.com/fernandasattamini" target="_blank" rel="noopener">@fernandasattamini</a></p>
+    <p>Identidade visual e site:<br>Eduardo Mattos<br><a href="https://instagram.com/macula.cc" target="_blank" rel="noopener">@macula.cc</a></p>
+  </div>
+  <div>
+    <p>Colaborações:<br>
+      Nuno Quinhões · <a href="https://instagram.com/nunoquinhoes" target="_blank" rel="noopener">@nunoquinhoes</a><br>
+      Alessandra Sposetti · <a href="https://instagram.com/alessandrasposetti" target="_blank" rel="noopener">@alessandrasposetti</a><br>
+      Adriana Macedo · <a href="https://instagram.com/adrianamacedo_artist" target="_blank" rel="noopener">@adrianamacedo_artist</a></p>
+  </div>
+</footer>
+
+<section class="artist" id="artist" tabindex="-1" aria-label="Artista" aria-hidden="true">
+  <div class="a-hero" id="aHero">
+    <div class="a-photo" id="aPhoto"></div>
+    <button class="a-close" id="aClose" aria-label="Fechar"></button>
+    <h1 class="a-name" id="aName"><span></span></h1>
+  </div>
+  <div class="a-meta">
+    <div class="a-igs" id="aIgs"></div>
+    <div class="a-bio" id="aBio"></div>
+  </div>
+</section>
+
+<script>
+const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1Zjux0r3uVJ8ua1ZXpWd68lOSP5Kj0XkU/gviz/tq?tqx=out:csv&sheet=Circuito';
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = s => document.querySelector(s);
+const EASE_IN_OUT = 'cubic-bezier(.65,0,.15,1)';
+
+/* ============================================================
+   dados
+   ============================================================ */
+function parseCSV(text){
+  const rows = []; let row = [], field = '', q = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (q){ if (c === '"'){ if (text[i+1] === '"'){ field += '"'; i++; } else q = false; } else field += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\r') {}
+    else if (c === '\n') { row.push(field); field = ''; rows.push(row); row = []; }
+    else field += c;
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+const slugify = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+// só aceita o que dá pra mostrar de verdade como imagem: arquivo do Drive
+// (vira miniatura) ou link direto de imagem. Post de Instagram, álbum do
+// Google Fotos, nome de arquivo solto etc. não são imagem — ficam sem foto.
+function photoURL(raw, size){
+  const m = (raw || '').match(/https?:\/\/[^\s]+/);
+  if (!m) return null;
+  const url = m[0];
+  const drive = url.match(/drive\.google\.com\/file\/d\/([\w-]+)/) || url.match(/drive\.google\.com\/(?:open|uc)\?[^#]*\bid=([\w-]+)/);
+  if (drive) return `https://drive.google.com/thumbnail?id=${drive[1]}&sz=w${size}`;
+  if (/\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(url) || /freight\.cargo\.site|payload\.cargocollective\.com/.test(url)) return url;
+  return null;
+}
+// fotos: cópia local (catalogo-fotos/, gerada por scripts/baixar-fotos-catalogo.py)
+// quando existe; senão cai no Drive, que às vezes responde 429 no navegador
+let LOCAL_PHOTOS = {};
+// manifesto: 1 = tem cópia local, 0 = link da planilha não funciona, ausente = artista novo (tenta o Drive)
+const thumbURL = a => LOCAL_PHOTOS[a.slug] === 1 ? `catalogo-fotos/t/${a.slug}.jpg` : LOCAL_PHOTOS[a.slug] === 0 ? null : photoURL(a.photoRaw, 640);
+const bigURL = a => LOCAL_PHOTOS[a.slug] === 1 ? `catalogo-fotos/${a.slug}.jpg` : LOCAL_PHOTOS[a.slug] === 0 ? null : photoURL(a.photoRaw, 1600);
+function parseHandles(raw){
+  return (raw || '').split(/[\s,;/|]+/)
+    .map(h => h.replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/[/?].*$/, ''))
+    .filter(h => /^[\w.]+$/.test(h));
+}
+async function loadArtists(){
+  const res = await fetch(`${SHEET_CSV_URL}&_=${Date.now()}`, { cache:'no-store' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const table = parseCSV(await res.text()).filter(r => r.some(c => c && c.trim()));
+  const idx = {}; table[0].forEach((h, i) => idx[h.trim()] = i);
+  const get = (row, n) => (idx[n] != null && row[idx[n]] != null) ? row[idx[n]].trim() : '';
+  const used = new Set(), out = [];
+  table.slice(1).forEach(row => {
+    const name = get(row, 'Nome do Artista');
+    if (!name) return;
+    let slug = slugify(name) || 'artista', n = 2;
+    while (used.has(slug)) slug = slugify(name) + '-' + n++;
+    used.add(slug);
+    out.push({
+      name, slug,
+      handles: parseHandles(get(row, 'Instagram')),
+      bio: get(row, 'Mini bio (1 parágrafo curto)'),
+      photoRaw: get(row, 'Foto do trabalho (URL)'),
+      thumbSrc: null
+    });
+  });
+  out.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity:'base' }));
+  return out;
+}
+
+/* ============================================================
+   carregador de imagens — fila com poucas requisições ao mesmo
+   tempo e nova tentativa: o Drive responde 429 quando recebe muitas
+   miniaturas de uma vez
+   ============================================================ */
+const imgCache = new Map(), imgQueue = []; let imgActive = 0;
+const IMG_MAX = 6;
+function loadImg(url, prio){
+  if (!url) return Promise.resolve(null);
+  if (imgCache.has(url)) return imgCache.get(url);
+  const p = new Promise(res => { const job = { url, res, tries:0 }; prio ? imgQueue.unshift(job) : imgQueue.push(job); imgPump(); });
+  imgCache.set(url, p);
+  return p;
+}
+function imgPump(){ while (imgActive < IMG_MAX && imgQueue.length) imgTry(imgQueue.shift()); }
+function imgTry(job){
+  imgActive++;
+  const img = new Image();
+  img.onload = () => { imgActive--; job.res(img); imgPump(); };
+  img.onerror = () => {
+    imgActive--; job.tries++;
+    if (job.tries < 3) setTimeout(() => { imgQueue.push(job); imgPump(); }, 1200 * job.tries);
+    else job.res(null);
+    imgPump();
+  };
+  img.src = job.tries ? job.url + (job.url.includes('?') ? '&' : '?') + '_r=' + job.tries : job.url;
+}
+
+/* ============================================================
+   hero — a minhocona, agora com as fotos dos artistas dentro do corpo
+   (foto em tons de cinza × degradê verde → cinza do site)
+   ============================================================ */
+const heroEl = $('#hero'), hc = $('#heroCanvas'), hctx = hc.getContext('2d');
+const scratch = document.createElement('canvas'), sctx = scratch.getContext('2d');
+const hero = { W:0, H:0, dpr:1, photos:[], legs:[], t:0, last:null, visible:true, total:0, drawT:0 };
+const LEG_T = .55, HOLD_T = 1.1, ERASE_T = 2.4, N_LEGS = 9;
+const easeSnap = t => t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
+
+function legPath(a, b){
+  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+  if (Math.random() < .25) return [{ ...a }, { ...b }];
+  const nx = -dy / len, ny = dx / len, off = len * (.15 + Math.random() * .3) * (Math.random() < .5 ? 1 : -1);
+  const mx = (a.x + b.x) / 2 + nx * off, my = (a.y + b.y) / 2 + ny * off, N = Math.max(18, Math.round(len / 14)), pts = [];
+  for (let i = 0; i <= N; i++){ const t = i / N, it = 1 - t; pts.push({ x:it*it*a.x + 2*it*t*mx + t*t*b.x, y:it*it*a.y + 2*it*t*my + t*t*b.y }); }
+  return pts;
+}
+const plen = pts => { let l = 0; for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y); return l; };
+function subUpTo(pts, dist){
+  const out = [pts[0]]; let d = 0;
+  for (let i = 1; i < pts.length; i++){
+    const seg = Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y);
+    if (d + seg >= dist){ const t = seg ? (dist - d) / seg : 0; out.push({ x:pts[i-1].x + (pts[i].x - pts[i-1].x) * t, y:pts[i-1].y + (pts[i].y - pts[i-1].y) * t }); return out; }
+    out.push(pts[i]); d += seg;
+  }
+  return out;
+}
+function subFrom(pts, dist){
+  if (dist <= 0) return pts;
+  let d = 0;
+  for (let i = 1; i < pts.length; i++){
+    const seg = Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y);
+    if (d + seg >= dist){ const t = seg ? (dist - d) / seg : 0; return [{ x:pts[i-1].x + (pts[i].x - pts[i-1].x) * t, y:pts[i-1].y + (pts[i].y - pts[i-1].y) * t }, ...pts.slice(i)]; }
+    d += seg;
+  }
+  return [pts[pts.length - 1]];
+}
+
+function heroResize(){
+  const r = heroEl.getBoundingClientRect();
+  hero.W = Math.max(1, Math.round(r.width)); hero.H = Math.max(1, Math.round(r.height));
+  hero.dpr = Math.min(2, window.devicePixelRatio || 1);
+  for (const c of [hc, scratch]){ c.width = hero.W * hero.dpr; c.height = hero.H * hero.dpr; }
+  heroNewCycle();
+}
+function heroNewCycle(){
+  const { W, H } = hero, width = Math.max(64, H * .42);
+  const rnd = () => ({ x:W * (-.05 + Math.random() * 1.1), y:H * (.05 + Math.random() * .9) });
+  let p = rnd(); const pts = [p];
+  for (let i = 0; i < N_LEGS; i++){
+    let q, tries = 0;
+    do { q = rnd(); tries++; } while (Math.hypot(q.x - p.x, q.y - p.y) < W * .28 && tries < 20);
+    pts.push(q); p = q;
+  }
+  const pool = [...hero.photos].sort(() => Math.random() - .5);
+  let off = 0;
+  hero.legs = [];
+  for (let i = 1; i < pts.length; i++){
+    const path = legPath(pts[i-1], pts[i]), len = plen(path), pad = width / 2 + 3;
+    const xs = path.map(q => q.x), ys = path.map(q => q.y);
+    const x0 = Math.max(0, Math.floor(Math.min(...xs) - pad)), y0 = Math.max(0, Math.floor(Math.min(...ys) - pad));
+    const x1 = Math.min(W, Math.ceil(Math.max(...xs) + pad)), y1 = Math.min(H, Math.ceil(Math.max(...ys) + pad));
+    hero.legs.push({ path, len, off, width, box:{ x:x0, y:y0, w:Math.max(0, x1 - x0), h:Math.max(0, y1 - y0) }, photo:pool.length ? pool[(i - 1) % pool.length] : null });
+    off += len;
+  }
+  hero.totalLen = off; hero.drawT = hero.legs.length * LEG_T; hero.total = hero.drawT + HOLD_T + ERASE_T; hero.t = 0; hero.last = null;
+}
+function drawLeg(leg, dS, dE){
+  const b = leg.box; if (b.w < 2 || b.h < 2) return;
+  const sub = subFrom(subUpTo(leg.path, dE), dS); if (sub.length < 2) return;
+  const s = sctx, a = leg.path[0], z = leg.path[leg.path.length - 1];
+  s.save(); s.setTransform(hero.dpr, 0, 0, hero.dpr, 0, 0);
+  s.globalCompositeOperation = 'source-over'; s.clearRect(b.x, b.y, b.w, b.h);
+  s.beginPath(); s.rect(b.x, b.y, b.w, b.h); s.clip();
+  const g = s.createLinearGradient(a.x, a.y, z.x, z.y); g.addColorStop(0, '#39FF14'); g.addColorStop(1, '#d8d8d6');
+  s.fillStyle = g; s.fillRect(b.x, b.y, b.w, b.h);
+  if (leg.photo){
+    const c = leg.photo, k = Math.max(b.w / c.width, b.h / c.height), w = c.width * k, h = c.height * k;
+    s.globalCompositeOperation = 'multiply';
+    s.drawImage(c, b.x + (b.w - w) / 2, b.y + (b.h - h) / 2, w, h);
+  }
+  s.globalCompositeOperation = 'destination-in';
+  s.lineWidth = leg.width; s.lineCap = 'round'; s.lineJoin = 'round'; s.strokeStyle = '#000';
+  s.beginPath(); sub.forEach((q, i) => i ? s.lineTo(q.x, q.y) : s.moveTo(q.x, q.y)); s.stroke();
+  s.restore();
+  hctx.drawImage(scratch, b.x * hero.dpr, b.y * hero.dpr, b.w * hero.dpr, b.h * hero.dpr, b.x, b.y, b.w, b.h);
+}
+function heroRender(t){
+  hctx.setTransform(hero.dpr, 0, 0, hero.dpr, 0, 0);
+  hctx.clearRect(0, 0, hero.W, hero.H);
+  hctx.fillStyle = '#d8d8d6'; hctx.fillRect(0, 0, hero.W, hero.H);
+  const legs = hero.legs;
+  if (t < hero.drawT){
+    const i = Math.min(legs.length - 1, Math.floor(t / LEG_T)), k = (t - i * LEG_T) / LEG_T;
+    legs.forEach((l, j) => { if (j < i) drawLeg(l, 0, l.len); else if (j === i) drawLeg(l, 0, easeSnap(Math.min(1, k)) * l.len); });
+  } else if (t < hero.drawT + HOLD_T){
+    legs.forEach(l => drawLeg(l, 0, l.len));
+  } else {
+    const e = easeSnap(Math.min(1, (t - hero.drawT - HOLD_T) / ERASE_T)) * hero.totalLen;
+    legs.forEach(l => { const s0 = Math.min(l.len, Math.max(0, e - l.off)); if (s0 < l.len) drawLeg(l, s0, l.len); });
+  }
+}
+function heroLoop(ts){
+  requestAnimationFrame(heroLoop);
+  if (!hero.visible || document.hidden || document.body.classList.contains('artist-open')){ hero.last = null; return; }
+  if (hero.last == null) hero.last = ts;
+  hero.t += Math.min(.1, (ts - hero.last) / 1000); hero.last = ts;
+  if (hero.t >= hero.total) heroNewCycle();
+  heroRender(hero.t);
+}
+function grayCanvas(img){
+  const k = 720 / Math.max(img.naturalWidth, img.naturalHeight), c = document.createElement('canvas');
+  c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+  const x = c.getContext('2d');
+  x.drawImage(img, 0, 0, c.width, c.height);
+  x.globalCompositeOperation = 'saturation'; x.fillStyle = '#808080'; x.fillRect(0, 0, c.width, c.height);
+  x.globalCompositeOperation = 'screen'; x.fillStyle = '#2a2a2a'; x.fillRect(0, 0, c.width, c.height);
+  return c;
+}
+function heroFeed(artists){
+  const withPhoto = artists.filter(thumbURL).sort(() => Math.random() - .5).slice(0, 12);
+  withPhoto.forEach(a => loadImg(thumbURL(a), true).then(img => {
+    if (img) hero.photos.push(grayCanvas(img));
+  }));
+}
+function heroStart(){
+  heroResize();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { heroResize(); if (REDUCED) heroStatic(); }, 150); });
+  new IntersectionObserver(es => { hero.visible = es[0].isIntersecting; }).observe(heroEl);
+  if (REDUCED){ heroStatic(); return; }
+  requestAnimationFrame(heroLoop);
+}
+function heroStatic(){ hero.t = hero.drawT + HOLD_T * .5; heroRender(hero.t); }
+
+/* ============================================================
+   abertura — o nome do evento desce do hero e vira o começo do texto
+   ============================================================ */
+const intro = $('#intro'), introP = $('#introP'), fly = $('#fly');
+let introFull = 0, leadOff = { x:0, y:0 };
+function introMeasure(){
+  const prev = intro.style.height;
+  intro.style.height = 'auto';
+  const ir = intro.getBoundingClientRect(), lr = introP.querySelector('.lead').getBoundingClientRect();
+  introFull = intro.scrollHeight; leadOff = { x:lr.left - ir.left, y:lr.top - ir.top };
+  intro.style.height = prev;
+}
+function introPrepare(){
+  const rest = introP.querySelector('.rest'), words = rest.textContent.split(/(\s+)/);
+  rest.textContent = '';
+  let n = 0;
+  words.forEach(w => {
+    if (!w) return;
+    if (/^\s+$/.test(w)){ rest.appendChild(document.createTextNode(' ')); return; }
+    const s = document.createElement('span'); s.className = 'w'; s.textContent = w;
+    s.style.transitionDelay = (650 + n * 13) + 'ms'; n++;
+    rest.appendChild(s);
+  });
+  const pre = introP.querySelector('.pre'); pre.className = 'pre w'; pre.textContent = 'O'; pre.style.marginRight = '.28em'; pre.style.transitionDelay = '650ms';
+}
+function introPlay(){
+  if (REDUCED){ intro.style.height = 'auto'; intro.classList.add('go', 'done'); fly.style.opacity = 0; return; }
+  introMeasure();
+  const ir = intro.getBoundingClientRect(), fr = fly.getBoundingClientRect();
+  const dx = ir.left + leadOff.x - fr.left, dy = ir.top + leadOff.y - fr.top, D = 1150;
+  intro.classList.add('go');
+  const a = intro.animate([{ height:'0px' }, { height:introFull + 'px' }], { duration:D, easing:EASE_IN_OUT, fill:'forwards' });
+  fly.animate([{ transform:'translate(0,0)' }, { transform:`translate(${dx}px,${dy}px)` }], { duration:D, easing:EASE_IN_OUT, fill:'forwards' });
+  a.onfinish = () => { intro.style.height = 'auto'; a.cancel(); intro.classList.add('done'); fly.style.opacity = 0; };
+}
+
+/* ============================================================
+   lista
+   ============================================================ */
+const listEl = $('#list'), bigEl = $('#big');
+let ARTISTS = [], BY_SLUG = new Map(), ROWS = new Map();
+
+function fitBig(){
+  const s = bigEl.firstElementChild, pad = parseFloat(getComputedStyle(bigEl).paddingLeft) || 0;
+  bigEl.style.fontSize = '100px';
+  const w = s.getBoundingClientRect().width;
+  bigEl.style.fontSize = (100 * (document.documentElement.clientWidth - pad * 2) / w) + 'px';
+}
+function igHTML(h){ return `<a class="ig" href="https://instagram.com/${h}" target="_blank" rel="noopener">@${h}</a>`; }
+function renderList(){
+  const hydrate = new IntersectionObserver(es => es.forEach(e => {
+    if (!e.isIntersecting) return;
+    hydrate.unobserve(e.target);
+    const a = e.target._a, url = thumbURL(a);
+    if (!url) return;
+    loadImg(url).then(img => {
+      if (!img) return;
+      a.thumbSrc = img.src;
+      e.target.querySelector('.thumb i').style.backgroundImage = `url("${img.src}")`;
+      e.target.querySelector('.thumb').classList.add('loaded');
+    });
+  }), { rootMargin:'600px 0px' });
+  const reveal = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting){ e.target.classList.add('in'); reveal.unobserve(e.target); }
+  }), { rootMargin:'0px 0px -4% 0px' });
+
+  const frag = document.createDocumentFragment();
+  ARTISTS.forEach(a => {
+    const li = document.createElement('li'); li.className = 'row'; li._a = a;
+    li.innerHTML = `<a class="row-link" href="#/${a.slug}"><span class="thumb"><i></i></span><span class="name"></span></a>`;
+    li.querySelector('.name').textContent = a.name;
+    if (a.handles.length) li.insertAdjacentHTML('beforeend', a.handles.map(igHTML).join(' '));
+    li.querySelector('.row-link').addEventListener('click', e => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+      e.preventDefault(); origin = li; location.hash = '#/' + a.slug;
+    });
+    frag.appendChild(li); ROWS.set(a.slug, li);
+    hydrate.observe(li); reveal.observe(li);
+  });
+  listEl.appendChild(frag);
+}
+
+/* ============================================================
+   página do artista + transição (a miniatura vira o hero)
+   ============================================================ */
+const artistEl = $('#artist'), aHero = $('#aHero'), aPhoto = $('#aPhoto'), aName = $('#aName'), aIgs = $('#aIgs'), aBio = $('#aBio');
+let current = null, origin = null, openedFromList = false, busy = null;
+
+function fitName(){
+  const span = aName.firstElementChild, avail = aName.clientWidth, max = Math.min(window.innerWidth * .115, 190), min = 34;
+  aName.style.fontSize = '100px'; span.style.display = 'inline-block'; span.style.whiteSpace = 'nowrap';
+  const w = span.getBoundingClientRect().width, fit = 100 * avail / w;
+  span.style.display = 'block';
+  if (fit >= min){ aName.style.fontSize = Math.min(max, fit) + 'px'; span.style.whiteSpace = 'nowrap'; }
+  else { aName.style.fontSize = min + 'px'; span.style.whiteSpace = 'normal'; }
+}
+function fillArtist(a){
+  aName.firstElementChild.textContent = a.name;
+  aIgs.innerHTML = a.handles.map(igHTML).join('');
+  aBio.className = 'a-bio';
+  if (a.bio){ aBio.innerHTML = ''; a.bio.split(/\n+/).forEach(t => { const p = document.createElement('p'); p.textContent = t; aBio.appendChild(p); }); }
+  else { aBio.classList.add('empty'); aBio.textContent = 'Mini bio em breve.'; }
+  aHero.classList.toggle('has-photo', !!a.thumbSrc);
+  aPhoto.style.backgroundImage = a.thumbSrc ? `url("${a.thumbSrc}")` : 'none';
+  if (bigURL(a)) loadImg(bigURL(a), true).then(img => {
+    if (!img) return;
+    a.bigSrc = img.src;
+    if (current === a){ aPhoto.style.backgroundImage = `url("${img.src}")`; aHero.classList.add('has-photo'); }
+  });
+  document.title = `${a.name} — Circuito de Ateliês do Centro`;
+}
+function makeMorph(rect, src){
+  const m = document.createElement('div'); m.className = 'morph';
+  Object.assign(m.style, { left:rect.left + 'px', top:rect.top + 'px', width:rect.width + 'px', height:rect.height + 'px' });
+  if (src) m.style.backgroundImage = `url("${src}")`;
+  document.body.appendChild(m); return m;
+}
+function morphTo(m, from, to, D){
+  return m.animate([
+    { left:from.left + 'px', top:from.top + 'px', width:from.width + 'px', height:from.height + 'px' },
+    { left:to.left + 'px', top:to.top + 'px', width:to.width + 'px', height:to.height + 'px' }
+  ], { duration:D, easing:EASE_IN_OUT, fill:'forwards' }).finished;
+}
+
+async function openArtist(a, row){
+  current = a; document.body.classList.add('artist-open');
+  fillArtist(a);
+  artistEl.scrollTop = 0; artistEl.classList.remove('revealed');
+  artistEl.classList.add('open'); artistEl.setAttribute('aria-hidden', 'false');
+  fitName();
+  const animate = row && !REDUCED;
+  if (!animate){
+    artistEl.style.opacity = 1; artistEl.classList.add('revealed'); artistEl.focus({ preventScroll:true }); return;
+  }
+  const token = busy = {};
+  const from = row.querySelector('.thumb').getBoundingClientRect(), to = aHero.getBoundingClientRect();
+  const m = makeMorph(from, a.thumbSrc);
+  aHero.classList.add('hide-photo');
+  artistEl.animate([{ opacity:0 }, { opacity:1 }], { duration:380, easing:'ease', fill:'forwards' });
+  await morphTo(m, from, to, 800);
+  if (busy !== token) { m.remove(); return; }
+  aHero.classList.remove('hide-photo'); m.remove();
+  artistEl.getAnimations().forEach(x => x.cancel()); artistEl.style.opacity = 1;
+  artistEl.classList.add('revealed');
+  artistEl.focus({ preventScroll:true });
+}
+async function closeArtist(){
+  const a = current; if (!a) return;
+  current = null; document.title = 'Artistas — Circuito de Ateliês do Centro';
+  const row = ROWS.get(a.slug), token = busy = {};
+  const done = () => {
+    artistEl.getAnimations().forEach(x => x.cancel());
+    artistEl.classList.remove('open', 'revealed'); artistEl.style.opacity = ''; artistEl.setAttribute('aria-hidden', 'true');
+    aHero.classList.remove('hide-photo'); document.body.classList.remove('artist-open');
+    if (row) row.querySelector('.row-link').focus({ preventScroll:true });
+  };
+  if (!row || REDUCED){ done(); return; }
+  const r0 = row.getBoundingClientRect();
+  if (r0.bottom < 0 || r0.top > window.innerHeight) row.scrollIntoView({ block:'center' });
+  const from = aHero.getBoundingClientRect(), to = row.querySelector('.thumb').getBoundingClientRect();
+  const m = makeMorph(from, a.bigSrc || a.thumbSrc);
+  aHero.classList.add('hide-photo'); artistEl.classList.remove('revealed');
+  artistEl.animate([{ opacity:1 }, { opacity:0 }], { duration:520, easing:'ease', fill:'forwards' });
+  await morphTo(m, from, to, 720);
+  m.remove();
+  if (busy === token) done();
+}
+
+function route(){
+  const m = location.hash.match(/^#\/(.+)$/), a = m && BY_SLUG.get(decodeURIComponent(m[1]));
+  if (a && current !== a){ openedFromList = !!origin; openArtist(a, origin); }
+  else if (!a && current) closeArtist();
+  origin = null;
+}
+window.addEventListener('hashchange', route);
+$('#aClose').addEventListener('click', () => { openedFromList ? history.back() : (location.hash = '#/'); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && current) $('#aClose').click(); });
+window.addEventListener('resize', () => { fitBig(); if (current) fitName(); });
+
+/* ============================================================
+   boot
+   ============================================================ */
+async function boot(){
+  heroStart();
+  introPrepare();
+  const fontsReady = Promise.race([document.fonts.load('350 100px Inter'), new Promise(r => setTimeout(r, 1500))]);
+  await fontsReady;
+  fitBig();
+  setTimeout(introPlay, REDUCED ? 0 : 1500);
+  try{
+    [ARTISTS, LOCAL_PHOTOS] = await Promise.all([
+      loadArtists(),
+      fetch('catalogo-fotos/manifest.json').then(r => r.ok ? r.json() : {}).catch(() => ({}))
+    ]);
+  } catch(err){
+    listEl.innerHTML = '<li class="msg">Não foi possível carregar os artistas agora. <a href="">Tentar de novo</a></li>';
+    return;
+  }
+  ARTISTS.forEach(a => BY_SLUG.set(a.slug, a));
+  heroFeed(ARTISTS);
+  renderList();
+  route();
+}
+boot();
+</script>
+</body>
+</html>
