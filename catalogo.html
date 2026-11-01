@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>
   :root{
     --ink:#111; --paper:#fff; --gray:#d8d8d6; --mid:#6b6b6b; --green:#39FF14;
@@ -43,7 +44,51 @@
   .spacer{ height:280vh; pointer-events:none; } /* pista de rolagem invisível: o hero fica fixo atrás */
 
   /* ---------- seção Artistas (branca, cobre o hero) ---------- */
-  .artists{ position:relative; z-index:2; background:var(--paper); padding-top:calc(var(--pad) * 1.2); box-shadow:0 -40px 80px -30px rgba(0,0,0,.22); }
+  .artists{ position:relative; z-index:2; background:var(--paper); box-shadow:0 -40px 80px -30px rgba(0,0,0,.22); }
+
+
+  /* ---------- mapa: fica no zoom inicial (interactive:false), então não captura a rolagem da página
+     nem mostra detalhe de endereço; só os pins respondem ao clique ---------- */
+  .map-section{ position:relative; height:clamp(380px, 72vh, 760px); background:#cacacc; overflow:hidden; isolation:isolate; }
+  #map{ position:absolute; inset:0; }
+  .maplibregl-map{ font-family:var(--sans); }
+  .maplibregl-ctrl-attrib{ font-family:var(--sans); font-size:.68rem !important; background:rgba(255,255,255,.75) !important; }
+  .map-error{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:.9rem; color:var(--mid); text-align:center; padding:2rem; }
+  .pin-hit{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2 !important; }
+  .pin{ width:24px; height:24px; border-radius:50%; position:relative; display:flex; align-items:center; justify-content:center; color:#fff;
+        font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:.6rem; font-weight:500; letter-spacing:.01em;
+        transition:transform .18s cubic-bezier(.4,0,.2,1), box-shadow .18s ease; }
+  .pin::before{ content:''; position:absolute; inset:2px; border-radius:50%; background:#171717; filter:blur(2px); z-index:-1; }
+  .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.18); box-shadow:0 4px 16px rgba(0,0,0,.35); }
+  .pin.active{ transform:scale(1.18); box-shadow:0 0 0 3px rgba(0,0,0,.18); }
+
+  /* ---------- drawer dos artistas de cada espaço (sem endereço e sem "como chegar") ---------- */
+  .overlay{ position:fixed; inset:0; background:rgba(0,0,0,.15); opacity:0; pointer-events:none; transition:opacity .25s ease; z-index:900; }
+  .overlay.open{ opacity:1; pointer-events:auto; }
+  .drawer{ position:fixed; z-index:950; display:flex; flex-direction:column; background:#fff; border-radius:10px; box-shadow:0 24px 70px rgba(0,0,0,.25);
+           visibility:hidden; transition:transform .35s cubic-bezier(.4,0,.2,1), visibility 0s .35s; }
+  .drawer.open{ visibility:visible; transform:none; transition-delay:0s; }
+  @media (min-width:781px){
+    .drawer{ top:calc(1rem + env(safe-area-inset-top)); right:calc(1rem + env(safe-area-inset-right)); bottom:calc(1rem + env(safe-area-inset-bottom));
+             width:440px; transform:translateX(calc(100% + 2rem)); }
+  }
+  @media (max-width:780px){
+    .drawer{ left:0; right:0; bottom:0; max-height:70vh; transform:translateY(100%); border-bottom-left-radius:0; border-bottom-right-radius:0; }
+  }
+  .drawer-head{ position:relative; padding:1.5rem 4rem 1.1rem 1.6rem; border-bottom:1px solid rgba(0,0,0,.15); flex-shrink:0; }
+  .drawer-title{ margin:0; font-size:1.57rem; font-weight:400; letter-spacing:-.02em; line-height:1.2; }
+  .drawer-title .num{ font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:.8rem; color:var(--mid); margin-right:.6em; letter-spacing:0; vertical-align:.18em; }
+  .drawer-head .a-close{ top:1.05rem; right:1rem; }
+  .drawer-list{ overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding:1rem 1.6rem calc(1.6rem + env(safe-area-inset-bottom)); }
+  .d-grid{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:1.1rem .9rem; }
+  .d-card{ display:flex; flex-direction:column; min-width:0; }
+  .d-photo{ display:block; width:100%; aspect-ratio:4/3; background:#e4e4e4 center / cover no-repeat; border-radius:6px; transition:opacity .15s ease; }
+  .d-photo:hover{ opacity:.85; }
+  .d-name{ display:block; margin:.55rem 0 .1rem; font-size:.95rem; font-weight:450; line-height:1.25; letter-spacing:-.01em; overflow-wrap:anywhere; }
+  .d-ig{ display:flex; flex-wrap:wrap; gap:0 .4rem; font-size:.83rem; line-height:1.4; min-width:0; overflow-wrap:anywhere; }
+  .d-ig .ig{ font-size:inherit; text-decoration:underline; text-underline-offset:2px; }
+  .d-room{ margin-top:.3rem; font-size:.75rem; color:var(--mid); }
+  .d-room span{ border:1px solid rgba(0,0,0,.15); padding:.05rem .3rem; }
 
   /* ---------- lista ---------- */
   .big{ margin:0; padding:calc(var(--pad) * .6) var(--pad) 0; font-weight:350; line-height:.8; letter-spacing:-.045em;
@@ -75,7 +120,7 @@
   @media (max-width:760px){ .foot{ grid-template-columns:repeat(2, 1fr); } }
 
   /* ---------- página do artista ---------- */
-  .artist{ position:fixed; inset:0; z-index:50; background:var(--paper); overflow-y:auto; overscroll-behavior:contain;
+  .artist{ position:fixed; inset:0; z-index:1000; background:var(--paper); overflow-y:auto; overscroll-behavior:contain;
            visibility:hidden; opacity:0; pointer-events:none; }
   .artist{ outline:none; }
   .artist.open{ visibility:visible; pointer-events:auto; }
@@ -111,7 +156,7 @@
   .a-bio{ margin:0; font-size:var(--body); line-height:1.25; max-width:40em; }
   .a-bio p{ margin:0 0 1em; }
   .a-bio.empty{ color:var(--mid); }
-  .morph{ position:fixed; z-index:60; background:var(--green) center / cover no-repeat; pointer-events:none; }
+  .morph{ position:fixed; z-index:1010; background:var(--green) center / cover no-repeat; pointer-events:none; }
 
   @media (prefers-reduced-motion:reduce){
     .row{ opacity:1; transform:none; transition:none; }
@@ -132,6 +177,8 @@
 <div class="spacer" id="spacer"></div>
 
 <div class="artists" id="artists">
+<section class="map-section" id="mapSection" aria-label="Mapa dos ateliês"><div id="map"></div></section>
+
 <main>
   <h2 class="big" id="big"><span>Artistas</span></h2>
   <ul class="list" id="list"></ul>
@@ -147,6 +194,15 @@
     Adriana Macedo · <a href="https://instagram.com/adrianamacedo_artist" target="_blank" rel="noopener">@adrianamacedo_artist</a></p></div>
 </footer>
 </div>
+
+<div class="overlay" id="overlay"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <button class="a-close" id="drawerClose" aria-label="Fechar"></button>
+    <div class="drawer-title" id="drawerTitle"></div>
+  </div>
+  <div class="drawer-list" id="drawerList"></div>
+</aside>
 
 <section class="artist" id="artist" tabindex="-1" aria-label="Artista" aria-hidden="true">
   <div class="a-top" id="aTop">
@@ -215,28 +271,122 @@ function parseHandles(raw){
     .map(h => h.replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/[/?].*$/, ''))
     .filter(h => /^[\w.]+$/.test(h));
 }
+function parseCoord(raw, min, max){
+  if (!raw) return null;
+  const normalized = raw.trim().replace(',', '.');
+  if (!/^-?\d{1,3}(\.\d+)?$/.test(normalized)) return null;
+  const n = parseFloat(normalized);
+  return (isNaN(n) || n < min || n > max) ? null : n;
+}
+
+// coordenadas curadas à mão pros endereços já confirmados — mesmo
+// princípio das estações de metrô/VLT (curadas no código, sem depender de
+// serviço externo): evita depender de Latitude/Longitude digitado certo na
+// planilha (a formatação de célula do Sheets já corrompeu esses valores
+// mais de uma vez — vírgula decimal virando separador de milhar) e evita
+// geocodificação ao vivo (lenta, ~1.1s por endereço) pros endereços mais
+// comuns. Endereço NOVO que ainda não estiver aqui cai automaticamente no
+// comportamento de sempre (lê Latitude/Longitude da planilha, ou
+// geocodifica via Nominatim se estiver vazio) — nada quebra, só não fica
+// com essa otimização até alguém adicionar aqui. Só edita quem mexe no
+// código (não é editável pela planilha).
+const CURATED_COORDS = {
+  'Arco do Telles, 17 - Pça XV': { lat: -22.9027582, lng: -43.1746864 },
+  'Av. Churchill 94, 4o andar': { lat: -22.9079936, lng: -43.1703966 }, // corrigido: reaudit — batia exato com o prédio real (Ministério Público do Trabalho), ~220m do valor antigo
+  'Av. Erasmo Braga 255, Sobreloja': { lat: -22.9056853, lng: -43.1744404 },
+  'Av. Marechal Floriano 143': { lat: -22.9024075, lng: -43.1853374 },
+  'Av. Nilo Peçanha 50, 2201': { lat: -22.9060475, lng: -43.1776024 },
+  'Av. Presidente Vargas 509/1603': { lat: -22.902087, lng: -43.180236 }, // corrigido: reaudit — batia exato com o prédio real (Edifício Montreal), ~360m do valor antigo
+  'Av. Rio Branco 277': { lat: -22.9118133, lng: -43.1747917 },
+  'Avenida Beira Mar 216': { lat: -22.9105342, lng: -43.1704502 },
+  'Avenida Franklin Roosevelt 39': { lat: -22.9096441, lng: -43.1714199 },
+  'Avenida Treze de Maio, nº 13, 1909': { lat: -22.9090323, lng: -43.1771338 },
+  'Largo de Santa Rita 6, sobrado': { lat: -22.8998691, lng: -43.1811527 },
+  'Praça XV de Novembro 34, Sobreloja': { lat: -22.902694, lng: -43.174694 },
+  'Rua Acre 83': { lat: -22.9005015, lng: -43.181881 },
+  'Rua Andre Cavalcanti 108': { lat: -22.914189, lng: -43.1868113 },
+  'Rua Buenos Aires 70, 601': { lat: -22.9022024, lng: -43.1774392 },
+  'Rua Camerino, 59': { lat: -22.9007393, lng: -43.1862836 },
+  'Rua Conde de Lages 27': { lat: -22.9172024, lng: -43.1777996 },
+  'Rua Conde de Lages 44': { lat: -22.9172024, lng: -43.1777996 },
+  'Rua da Alfândega 91': { lat: -22.9025776, lng: -43.1797789 },
+  'Rua da Conceição 105': { lat: -22.9016505, lng: -43.1836073 },
+  'Rua da Quitanda 3': { lat: -22.9053821, lng: -43.1760508 },
+  'Rua da quitanda 3': { lat: -22.9054597, lng: -43.1760521 },
+  'Rua do Passeio 2': { lat: -22.9125195, lng: -43.1754608 },
+  'Rua do Rosário 104, 4º andar': { lat: -22.9026452, lng: -43.1777889 },
+  'Rua do Russel, 300': { lat: -22.9233172, lng: -43.1728138 },
+  'Rua do Senado 227': { lat: -22.9091948, lng: -43.1846348 }, // corrigido: reaudit — match exato com o número da casa, ~490m do valor antigo
+  'Rua dos invalidos 27, sobrado': { lat: -22.9090507, lng: -43.1856628 },
+  'Rua dos Inválidos 08': { lat: -22.913504, lng: -43.1842394 },
+  'Rua Luis de Camões 42': { lat: -22.9055693, lng: -43.1822654 },
+  'Rua Luís de Camões 02, sobrado': { lat: -22.904813, lng: -43.1811294 },
+  'Rua Mayrink Veiga 6, 11º andar': { lat: -22.899271, lng: -43.180383 },
+  'Rua Sara, 82': { lat: -22.9008919, lng: -43.2041747 },
+  'Rua Luís de Camões 75': { lat: -22.9055693, lng: -43.1822654 },
+  'Rua Sarah, 34': { lat: -22.9013783, lng: -43.2044414 }, // corrigido: célula com lat/lng corrompida pela planilha ("-229.013.783"), caiu no geocoding automático e resolveu em Nilópolis por engano
+  'Rua da Lapa 102': { lat: -22.9155886, lng: -43.1777324 }, // corrigido: geocodificação automática (com o sufixo "Centro" na busca) resolvia no Centro Histórico de Paraty, não no Centro do Rio — "Centro" bateu com o nome do bairro de lá
+  'Av. Gomes Freire, 33': { lat: -22.9116751, lng: -43.1835037 }, // Ateliê 2050 LAPA — endereço novo, geocodado (trecho da Av. Gomes Freire na Lapa)
+  'Rua Conde de Lages ,27': { lat: -22.9172024, lng: -43.1777996 }, // mesma coordenada de "Rua Conde de Lages 27" — variação de formatação na planilha (vírgula antes do número)
+  'Rua do Russel, 300 Edificio Lage': { lat: -22.9233172, lng: -43.1728138 }, // mesma coordenada de "Rua do Russel, 300" — erro de digitação na planilha juntou o nome do prédio (deveria estar em Local/Coletivo) ao endereço
+  'Av. Mem de Sá, 33': { lat: -22.9106465, lng: -43.1842689 }, // 2050 LAPA — célula de lat/lng corrompida pela planilha, geocodado e confirmado
+  'Rua Miguel Couto, 98': { lat: -22.900923, lng: -43.180354 }, // corrigido: célula corrompida pela planilha ("-22.900.923"/"-43.180.354")
+  'Rua do Senado 338': { lat: -22.9116961314177, lng: -43.1926349617462 }, // corrigido: célula bem corrompida pela planilha ("-22.911.696.131.417.700")
+  'Rua Camerino, 57': { lat: -22.9007393, lng: -43.1862836 }, // mesma coordenada do vizinho já curado "Rua Camerino, 59"
+  'R. Carlos Sampaio, 47': { lat: -22.9131142, lng: -43.1882705 }, // geocodado — confiança média, 2 candidatos ~250m diferentes dentro do Centro
+  'Avenida Beira Mar 262': { lat: -22.910610, lng: -43.170899 }, // corrigido: reclamação de morador (pino parecia ficar antes do 216, deveria vir depois) — interpolado a partir de números de porta REAIS mapeados no OpenStreetMap na mesma via (216, confirmado certo, e 280), não geocodificação de texto livre
+  'Rua México 164': { lat: -22.9071644, lng: -43.1757713 },
+  'Rua México 31': { lat: -22.9114856, lng: -43.1743552 },
+  'Rua Pedro Ernesto 56': { lat: -22.8960326, lng: -43.1936254 },
+  'Rua Pedro Ernesto 56 - Gamboa': { lat: -22.8961902, lng: -43.1935285 },
+  'Rua Teixeira de Freitas 5': { lat: -22.914568, lng: -43.176575 },
+  'Rua Uruguaiana 10': { lat: -22.9061872, lng: -43.1785202 },
+  'Rua Álvaro Alvim 21, 18º andar': { lat: -22.9115713, lng: -43.1761788 },
+  'Travessa do Paço 23': { lat: -22.904291, lng: -43.1733626 },
+};
+
+
+let LOCATIONS = [], LOC_BY_ID = new Map(), locNum = {};
 async function loadArtists(){
   const res = await fetch(`${SHEET_CSV_URL}&_=${Date.now()}`, { cache:'no-store' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const table = parseCSV(await res.text()).filter(r => r.some(c => c && c.trim()));
   const idx = {}; table[0].forEach((h, i) => idx[h.trim()] = i);
   const get = (row, n) => (idx[n] != null && row[idx[n]] != null) ? row[idx[n]].trim() : '';
-  const used = new Set(), out = [];
+  const used = new Set(), out = [], locMap = {}, locs = [];
   table.slice(1).forEach(row => {
-    const name = get(row, 'Nome do Artista');
+    const name = get(row, 'Nome do Artista'), endereco = get(row, 'Endereço');
     if (!name) return;
     let slug = slugify(name) || 'artista', n = 2;
     while (used.has(slug)) slug = slugify(name) + '-' + n++;
     used.add(slug);
-    out.push({
+    const artist = {
       name, slug,
       handles: parseHandles(get(row, 'Instagram')),
       bio: get(row, 'Mini bio (1 parágrafo curto)'),
       photoRaw: get(row, 'Foto do trabalho (URL)'),
+      sala: get(row, 'Sala') || get(row, 'Observações'),
       thumbSrc: null
-    });
+    };
+    out.push(artist);
+    // espaços: um por endereço (vários artistas dividem o mesmo)
+    if (!locMap[endereco]){
+      const cur = CURATED_COORDS[endereco];
+      locMap[endereco] = {
+        id: 'loc' + locs.length, local: get(row, 'Local / Coletivo'), endereco,
+        lat: cur ? cur.lat : parseCoord(get(row, 'Latitude'), -90, 90),
+        lng: cur ? cur.lng : parseCoord(get(row, 'Longitude'), -180, 180),
+        artistas: []
+      };
+      locs.push(locMap[endereco]);
+    }
+    locMap[endereco].artistas.push(artist);
   });
   out.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity:'base' }));
+  LOCATIONS = locs; LOC_BY_ID = new Map(locs.map(l => [l.id, l]));
+  // numeração dos pins: ordem alfabética do nome do espaço (igual à do site principal)
+  locNum = {};
+  [...locs].sort((a, b) => (a.local || a.endereco).localeCompare(b.local || b.endereco, 'pt-BR', { sensitivity:'base' })).forEach((l, i) => { locNum[l.id] = i + 1; });
   return out;
 }
 
@@ -466,7 +616,7 @@ function renderList(){
     li.querySelector('.row-link').addEventListener('pointerdown', () => prefetchMid(a, li), { passive:true });
     li.querySelector('.row-link').addEventListener('click', e => {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
-      e.preventDefault(); origin = li; location.hash = '#/' + a.slug;
+      e.preventDefault(); origin = li.querySelector('.thumb'); location.hash = '#/' + a.slug;
     });
     frag.appendChild(li); ROWS.set(a.slug, li);
     hydrate.observe(li); reveal.observe(li);
@@ -478,7 +628,7 @@ function renderList(){
    página do artista + transição (a miniatura vira o hero)
    ============================================================ */
 const artistEl = $('#artist'), aTop = $('#aTop'), aHero = $('#aHero'), aPhoto = $('#aPhoto'), aName = $('#aName'), aNameW = $('#aNameW'), aNameBar = $('#aNameBar'), aGap = $('#aGap'), aIgs = $('#aIgs'), aBio = $('#aBio');
-let current = null, origin = null, openedFromList = false, busy = null;
+let current = null, origin = null, currentOrigin = null, openedFromList = false, busy = null;
 
 function fitName(){
   const span = aName.firstElementChild, avail = aName.clientWidth, max = Math.min(window.innerWidth * .115, 190), min = 34;
@@ -534,18 +684,18 @@ function morphTo(m, from, to, D){
   ], { duration:D, easing:EASE_IN_OUT, fill:'forwards' }).finished;
 }
 
-async function openArtist(a, row){
-  current = a; document.body.classList.add('artist-open');
+async function openArtist(a, originEl){
+  current = a; currentOrigin = originEl || null; document.body.classList.add('artist-open');
   fillArtist(a);
   artistEl.scrollTop = 0; artistEl.classList.remove('revealed');
   artistEl.classList.add('open'); artistEl.setAttribute('aria-hidden', 'false');
   fitName();
-  const animate = row && !REDUCED;
+  const animate = originEl && !REDUCED;
   if (!animate){
     artistEl.style.opacity = 1; artistEl.classList.add('revealed'); artistEl.focus({ preventScroll:true }); return;
   }
   const token = busy = {};
-  const from = row.querySelector('.thumb').getBoundingClientRect(), to = aHero.getBoundingClientRect();
+  const from = originEl.getBoundingClientRect(), to = aHero.getBoundingClientRect();
   const m = makeMorph(from, a.thumbSrc);
   aHero.classList.add('hide-photo');
   artistEl.animate([{ opacity:0 }, { opacity:1 }], { duration:380, easing:'ease', fill:'forwards' });
@@ -560,17 +710,24 @@ async function closeArtist(){
   const a = current; if (!a) return;
   current = null; document.title = 'Artistas — Circuito de Ateliês do Centro';
   const row = ROWS.get(a.slug), token = busy = {};
+  const rowThumb = row && row.querySelector('.thumb');
+  // volta pra miniatura de onde veio (drawer ou lista); se o drawer já fechou, cai na linha da lista
+  let target = currentOrigin && currentOrigin.isConnected ? currentOrigin : rowThumb;
+  if (target && target.closest('.drawer') && !drawerEl.classList.contains('open')) target = rowThumb;
+  currentOrigin = null;
   const done = () => {
     artistEl.getAnimations().forEach(x => x.cancel());
     artistEl.classList.remove('open', 'revealed'); artistEl.style.opacity = ''; artistEl.setAttribute('aria-hidden', 'true');
     aHero.classList.remove('hide-photo'); document.body.classList.remove('artist-open');
-    if (row) row.querySelector('.row-link').focus({ preventScroll:true });
+    const f = target && target.closest('a, button'); if (f) f.focus({ preventScroll:true });
   };
-  if (!row || REDUCED){ done(); return; }
+  if (!target || REDUCED){ done(); return; }
   artistEl.scrollTop = 0;
-  const r0 = row.getBoundingClientRect();
-  if (r0.bottom < 0 || r0.top > window.innerHeight) row.scrollIntoView({ block:'center' });
-  const from = aHero.getBoundingClientRect(), to = row.querySelector('.thumb').getBoundingClientRect();
+  if (target === rowThumb){
+    const r0 = row.getBoundingClientRect();
+    if (r0.bottom < 0 || r0.top > window.innerHeight) row.scrollIntoView({ block:'center' });
+  }
+  const from = aHero.getBoundingClientRect(), to = target.getBoundingClientRect();
   const m = makeMorph(from, a.bigSrc || a.thumbSrc);
   aHero.classList.add('hide-photo'); artistEl.classList.remove('revealed');
   artistEl.animate([{ opacity:1 }, { opacity:0 }], { duration:520, easing:'ease', fill:'forwards' });
@@ -587,11 +744,287 @@ function route(){
 }
 window.addEventListener('hashchange', route);
 $('#aClose').addEventListener('click', () => { openedFromList ? history.back() : (location.hash = '#/'); });
-window.addEventListener('keydown', e => { if (e.key === 'Escape' && current) $('#aClose').click(); });
+window.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (current) $('#aClose').click(); else if (drawerEl.classList.contains('open')) closeDrawer();
+});
 window.addEventListener('resize', () => {
   if (window.innerWidth === lastW && Math.abs(window.innerHeight - lastH) < 160) return;
   fitBig(); if (current) fitName();
+  if (map){ map.resize(); frameMap(); syncMarkers(); }
 });
+
+/* ============================================================
+   mapa — zoom inicial fixo (interactive:false): não captura a rolagem da
+   página e não mostra detalhe de endereço. Só os pins respondem ao clique.
+   ============================================================ */
+let map = null, mapNear = false;
+const markers = {};
+const pinLabel = loc => String(locNum[loc.id] || '?').padStart(2, '0');
+function loadMapLibre(){
+  if (window.maplibregl) return Promise.resolve();
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js'; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+const MONO_COLORS = {
+  background: '#CACACC', water: '#D4D4D6', landuse: '#CACACC', building: '#CACACC',
+  buildingOutline: '#CACACC', road: '#D9D9DB', roadCasing: '#D9D9DB',
+  boundary: '#B2B2B3', text: '#222222', textHalo: '#D9D9DB'
+};
+function applyMonochromeStyle(){
+  const layers = map.getStyle().layers || [];
+  let buildingSource = null, buildingSourceLayer = null;
+  let firstSymbolId = null;
+  layers.forEach(layer => {
+    const id = layer.id.toLowerCase();
+    const sl = (layer['source-layer'] || '').toLowerCase();
+    const isWater = id.includes('water') || sl.includes('water');
+    const isBuilding = sl === 'building' || id.includes('building');
+    const isRoad = sl === 'transportation' && layer.type === 'line';
+    const isCasing = id.includes('casing');
+    const isBoundary = sl === 'boundary';
+    if (isBuilding && layer.type === 'fill'){ buildingSource = layer.source; buildingSourceLayer = layer['source-layer']; }
+    if (layer.type === 'symbol' && firstSymbolId === null){ firstSymbolId = layer.id; }
+    try{
+      if (layer.type === 'fill-extrusion'){
+        // "building-3d" do estilo "liberty" — prédios com altura/sombra.
+        // A gente já tem os prédios "achatados" na camada fill comum
+        // (building), então só esconde a versão 3D em vez de recolorir
+        map.setLayoutProperty(layer.id, 'visibility', 'none');
+      } else if (layer.type === 'background'){
+        map.setPaintProperty(layer.id, 'background-color', MONO_COLORS.background);
+      } else if (layer.type === 'fill'){
+        // camadas com "fill-pattern" (ex: hachurado de área de pedestre,
+        // zona úmida) pintam uma textura de sprite por cima — não dá pra
+        // recolorir com fill-color, então em vez de deixar o hachurado
+        // sempre branco/cinza aparecendo por cima de qualquer paleta, some
+        // com a camada inteira
+        if (map.getPaintProperty(layer.id, 'fill-pattern')){
+          map.setLayoutProperty(layer.id, 'visibility', 'none');
+          return;
+        }
+        const color = isWater ? MONO_COLORS.water : (isBuilding ? MONO_COLORS.building : MONO_COLORS.landuse);
+        map.setPaintProperty(layer.id, 'fill-color', color);
+        // algumas camadas de preenchimento (prédio, parque) trazem um
+        // "fill-outline-color" próprio no estilo-base, fixo, sem ligação
+        // com fill-color — sem isso, cada prédio ficava com um contorno
+        // claro/esbranquiçado por cima de qualquer paleta. Iguala ao
+        // preenchimento pra ficar invisível, como o resto do "xerox".
+        if (map.getPaintProperty(layer.id, 'fill-outline-color') !== undefined){
+          map.setPaintProperty(layer.id, 'fill-outline-color', color);
+        }
+      } else if (layer.type === 'line'){
+        let color = MONO_COLORS.landuse; // linhas genéricas (contorno de parque etc.)
+        if (isWater) color = MONO_COLORS.water;
+        else if (isBoundary) color = MONO_COLORS.boundary;
+        else if (isRoad) color = isCasing ? MONO_COLORS.roadCasing : MONO_COLORS.road;
+        map.setPaintProperty(layer.id, 'line-color', color);
+      } else if (layer.type === 'symbol'){
+        // poi_r1/r7/r20 = POI genérico por ranking (loja, restaurante etc.)
+        // poi_transit = pontos de ônibus/trem/aeroporto (linha, terminal,
+        // ponto final) — informação de transporte que a gente não quer
+        // exibir. Nenhum dos dois esconde a camada "airport" (nome do
+        // aeroporto), que é separada e continua normalmente.
+        const isGenericPoi = sl === 'poi' && /^poi_r\d+$/.test(id);
+        const isTransitPoi = id === 'poi_transit';
+        if (isGenericPoi || isTransitPoi){
+          map.setLayoutProperty(layer.id, 'visibility', 'none');
+          return;
+        }
+        map.setPaintProperty(layer.id, 'text-color', MONO_COLORS.text);
+        map.setPaintProperty(layer.id, 'text-halo-color', MONO_COLORS.textHalo);
+        // o estilo "liberty" traz ícones de POI (ônibus, bancos, etc.) que a
+        // gente nunca teve no tile raster do CARTO — escondidos aqui,
+        // mantendo só os rótulos de texto (nomes de rua/bairro)
+        map.setPaintProperty(layer.id, 'icon-opacity', 0);
+      }
+    } catch(e){ /* propriedade pode não existir nessa camada específica — ignora */ }
+  });
+  // o estilo "liberty" não vem com um contorno de prédio separado — cria
+  // uma camada de linha nova em cima da mesma fonte/source-layer da
+  // camada de preenchimento (que ficou branca/invisível logo acima).
+  // Insere ANTES da primeira camada de texto/símbolo — sem isso o
+  // addLayer joga a linha pro topo absoluto da pilha e ela passa por
+  // cima de nomes de rua/bairro em alguns zooms, apagando um pouco o texto.
+  if (buildingSource && !map.getLayer('building_outline_xerox')){
+    map.addLayer({
+      id: 'building_outline_xerox',
+      type: 'line',
+      source: buildingSource,
+      'source-layer': buildingSourceLayer,
+      paint: { 'line-color': MONO_COLORS.buildingOutline, 'line-width': 1 }
+    }, firstSymbolId || undefined);
+  }
+}
+
+// Com o zoom fixo, vários pins caem um em cima do outro (principalmente no Centro). Em vez de
+// mostrar a posição exata, espalha os pins em pixels de tela até não se tocarem — o que também
+// deixa a posição aproximada, de propósito (o mapa não entrega o endereço exato).
+function layoutPins(){
+  const D = window.innerWidth < 780 ? 22 : 26, W = map.getContainer().clientWidth, H = map.getContainer().clientHeight;
+  const items = LOCATIONS.filter(l => l.lat != null && l.lng != null).map(l => {
+    const p = map.project([l.lng, l.lat]); return { l, hx:p.x, hy:p.y, x:p.x, y:p.y };
+  });
+  for (let it = 0; it < 120; it++){
+    let moved = false;
+    for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++){
+      const a = items[i], b = items[j]; let dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+      if (d >= D) continue;
+      if (d < .01){ const ang = i * 2.399; dx = Math.cos(ang); dy = Math.sin(ang); d = 1; }
+      const push = (D - d) / 2 * .6, ux = dx / d, uy = dy / d;
+      a.x -= ux * push; a.y -= uy * push; b.x += ux * push; b.y += uy * push; moved = true;
+    }
+    items.forEach(p => {
+      p.x += (p.hx - p.x) * .03; p.y += (p.hy - p.y) * .03;
+      p.x = Math.min(W - 18, Math.max(18, p.x)); p.y = Math.min(H - 18, Math.max(18, p.y));
+    });
+    if (!moved) break;
+  }
+  items.forEach(p => { const ll = map.unproject([p.x, p.y]); p.l._disp = [ll.lng, ll.lat]; });
+}
+function frameMap(){
+  if (!map) return;
+  const pts = LOCATIONS.filter(l => l.lat != null && l.lng != null);
+  if (pts.length < 2){ map.jumpTo({ center:[-43.1795, -22.9065], zoom:14 }); return; }
+  const lats = pts.map(l => l.lat), lngs = pts.map(l => l.lng);
+  map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding:{ top:50, bottom:50, left:36, right:36 }, duration:0 });
+}
+function makePinEl(label){
+  const el = document.createElement('div');
+  el.className = 'pin-hit'; el.setAttribute('role', 'button'); el.tabIndex = 0; el.setAttribute('aria-label', 'Abrir ateliê ' + label);
+  el.innerHTML = `<div class="pin">${label}</div>`;
+  return el;
+}
+function syncMarkers(){
+  if (!map) return;
+  layoutPins();
+  LOCATIONS.forEach(loc => {
+    if (loc.lat == null || loc.lng == null) return;
+    const pos = loc._disp || [loc.lng, loc.lat];
+    if (markers[loc.id]){ markers[loc.id].setLngLat(pos); return; }
+    const el = makePinEl(pinLabel(loc));
+    el.addEventListener('click', () => openDrawer(loc.id));
+    el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openDrawer(loc.id); } });
+    markers[loc.id] = new maplibregl.Marker({ element:el, anchor:'center' }).setLngLat(pos).addTo(map);
+  });
+}
+async function initMap(){
+  if (map) return;
+  try{
+    await loadMapLibre();
+    map = new maplibregl.Map({
+      container:'map', style:'https://tiles.openfreemap.org/styles/liberty',
+      center:[-43.1795, -22.9065], zoom:14, pitch:0, maxPitch:0, interactive:false, attributionControl:false
+    });
+    map.addControl(new maplibregl.AttributionControl({ compact:true }), 'bottom-right');
+    map.on('load', () => { applyMonochromeStyle(); frameMap(); syncMarkers(); resolveMissingCoordinates(); });
+  } catch(err){
+    map = null; console.error('Mapa indisponível:', err);
+    $('#map').innerHTML = '<div class="map-error">Não foi possível carregar o mapa agora.</div>';
+  }
+}
+// o mapa (e o MapLibre, ~800 KB) só é carregado quando a seção está perto da tela
+function maybeInitMap(){ if (mapNear && LOCATIONS.length && !map) initMap(); }
+async function geocodeAddress(query){
+  try{
+    // limit=1 sozinho é arriscado: várias cidades da Região Metropolitana
+    // do Rio (Belford Roxo, Volta Redonda, Cabo Frio...) têm ruas com o
+    // mesmo nome, e "Rio de Janeiro" no texto da busca pode ser lido como
+    // o ESTADO (que inclui todas elas), não só a cidade — o primeiro
+    // resultado às vezes é dessas outras cidades, não da capital. Pede
+    // mais resultados com endereço detalhado e filtra pelo campo
+    // city/town batendo exatamente com "Rio de Janeiro".
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&q=${encodeURIComponent(query)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('geocode http error ' + res.status);
+    const results = await res.json();
+    if (results && results.length){
+      const inRioCity = results.find(r => {
+        const city = (r.address && (r.address.city || r.address.town)) || '';
+        return city.toLowerCase() === 'rio de janeiro';
+      });
+      const best = inRioCity || results[0];
+      return { lat: parseFloat(best.lat), lng: parseFloat(best.lon) };
+    }
+  } catch(err){
+    console.warn('Falha ao geocodificar endereço:', query, err);
+  }
+  return null;
+}
+
+// só nome da rua + primeiro número servem pro Nominatim — ele geocodifica
+// no nível de prédio/rua, nunca sala/andar/bairro/complemento, e esse
+// "resto" às vezes nem é ignorado: ativamente atrapalha e faz a busca
+// falhar em silêncio (endereço fica "pendente" pra sempre, sem erro
+// visível). Corta tudo a partir do primeiro número (inclusive) em diante.
+function simplifyAddressForGeocoding(endereco){
+  const m = endereco.match(/^(.*?\d+)/);
+  return (m ? m[1] : endereco).trim();
+}
+
+async function resolveMissingCoordinates(){
+  const pending = LOCATIONS.filter(l =>
+    (l.lat == null || l.lng == null) && !/confirmar/i.test(l.endereco)
+  );
+  for (const loc of pending){
+    // "Rio de Janeiro, Brasil" no final já desambigua o suficiente — não
+    // precisa (e não deve) levar bairro/complemento do texto original.
+    const query = `${simplifyAddressForGeocoding(loc.endereco)}, Rio de Janeiro, Brasil`;
+    const coords = await geocodeAddress(query);
+    if (coords){
+      loc.lat = coords.lat;
+      loc.lng = coords.lng;
+      frameMap(); syncMarkers(); // um novo ponto pode mudar o enquadramento e colidir com um já existente
+    }
+    // pequena pausa entre chamadas por educação com o serviço gratuito
+    await new Promise(r => setTimeout(r, 1100));
+  }
+}
+
+
+
+/* ============================================================
+   drawer — artistas de cada espaço; clicar no artista abre a página dele
+   ============================================================ */
+const overlayEl = $('#overlay'), drawerEl = $('#drawer'), drawerTitle = $('#drawerTitle'), drawerList = $('#drawerList');
+function setActivePin(id){
+  for (const k in markers) markers[k].getElement().querySelector('.pin').classList.toggle('active', k === id);
+}
+function openDrawer(locId){
+  const loc = LOC_BY_ID.get(locId); if (!loc) return;
+  drawerTitle.textContent = '';
+  const num = document.createElement('span'); num.className = 'num'; num.textContent = pinLabel(loc);
+  drawerTitle.append(num, document.createTextNode(loc.local || 'Ateliê'));
+  drawerList.textContent = ''; drawerList.scrollTop = 0;
+  const grid = document.createElement('div'); grid.className = 'd-grid';
+  loc.artistas.forEach(a => {
+    const card = document.createElement('div'); card.className = 'd-card';
+    const photo = document.createElement('a'); photo.className = 'd-photo'; photo.href = '#/' + a.slug; photo.setAttribute('aria-label', a.name);
+    const name = document.createElement('a'); name.className = 'd-name'; name.href = '#/' + a.slug; name.textContent = a.name;
+    [photo, name].forEach(el => el.addEventListener('click', e => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+      e.preventDefault(); origin = photo; location.hash = '#/' + a.slug;
+    }));
+    const mid = midURL(a);
+    if (mid) loadImg(mid).then(img => { if (img){ photo.style.backgroundImage = `url("${img.src}")`; a.thumbSrc = img.src; } });
+    card.append(photo, name);
+    if (a.handles.length){ const ig = document.createElement('div'); ig.className = 'd-ig'; ig.innerHTML = a.handles.map(igHTML).join(' '); card.append(ig); }
+    if (a.sala){ const r = document.createElement('div'); r.className = 'd-room'; const s = document.createElement('span'); s.textContent = a.sala; r.append(s); card.append(r); }
+    grid.append(card);
+  });
+  drawerList.append(grid);
+  setActivePin(locId);
+  overlayEl.classList.add('open'); drawerEl.classList.add('open'); drawerEl.setAttribute('aria-hidden', 'false');
+}
+function closeDrawer(){
+  overlayEl.classList.remove('open'); drawerEl.classList.remove('open'); drawerEl.setAttribute('aria-hidden', 'true');
+  setActivePin(null);
+}
+$('#drawerClose').addEventListener('click', closeDrawer);
+overlayEl.addEventListener('click', closeDrawer);
 
 /* ============================================================
    boot
@@ -612,6 +1045,7 @@ async function boot(){
   }
   ARTISTS.forEach(a => BY_SLUG.set(a.slug, a));
   renderList();
+  new IntersectionObserver(es => { if (es[0].isIntersecting){ mapNear = true; maybeInitMap(); } }, { rootMargin:'1200px 0px' }).observe($('#mapSection'));
   route();
 }
 boot();
