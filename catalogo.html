@@ -51,8 +51,7 @@
 
   /* ---------- mapa: fica no zoom inicial (interactive:false), então não captura a rolagem da página
      nem mostra detalhe de endereço; só os pins respondem ao clique ---------- */
-  .map-section{ position:sticky; top:0; z-index:1; height:100vh; background:#cacacc; overflow:hidden; isolation:isolate; box-shadow:0 -40px 80px -30px rgba(0,0,0,.22); }
-  .list-layer{ position:relative; z-index:2; background:var(--paper); box-shadow:0 -40px 80px -30px rgba(0,0,0,.22); }
+  .map-section{ position:relative; height:100vh; background:#cacacc; overflow:hidden; isolation:isolate; box-shadow:0 -40px 80px -30px rgba(0,0,0,.22); }
   #map{ position:absolute; inset:0; }
   .maplibregl-map{ font-family:var(--sans); }
   .maplibregl-ctrl-attrib{ font-family:var(--sans); font-size:.68rem !important; background:rgba(255,255,255,.75) !important; }
@@ -92,6 +91,27 @@
   .d-ig .ig{ font-size:inherit; text-decoration:underline; text-underline-offset:2px; }
   .d-room{ margin-top:.3rem; font-size:.75rem; color:var(--mid); }
   .d-room span{ border:1px solid rgba(0,0,0,.15); padding:.05rem .3rem; }
+
+  /* ---------- toggle Mapa | Lista (mesmo vidro do site principal) e a lista por cima do mapa ---------- */
+  .switcher{ position:fixed; left:50%; bottom:calc(1.6rem + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:800;
+             display:flex; gap:2px; font-weight:400; font-size:.79rem;
+             background:rgba(200,200,200,.55); backdrop-filter:blur(18px) saturate(180%); -webkit-backdrop-filter:blur(18px) saturate(180%);
+             border:1px solid rgba(255,255,255,.4); border-radius:999px; padding:3px; box-shadow:0 3px 12px rgba(0,0,0,.22);
+             opacity:0; pointer-events:none; transition:opacity .3s ease; }
+  .switcher.show{ opacity:1; pointer-events:auto; }
+  .switcher button{ background:transparent; border:none; cursor:pointer; color:var(--ink); padding:.55rem .9rem; min-height:38px; border-radius:999px;
+                    position:relative; transition:color .2s ease; }
+  .switcher button::before{ content:''; position:absolute; inset:2px; border-radius:999px; background:#171717; filter:blur(2px); z-index:-1; opacity:0; transition:opacity .2s ease; }
+  .switcher button.active{ color:#fff; }
+  .switcher button.active::before{ opacity:1; }
+  .switcher button:not(.active):hover{ background:rgba(255,255,255,.35); }
+  .list-panel{ position:fixed; inset:0; z-index:700; background:var(--paper); overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+               padding-top:calc(var(--pad) * 1.2 + env(safe-area-inset-top));
+               transform:translateY(100%); visibility:hidden; transition:transform .55s cubic-bezier(.16,1,.3,1), visibility 0s .55s; }
+  .list-panel.open{ transform:none; visibility:visible; transition-delay:0s; }
+  .list-panel .list{ padding-bottom:calc(6.5rem + env(safe-area-inset-bottom)); } /* o toggle fixo não cobre os últimos da lista */
+  body.list-open{ overflow:hidden; }
+  .artists .foot{ background:var(--paper); position:relative; }
 
   /* ---------- lista ---------- */
   .big{ margin:0; padding:calc(var(--pad) * .6) var(--pad) 0; font-weight:350; line-height:.8; letter-spacing:-.045em;
@@ -182,14 +202,7 @@
 
 <div class="artists" id="artists">
 <section class="map-section" id="mapSection" aria-label="Mapa dos ateliês"><div id="map"></div></section>
-
-<div class="list-layer">
-<main>
-  <h2 class="big" id="big"><span>Artistas</span></h2>
-  <ul class="list" id="list"></ul>
-</main>
-
-<footer class="foot">
+<footer class="foot" id="pageFoot">
   <div><p>Instagram:<br><a href="https://instagram.com/circuito.de.atelies.do.centro" target="_blank" rel="noopener">@circuito.de.atelies.do.centro</a></p></div>
   <div><p>Idealização e Produção Executiva:<br>Fernanda Sattamini<br><a href="https://instagram.com/fernandasattamini" target="_blank" rel="noopener">@fernandasattamini</a></p></div>
   <div><p>Identidade visual e site:<br>Eduardo Mattos<br><a href="https://instagram.com/macula.cc" target="_blank" rel="noopener">@macula.cc</a></p></div>
@@ -199,6 +212,17 @@
     Adriana Macedo · <a href="https://instagram.com/adrianamacedo_artist" target="_blank" rel="noopener">@adrianamacedo_artist</a></p></div>
 </footer>
 </div>
+
+<div class="switcher" id="switcher" role="group" aria-label="Mapa ou lista de artistas">
+  <button id="swMap" class="active" aria-pressed="true">Mapa</button>
+  <button id="swList" aria-pressed="false">Lista</button>
+</div>
+
+<div class="list-panel" id="listPanel" aria-hidden="true">
+<main>
+  <h2 class="big" id="big"><span>Artistas</span></h2>
+  <ul class="list" id="list"></ul>
+</main>
 </div>
 
 <div class="overlay" id="overlay"></div>
@@ -541,13 +565,15 @@ const easeIO = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
    de 50%) e só vale no estado inicial do hero: assim que a cobrona ganha blur, o título
    volta a ser todo preto.
    ============================================================ */
-const TITLE = { black:null, white:null, bw:0, bh:0 };
+const TITLE = { black:null, white:null, bw:0, bh:0, padTop:4 };
 const maskC = document.createElement('canvas'), mctx = maskC.getContext('2d');
 const t1C = document.createElement('canvas'), t1 = t1C.getContext('2d'), t2C = document.createElement('canvas'), t2 = t2C.getContext('2d');
 function renderTitleSprites(){
   const fs = parseFloat(titleEl.style.fontSize) || 40, lh = fs * .88, dpr = hero.dpr;
   const lines = [...titleEl.children].map(c => c.textContent.toUpperCase());
-  TITLE.bw = Math.ceil(titleEl.getBoundingClientRect().width) + 8; TITLE.bh = Math.ceil(TITLE_H) + 8;
+  // folga em cima proporcional à fonte: o acento do Ê passa bem da altura das maiúsculas
+  TITLE.padTop = Math.ceil(fs * .3) + 4;
+  TITLE.bw = Math.ceil(titleEl.getBoundingClientRect().width) + 8; TITLE.bh = Math.ceil(TITLE_H) + TITLE.padTop + 4;
   for (const [key, color] of [['black', '#111111'], ['white', '#ffffff']]){
     const c = TITLE[key] || (TITLE[key] = document.createElement('canvas'));
     c.width = Math.ceil(TITLE.bw * dpr); c.height = Math.ceil(TITLE.bh * dpr);
@@ -557,7 +583,7 @@ function renderTitleSprites(){
     const ls = -.05 * fs, native = 'letterSpacing' in x;
     if (native) x.letterSpacing = ls + 'px';
     lines.forEach((ln, i) => {
-      const y = 4 + i * lh + .8033 * fs;
+      const y = TITLE.padTop + i * lh + .8033 * fs;
       if (native) x.fillText(ln, 4, y);
       else { let px = 4; for (const ch of ln){ x.fillText(ch, px, y); px += x.measureText(ch).width + ls; } }
     });
@@ -567,7 +593,7 @@ function heroDrawTitle(){
   if (!TITLE.black) return;
   const dpr = hero.dpr;
   tctx.setTransform(1, 0, 0, 1, 0, 0); tctx.clearRect(0, 0, tc.width, tc.height);
-  const bx = TITLE_PAD - 4, by = hero.titleTop - 4, bw = TITLE.bw, bh = TITLE.bh;
+  const bx = TITLE_PAD - 4, by = hero.titleTop - TITLE.padTop, bw = TITLE.bw, bh = TITLE.bh;
   if (by > window.innerHeight || by + bh < 0) return;
   // com blur (qualquer rolagem), sem negativo: só o título preto
   if (Math.round(hero.e * (COARSE ? 12 : 20)) > 0){ tctx.drawImage(TITLE.black, Math.round(bx * dpr), Math.round(by * dpr)); return; }
@@ -629,6 +655,7 @@ function onScroll(){
     // o título começa alinhado pela base do hero e sobe até o topo junto com o texto (desenhado no canvas)
     hero.e = e; hero.titleTop = (vh - TITLE_PAD - TITLE_H) - e * travel + shift;
     hero.covered = y > TRACK;
+    switcherEl.classList.toggle('show', listOpen || (y > TRACK - vh * .5 && y < TRACK + 40));
     heroDrawTitle();
   });
 }
@@ -644,7 +671,7 @@ window.addEventListener('resize', () => {
 /* ============================================================
    lista
    ============================================================ */
-const listEl = $('#list'), bigEl = $('#big');
+const listEl = $('#list'), bigEl = $('#big'), listPanelEl = $('#listPanel');
 let ARTISTS = [], BY_SLUG = new Map(), ROWS = new Map();
 
 function fitBig(){
@@ -675,10 +702,10 @@ function renderList(){
       e.target.querySelector('.thumb i').style.backgroundImage = `url("${img.src}")`;
       e.target.querySelector('.thumb').classList.add('loaded');
     });
-  }), { rootMargin:'600px 0px' });
+  }), { root:listPanelEl, rootMargin:'600px 0px' });
   const reveal = new IntersectionObserver(es => es.forEach(e => {
     if (e.isIntersecting){ e.target.classList.add('in'); reveal.unobserve(e.target); }
-  }), { rootMargin:'0px 0px -4% 0px' });
+  }), { root:listPanelEl, rootMargin:'0px 0px -4% 0px' });
 
   const frag = document.createDocumentFragment();
   ARTISTS.forEach(a => {
@@ -788,6 +815,7 @@ async function closeArtist(){
   // volta pra miniatura de onde veio (drawer ou lista); se o drawer já fechou, cai na linha da lista
   let target = currentOrigin && currentOrigin.isConnected ? currentOrigin : rowThumb;
   if (target && target.closest('.drawer') && !drawerEl.classList.contains('open')) target = rowThumb;
+  if (target && target.closest('.list-panel') && !listOpen) target = null; // lista fechada (ex.: link direto): só some com fade
   currentOrigin = null;
   const done = () => {
     artistEl.getAnimations().forEach(x => x.cancel());
@@ -820,7 +848,7 @@ window.addEventListener('hashchange', route);
 $('#aClose').addEventListener('click', () => { openedFromList ? history.back() : (location.hash = '#/'); });
 window.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
-  if (current) $('#aClose').click(); else if (drawerEl.classList.contains('open')) closeDrawer();
+  if (current) $('#aClose').click(); else if (drawerEl.classList.contains('open')) closeDrawer(); else if (listOpen) setListOpen(false);
 });
 window.addEventListener('resize', () => {
   if (window.innerWidth === lastW && Math.abs(window.innerHeight - lastH) < 160) return;
@@ -1099,6 +1127,25 @@ function closeDrawer(){
 }
 $('#drawerClose').addEventListener('click', closeDrawer);
 overlayEl.addEventListener('click', closeDrawer);
+
+/* ============================================================
+   toggle Mapa | Lista — a lista (só de artistas) vem por cima do mapa
+   ============================================================ */
+const switcherEl = $('#switcher'), swMap = $('#swMap'), swList = $('#swList');
+let listOpen = false;
+function setListOpen(open){
+  if (open === listOpen) return;
+  listOpen = open;
+  if (open) closeDrawer();
+  listPanelEl.classList.toggle('open', open); listPanelEl.setAttribute('aria-hidden', String(!open));
+  document.body.classList.toggle('list-open', open);
+  swMap.classList.toggle('active', !open); swList.classList.toggle('active', open);
+  swMap.setAttribute('aria-pressed', String(!open)); swList.setAttribute('aria-pressed', String(open));
+  if (open){ listPanelEl.scrollTop = 0; fitBig(); }
+  onScroll();
+}
+swMap.addEventListener('click', () => setListOpen(false));
+swList.addEventListener('click', () => setListOpen(true));
 
 /* ============================================================
    boot
