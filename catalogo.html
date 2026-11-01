@@ -30,21 +30,20 @@
   a{ color:inherit; text-decoration:none; }
   button{ font:inherit; color:inherit; }
 
-  /* ---------- hero ---------- */
-  .hero{ position:relative; height:var(--hero-h); background:var(--gray); }
-  #heroCanvas{ position:absolute; inset:0; width:100%; height:100%; display:block; }
-  .fly{ position:absolute; left:var(--pad); top:calc(var(--pad) * .8); z-index:3; font-size:var(--body); line-height:1.22;
-        text-transform:uppercase; white-space:nowrap; will-change:transform; }
-  .fly span{ display:block; animation:flyIn .9s .15s var(--ease) both; }
-  @keyframes flyIn{ from{ opacity:0; transform:translateY(10px); } }
+  /* ---------- hero (fixo no fundo; o texto sobe até o título, a seção Artistas cobre tudo) ---------- */
+  .hero{ position:sticky; top:0; height:100vh; height:100svh; overflow:hidden; background:var(--gray); z-index:0; }
+  #heroCanvas{ position:absolute; inset:0; width:100%; height:100%; display:block; transform:scale(1.12); will-change:filter; }
+  .veil{ position:absolute; inset:0; background:#e6e6e4; opacity:0; pointer-events:none; }
+  .hero-content{ position:absolute; inset:0; will-change:transform; }
+  .title{ position:absolute; left:var(--pad); top:calc(var(--pad) * .9); margin:0; font-weight:350; line-height:.88; letter-spacing:-.05em;
+          text-transform:uppercase; }
+  .title span{ display:block; white-space:nowrap; }
+  .lede{ position:absolute; left:var(--pad); right:var(--pad); bottom:var(--pad); margin:0; max-width:1180px; font-size:var(--body); line-height:1.22;
+         will-change:transform, opacity; }
+  .spacer{ height:150vh; }
 
-  /* ---------- texto de abertura ---------- */
-  .js .intro{ height:0; overflow:hidden; }
-  .intro p{ margin:0; padding:var(--pad) var(--pad) calc(var(--pad) * 1.1); font-size:var(--body); line-height:1.22; max-width:1180px; }
-  .intro .lead{ visibility:hidden; }
-  .intro.done .lead{ visibility:visible; }
-  .w{ display:inline-block; opacity:0; transform:translateY(.5em); transition:opacity .8s var(--ease), transform .8s var(--ease); }
-  .intro.go .w{ opacity:1; transform:none; }
+  /* ---------- seção Artistas (branca, cobre o hero) ---------- */
+  .artists{ position:relative; z-index:2; background:var(--paper); padding-top:calc(var(--pad) * 1.2); box-shadow:0 -40px 80px -30px rgba(0,0,0,.22); }
 
   /* ---------- lista ---------- */
   .big{ margin:0; padding:calc(var(--pad) * .6) var(--pad) 0; font-weight:350; line-height:.8; letter-spacing:-.045em;
@@ -106,8 +105,7 @@
 
   @media (prefers-reduced-motion:reduce){
     .row{ opacity:1; transform:none; transition:none; }
-    .w{ opacity:1; transform:none; transition:none; }
-    .fly span{ animation:none; }
+    .spacer{ height:40vh; }
   }
 </style>
 </head>
@@ -115,13 +113,15 @@
 
 <header class="hero" id="hero">
   <canvas id="heroCanvas"></canvas>
-  <div class="fly" id="fly"><span>Circuito de Ateliês do Centro</span></div>
+  <div class="veil" id="veil"></div>
+  <div class="hero-content" id="heroContent">
+    <h1 class="title" id="title">Circuito de Ateliês do Centro</h1>
+    <p class="lede" id="lede">O CIRCUITO DE ATELIÊS DO CENTRO nasce da articulação de uma rede de artistas que compartilham o desejo de fortalecer a cena artística contemporânea do Centro do Rio de Janeiro e ampliar as possibilidades de encontro entre arte, cidade e público. Em uma região historicamente marcada pela diversidade cultural e pela efervescência de sua produção artística, o projeto volta o olhar para os lugares onde a arte acontece antes de chegar às exposições: os ateliês, como espaços de pesquisa, experimentação e criação, onde obras, ideias e processos ganham forma.</p>
+  </div>
 </header>
+<div class="spacer" id="spacer"></div>
 
-<section class="intro" id="intro">
-  <p id="introP"><span class="pre">O </span><span class="lead">CIRCUITO DE ATELIÊS DO CENTRO</span><span class="rest"> nasce da articulação de uma rede de artistas que compartilham o desejo de fortalecer a cena artística contemporânea do Centro do Rio de Janeiro e ampliar as possibilidades de encontro entre arte, cidade e público. Em uma região historicamente marcada pela diversidade cultural e pela efervescência de sua produção artística, o projeto volta o olhar para os lugares onde a arte acontece antes de chegar às exposições: os ateliês, como espaços de pesquisa, experimentação e criação, onde obras, ideias e processos ganham forma.</span></p>
-</section>
-
+<div class="artists" id="artists">
 <main>
   <h2 class="big" id="big"><span>Artistas</span></h2>
   <ul class="list" id="list"></ul>
@@ -139,6 +139,7 @@
       Adriana Macedo · <a href="https://instagram.com/adrianamacedo_artist" target="_blank" rel="noopener">@adrianamacedo_artist</a></p>
   </div>
 </footer>
+</div>
 
 <section class="artist" id="artist" tabindex="-1" aria-label="Artista" aria-hidden="true">
   <div class="a-hero" id="aHero">
@@ -254,13 +255,11 @@ function imgTry(job){
 }
 
 /* ============================================================
-   hero — a minhocona, agora com as fotos dos artistas dentro do corpo
-   (foto em tons de cinza × degradê verde → cinza do site)
+   hero — a minhocona (verde → cinza), em tela cheia no fundo
    ============================================================ */
 const heroEl = $('#hero'), hc = $('#heroCanvas'), hctx = hc.getContext('2d');
-const scratch = document.createElement('canvas'), sctx = scratch.getContext('2d');
-const hero = { W:0, H:0, dpr:1, photos:[], legs:[], t:0, last:null, visible:true, total:0, drawT:0 };
-const LEG_T = .55, HOLD_T = 1.1, ERASE_T = 2.4, N_LEGS = 9;
+const hero = { W:0, H:0, dpr:1, legs:[], t:0, last:null, covered:false, total:0, drawT:0, totalLen:0 };
+const LEG_T = .55, HOLD_T = 1.1, ERASE_T = 2.4, N_LEGS = 11;
 const easeSnap = t => t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
 
 function legPath(a, b){
@@ -293,57 +292,38 @@ function subFrom(pts, dist){
 }
 
 function heroResize(){
-  const r = heroEl.getBoundingClientRect();
-  hero.W = Math.max(1, Math.round(r.width)); hero.H = Math.max(1, Math.round(r.height));
+  hero.W = Math.max(1, heroEl.clientWidth); hero.H = Math.max(1, heroEl.clientHeight);
   hero.dpr = Math.min(2, window.devicePixelRatio || 1);
-  for (const c of [hc, scratch]){ c.width = hero.W * hero.dpr; c.height = hero.H * hero.dpr; }
+  hc.width = hero.W * hero.dpr; hc.height = hero.H * hero.dpr;
   heroNewCycle();
 }
 function heroNewCycle(){
-  const { W, H } = hero, width = Math.max(64, H * .42);
-  const rnd = () => ({ x:W * (-.05 + Math.random() * 1.1), y:H * (.05 + Math.random() * .9) });
+  const { W, H } = hero, width = Math.min(W, H) * .2;
+  const rnd = () => ({ x:W * (-.05 + Math.random() * 1.1), y:H * (-.05 + Math.random() * 1.1) });
   let p = rnd(); const pts = [p];
   for (let i = 0; i < N_LEGS; i++){
     let q, tries = 0;
-    do { q = rnd(); tries++; } while (Math.hypot(q.x - p.x, q.y - p.y) < W * .28 && tries < 20);
+    do { q = rnd(); tries++; } while (Math.hypot(q.x - p.x, q.y - p.y) < Math.min(W, H) * .5 && tries < 20);
     pts.push(q); p = q;
   }
-  const pool = [...hero.photos].sort(() => Math.random() - .5);
   let off = 0;
   hero.legs = [];
   for (let i = 1; i < pts.length; i++){
-    const path = legPath(pts[i-1], pts[i]), len = plen(path), pad = width / 2 + 3;
-    const xs = path.map(q => q.x), ys = path.map(q => q.y);
-    const x0 = Math.max(0, Math.floor(Math.min(...xs) - pad)), y0 = Math.max(0, Math.floor(Math.min(...ys) - pad));
-    const x1 = Math.min(W, Math.ceil(Math.max(...xs) + pad)), y1 = Math.min(H, Math.ceil(Math.max(...ys) + pad));
-    hero.legs.push({ path, len, off, width, box:{ x:x0, y:y0, w:Math.max(0, x1 - x0), h:Math.max(0, y1 - y0) }, photo:pool.length ? pool[(i - 1) % pool.length] : null });
+    const path = legPath(pts[i-1], pts[i]), len = plen(path);
+    hero.legs.push({ path, len, off, width });
     off += len;
   }
   hero.totalLen = off; hero.drawT = hero.legs.length * LEG_T; hero.total = hero.drawT + HOLD_T + ERASE_T; hero.t = 0; hero.last = null;
 }
 function drawLeg(leg, dS, dE){
-  const b = leg.box; if (b.w < 2 || b.h < 2) return;
   const sub = subFrom(subUpTo(leg.path, dE), dS); if (sub.length < 2) return;
-  const s = sctx, a = leg.path[0], z = leg.path[leg.path.length - 1];
-  s.save(); s.setTransform(hero.dpr, 0, 0, hero.dpr, 0, 0);
-  s.globalCompositeOperation = 'source-over'; s.clearRect(b.x, b.y, b.w, b.h);
-  s.beginPath(); s.rect(b.x, b.y, b.w, b.h); s.clip();
-  const g = s.createLinearGradient(a.x, a.y, z.x, z.y); g.addColorStop(0, '#39FF14'); g.addColorStop(1, '#d8d8d6');
-  s.fillStyle = g; s.fillRect(b.x, b.y, b.w, b.h);
-  if (leg.photo){
-    const c = leg.photo, k = Math.max(b.w / c.width, b.h / c.height), w = c.width * k, h = c.height * k;
-    s.globalCompositeOperation = 'multiply';
-    s.drawImage(c, b.x + (b.w - w) / 2, b.y + (b.h - h) / 2, w, h);
-  }
-  s.globalCompositeOperation = 'destination-in';
-  s.lineWidth = leg.width; s.lineCap = 'round'; s.lineJoin = 'round'; s.strokeStyle = '#000';
-  s.beginPath(); sub.forEach((q, i) => i ? s.lineTo(q.x, q.y) : s.moveTo(q.x, q.y)); s.stroke();
-  s.restore();
-  hctx.drawImage(scratch, b.x * hero.dpr, b.y * hero.dpr, b.w * hero.dpr, b.h * hero.dpr, b.x, b.y, b.w, b.h);
+  const a = leg.path[0], z = leg.path[leg.path.length - 1];
+  const g = hctx.createLinearGradient(a.x, a.y, z.x, z.y); g.addColorStop(0, '#39FF14'); g.addColorStop(1, '#d8d8d6');
+  hctx.lineWidth = leg.width; hctx.lineCap = 'round'; hctx.lineJoin = 'round'; hctx.strokeStyle = g;
+  hctx.beginPath(); sub.forEach((q, i) => i ? hctx.lineTo(q.x, q.y) : hctx.moveTo(q.x, q.y)); hctx.stroke();
 }
 function heroRender(t){
   hctx.setTransform(hero.dpr, 0, 0, hero.dpr, 0, 0);
-  hctx.clearRect(0, 0, hero.W, hero.H);
   hctx.fillStyle = '#d8d8d6'; hctx.fillRect(0, 0, hero.W, hero.H);
   const legs = hero.legs;
   if (t < hero.drawT){
@@ -358,71 +338,55 @@ function heroRender(t){
 }
 function heroLoop(ts){
   requestAnimationFrame(heroLoop);
-  if (!hero.visible || document.hidden || document.body.classList.contains('artist-open')){ hero.last = null; return; }
+  if (hero.covered || document.hidden || document.body.classList.contains('artist-open')){ hero.last = null; return; }
   if (hero.last == null) hero.last = ts;
   hero.t += Math.min(.1, (ts - hero.last) / 1000); hero.last = ts;
   if (hero.t >= hero.total) heroNewCycle();
   heroRender(hero.t);
 }
-function grayCanvas(img){
-  const k = 720 / Math.max(img.naturalWidth, img.naturalHeight), c = document.createElement('canvas');
-  c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
-  const x = c.getContext('2d');
-  x.drawImage(img, 0, 0, c.width, c.height);
-  x.globalCompositeOperation = 'saturation'; x.fillStyle = '#808080'; x.fillRect(0, 0, c.width, c.height);
-  x.globalCompositeOperation = 'screen'; x.fillStyle = '#2a2a2a'; x.fillRect(0, 0, c.width, c.height);
-  return c;
-}
-function heroFeed(artists){
-  const withPhoto = artists.filter(thumbURL).sort(() => Math.random() - .5).slice(0, 12);
-  withPhoto.forEach(a => loadImg(thumbURL(a), true).then(img => {
-    if (img) hero.photos.push(grayCanvas(img));
-  }));
-}
+function heroStatic(){ hero.t = hero.drawT + HOLD_T * .5; heroRender(hero.t); }
 function heroStart(){
   heroResize();
-  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { heroResize(); if (REDUCED) heroStatic(); }, 150); });
-  new IntersectionObserver(es => { hero.visible = es[0].isIntersecting; }).observe(heroEl);
   if (REDUCED){ heroStatic(); return; }
   requestAnimationFrame(heroLoop);
 }
-function heroStatic(){ hero.t = hero.drawT + HOLD_T * .5; heroRender(hero.t); }
 
 /* ============================================================
-   abertura — o nome do evento desce do hero e vira o começo do texto
+   rolagem — o texto sobe até o título, a cobrona ganha blur e a
+   seção Artistas (branca) entra por cima do hero com parallax
    ============================================================ */
-const intro = $('#intro'), introP = $('#introP'), fly = $('#fly');
-let introFull = 0, leadOff = { x:0, y:0 };
-function introMeasure(){
-  const prev = intro.style.height;
-  intro.style.height = 'auto';
-  const ir = intro.getBoundingClientRect(), lr = introP.querySelector('.lead').getBoundingClientRect();
-  introFull = intro.scrollHeight; leadOff = { x:lr.left - ir.left, y:lr.top - ir.top };
-  intro.style.height = prev;
+const titleEl = $('#title'), ledeEl = $('#lede'), veilEl = $('#veil'), contentEl = $('#heroContent'), spacerEl = $('#spacer');
+const clamp01 = v => Math.min(1, Math.max(0, v));
+const easeIO = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+
+function fitTitle(){
+  const wide = window.innerWidth >= 900, lines = wide ? ['Circuito de Ateliês', 'do Centro'] : ['Circuito de', 'Ateliês do', 'Centro'];
+  titleEl.innerHTML = lines.map(l => `<span>${l}</span>`).join('');
+  const pad = parseFloat(getComputedStyle(titleEl).left) || 0;
+  titleEl.style.fontSize = '100px';
+  const w = Math.max(...[...titleEl.children].map(c => c.getBoundingClientRect().width));
+  const fit = 100 * (window.innerWidth - pad * 2) / w, cap = heroEl.clientHeight * (wide ? .26 : .17);
+  titleEl.style.fontSize = Math.min(fit, cap) + 'px';
 }
-function introPrepare(){
-  const rest = introP.querySelector('.rest'), words = rest.textContent.split(/(\s+)/);
-  rest.textContent = '';
-  let n = 0;
-  words.forEach(w => {
-    if (!w) return;
-    if (/^\s+$/.test(w)){ rest.appendChild(document.createTextNode(' ')); return; }
-    const s = document.createElement('span'); s.className = 'w'; s.textContent = w;
-    s.style.transitionDelay = (650 + n * 13) + 'ms'; n++;
-    rest.appendChild(s);
+let scrollQueued = false;
+function onScroll(){
+  if (scrollQueued) return;
+  scrollQueued = true;
+  requestAnimationFrame(() => {
+    scrollQueued = false;
+    const y = window.scrollY, vh = heroEl.clientHeight, S = spacerEl.offsetHeight;
+    const p = REDUCED ? 1 : clamp01(y / (S * .78)), e = easeIO(p);
+    ledeEl.style.transform = `translate3d(0, ${(1 - e) * vh}px, 0)`;
+    ledeEl.style.opacity = REDUCED ? 1 : clamp01(p * 5);
+    hc.style.filter = `blur(${(e * 20).toFixed(1)}px)`;
+    veilEl.style.opacity = (e * .35).toFixed(3);
+    const q = clamp01((y - S) / vh);
+    contentEl.style.transform = REDUCED ? '' : `translate3d(0, ${(-q * vh * .35).toFixed(1)}px, 0)`;
+    hero.covered = y > S + vh;
   });
-  const pre = introP.querySelector('.pre'); pre.className = 'pre w'; pre.textContent = 'O'; pre.style.marginRight = '.28em'; pre.style.transitionDelay = '650ms';
 }
-function introPlay(){
-  if (REDUCED){ intro.style.height = 'auto'; intro.classList.add('go', 'done'); fly.style.opacity = 0; return; }
-  introMeasure();
-  const ir = intro.getBoundingClientRect(), fr = fly.getBoundingClientRect();
-  const dx = ir.left + leadOff.x - fr.left, dy = ir.top + leadOff.y - fr.top, D = 1150;
-  intro.classList.add('go');
-  const a = intro.animate([{ height:'0px' }, { height:introFull + 'px' }], { duration:D, easing:EASE_IN_OUT, fill:'forwards' });
-  fly.animate([{ transform:'translate(0,0)' }, { transform:`translate(${dx}px,${dy}px)` }], { duration:D, easing:EASE_IN_OUT, fill:'forwards' });
-  a.onfinish = () => { intro.style.height = 'auto'; a.cancel(); intro.classList.add('done'); fly.style.opacity = 0; };
-}
+window.addEventListener('scroll', onScroll, { passive:true });
+window.addEventListener('resize', () => { heroResize(); fitTitle(); onScroll(); });
 
 /* ============================================================
    lista
@@ -572,11 +536,9 @@ window.addEventListener('resize', () => { fitBig(); if (current) fitName(); });
    ============================================================ */
 async function boot(){
   heroStart();
-  introPrepare();
   const fontsReady = Promise.race([document.fonts.load('350 100px Inter'), new Promise(r => setTimeout(r, 1500))]);
   await fontsReady;
-  fitBig();
-  setTimeout(introPlay, REDUCED ? 0 : 1500);
+  fitBig(); fitTitle(); onScroll();
   try{
     [ARTISTS, LOCAL_PHOTOS] = await Promise.all([
       loadArtists(),
@@ -587,7 +549,6 @@ async function boot(){
     return;
   }
   ARTISTS.forEach(a => BY_SLUG.set(a.slug, a));
-  heroFeed(ARTISTS);
   renderList();
   route();
 }
