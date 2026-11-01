@@ -17,7 +17,6 @@
     --body:clamp(1.06rem, .86rem + 1.05vw, 1.95rem);
     --bio:clamp(1.02rem, .9rem + .6vw, 1.5rem);
     --hero-h:clamp(250px, 46vh, 560px);
-    --a-hero-h:clamp(320px, 62vh, 740px);
     --thumb-w:clamp(56px, 9vw, 150px);
     --thumb-h:calc(var(--thumb-w) * .72);
     --ease:cubic-bezier(.22,.8,.2,1);
@@ -67,18 +66,18 @@
   .msg{ padding:var(--pad); font-size:var(--body); color:var(--mid); }
   .msg a{ text-decoration:underline; text-underline-offset:3px; color:var(--ink); }
 
-  .foot{ display:grid; grid-template-columns:1fr 1fr; gap:var(--pad); padding:calc(var(--pad) * 4) var(--pad) calc(var(--pad) * 1.5 + env(safe-area-inset-bottom));
+  .foot{ display:grid; grid-template-columns:repeat(4, 1fr); gap:var(--pad); padding:calc(var(--pad) * 4) var(--pad) calc(var(--pad) * 1.5 + env(safe-area-inset-bottom));
          font-size:clamp(.72rem, .6rem + .35vw, .95rem); line-height:1.28; }
   .foot p{ margin:0 0 .9em; }
   .foot a{ text-decoration:underline; text-underline-offset:2px; }
-  @media (max-width:520px){ .foot{ grid-template-columns:1fr; } }
+  @media (max-width:760px){ .foot{ grid-template-columns:repeat(2, 1fr); } }
 
   /* ---------- página do artista ---------- */
   .artist{ position:fixed; inset:0; z-index:50; background:var(--paper); overflow-y:auto; overscroll-behavior:contain;
            visibility:hidden; opacity:0; pointer-events:none; }
   .artist{ outline:none; }
   .artist.open{ visibility:visible; pointer-events:auto; }
-  .a-hero{ position:relative; height:var(--a-hero-h); background:var(--green); overflow:hidden; }
+  .a-hero{ position:relative; height:100vh; height:100svh; background:var(--green); overflow:hidden; }
   .a-photo{ position:absolute; inset:0; background:center / cover no-repeat; }
   .a-hero.has-photo::after{ content:''; position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,.5), rgba(0,0,0,0) 55%); }
   .a-hero.hide-photo .a-photo, .a-hero.hide-photo::after{ opacity:0; }
@@ -96,7 +95,9 @@
   .a-meta > *{ opacity:0; transform:translateY(18px); }
   .artist.revealed .a-meta > *{ opacity:1; transform:none; transition:opacity .8s var(--ease), transform .8s var(--ease); }
   .artist.revealed .a-meta > :nth-child(2){ transition-delay:.12s; }
-  .a-igs{ display:flex; flex-wrap:wrap; gap:0 1.1em; font-size:var(--body); }
+  .a-igs{ display:flex; flex-wrap:wrap; gap:0 .5em; font-size:var(--body); }
+  .a-igs .lbl{ color:var(--mid); margin-right:.1em; }
+  .a-igs .ig{ font-size:inherit; }
   .a-igs a{ text-decoration:underline; text-underline-offset:4px; text-decoration-thickness:1px; }
   .a-bio{ margin:calc(var(--pad) * 1.3) 0 0; font-size:var(--bio); line-height:1.28; max-width:46em; }
   .a-bio p{ margin:0 0 1em; }
@@ -128,16 +129,13 @@
 </main>
 
 <footer class="foot">
-  <div>
-    <p>Idealização e Produção Executiva:<br>Fernanda Sattamini<br><a href="https://instagram.com/fernandasattamini" target="_blank" rel="noopener">@fernandasattamini</a></p>
-    <p>Identidade visual e site:<br>Eduardo Mattos<br><a href="https://instagram.com/macula.cc" target="_blank" rel="noopener">@macula.cc</a></p>
-  </div>
-  <div>
-    <p>Colaborações:<br>
-      Nuno Quinhões · <a href="https://instagram.com/nunoquinhoes" target="_blank" rel="noopener">@nunoquinhoes</a><br>
-      Alessandra Sposetti · <a href="https://instagram.com/alessandrasposetti" target="_blank" rel="noopener">@alessandrasposetti</a><br>
-      Adriana Macedo · <a href="https://instagram.com/adrianamacedo_artist" target="_blank" rel="noopener">@adrianamacedo_artist</a></p>
-  </div>
+  <div><p>Instagram:<br><a href="https://instagram.com/circuitodeateliesdocentro" target="_blank" rel="noopener">@circuitodeateliesdocentro</a></p></div>
+  <div><p>Idealização e Produção Executiva:<br>Fernanda Sattamini<br><a href="https://instagram.com/fernandasattamini" target="_blank" rel="noopener">@fernandasattamini</a></p></div>
+  <div><p>Identidade visual e site:<br>Eduardo Mattos<br><a href="https://instagram.com/macula.cc" target="_blank" rel="noopener">@macula.cc</a></p></div>
+  <div><p>Colaborações:<br>
+    Nuno Quinhões · <a href="https://instagram.com/nunoquinhoes" target="_blank" rel="noopener">@nunoquinhoes</a><br>
+    Alessandra Sposetti · <a href="https://instagram.com/alessandrasposetti" target="_blank" rel="noopener">@alessandrasposetti</a><br>
+    Adriana Macedo · <a href="https://instagram.com/adrianamacedo_artist" target="_blank" rel="noopener">@adrianamacedo_artist</a></p></div>
 </footer>
 </div>
 
@@ -450,7 +448,7 @@ function fitName(){
 }
 function fillArtist(a){
   aName.firstElementChild.textContent = a.name;
-  aIgs.innerHTML = a.handles.map(igHTML).join('');
+  aIgs.innerHTML = a.handles.length ? '<span class="lbl">instagram:</span>' + a.handles.map(igHTML).join('') : '';
   aBio.className = 'a-bio';
   if (a.bio){ aBio.innerHTML = ''; a.bio.split(/\n+/).forEach(t => { const p = document.createElement('p'); p.textContent = t; aBio.appendChild(p); }); }
   else { aBio.classList.add('empty'); aBio.textContent = 'Mini bio em breve.'; }
@@ -509,6 +507,7 @@ async function closeArtist(){
     if (row) row.querySelector('.row-link').focus({ preventScroll:true });
   };
   if (!row || REDUCED){ done(); return; }
+  artistEl.scrollTop = 0;
   const r0 = row.getBoundingClientRect();
   if (r0.bottom < 0 || r0.top > window.innerHeight) row.scrollIntoView({ block:'center' });
   const from = aHero.getBoundingClientRect(), to = row.querySelector('.thumb').getBoundingClientRect();
