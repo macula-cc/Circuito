@@ -452,8 +452,9 @@ function imgTry(job){
    hero — a minhocona (verde → cinza), em tela cheia no fundo
    ============================================================ */
 const heroEl = $('#hero'), hc = $('#heroCanvas'), hctx = hc.getContext('2d'), tc = $('#titleCanvas'), tctx = tc.getContext('2d');
-const hero = { W:0, H:0, dpr:1, vis:[], e:0, titleTop:0, legs:[], t:0, last:null, covered:false, total:0, drawT:0, totalLen:0 };
-const LEG_T = .55, HOLD_T = 1.1, ERASE_T = 2.4, N_LEGS = 11;
+const bake = document.createElement('canvas'), bctx = bake.getContext('2d');
+const hero = { W:0, H:0, dpr:1, baked:0, vis:[], e:0, titleTop:0, legs:[], t:0, last:null, covered:false, total:0, drawT:0, totalLen:0 };
+const LEG_T = .32, HOLD_T = 1.1, ERASE_T = 2.4, N_LEGS = 11;
 const easeSnap = t => t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
 
 function legPath(a, b){
@@ -486,21 +487,36 @@ function subFrom(pts, dist){
 }
 
 const COARSE = matchMedia('(pointer:coarse)').matches;
+// pontos reais do mapa (projeção Mercator), enquadrados bem maiores que a tela — mesmo enquadramento do hero do
+// index.html: o conjunto estoura pra fora da tela e a cobrona liga todos os endereços, em ordem sorteada
+const mercator = (lat, lng) => ({ x: lng * Math.PI / 180, y: -Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2)) });
+const SNAKE_GROW = 5.5;
+function heroRealPoints(){
+  const raw = LOCATIONS.filter(l => l.lat != null && l.lng != null).map(l => mercator(l.lat, l.lng));
+  if (raw.length < 3) return null;
+  const { W, H } = hero, box = { x:0, y:H * .02, w:W, h:H * .96 };
+  const xs = raw.map(p => p.x), ys = raw.map(p => p.y);
+  const w = (Math.max(...xs) - Math.min(...xs)) || 1, h = (Math.max(...ys) - Math.min(...ys)) || 1;
+  const scale = Math.min(box.w * .82 * SNAKE_GROW / w, box.h * .82 * SNAKE_GROW / h);
+  const cx = xs.reduce((a, v) => a + v, 0) / xs.length, cy = ys.reduce((a, v) => a + v, 0) / ys.length; // centro pelo centroide, não pela caixa
+  return { pts: raw.map(p => ({ x:box.x + box.w / 2 + (p.x - cx) * scale, y:box.y + box.h / 2 + (p.y - cy) * scale })), width: Math.min(box.w, box.h) * .04 * SNAKE_GROW };
+}
 function heroResize(){
   hero.W = Math.max(1, hc.clientWidth); hero.H = Math.max(1, hc.clientHeight);
   hero.dpr = COARSE ? 1 : Math.min(2, window.devicePixelRatio || 1);
   hc.width = hero.W * hero.dpr; hc.height = hero.H * hero.dpr;
   tc.width = hc.width; tc.height = hc.height;
+  bake.width = hc.width; bake.height = hc.height;
   heroNewCycle();
 }
 function heroNewCycle(){
-  const { W, H } = hero, width = Math.min(W, H) * .2;
-  const rnd = () => ({ x:W * (-.05 + Math.random() * 1.1), y:H * (-.05 + Math.random() * 1.1) });
-  let p = rnd(); const pts = [p];
-  for (let i = 0; i < N_LEGS; i++){
-    let q, tries = 0;
-    do { q = rnd(); tries++; } while (Math.hypot(q.x - p.x, q.y - p.y) < Math.min(W, H) * .5 && tries < 20);
-    pts.push(q); p = q;
+  const { W, H } = hero;
+  let pts, width = Math.min(W, H) * .2;
+  const real = heroRealPoints();
+  if (real){ pts = [...real.pts].sort(() => Math.random() - .5); width = real.width; }
+  else {                                   // enquanto a planilha não chegou: pontos soltos na tela
+    const rnd = () => ({ x:W * (-.05 + Math.random() * 1.1), y:H * (-.05 + Math.random() * 1.1) });
+    pts = Array.from({ length:N_LEGS + 1 }, rnd);
   }
   let off = 0;
   hero.legs = [];
@@ -510,14 +526,17 @@ function heroNewCycle(){
     off += len;
   }
   hero.totalLen = off; hero.drawT = hero.legs.length * LEG_T; hero.total = hero.drawT + HOLD_T + ERASE_T; hero.t = 0; hero.last = null;
+  heroResetBake();
 }
-function drawLeg(leg, dS, dE){
+// trechos já completos ficam guardados num canvas à parte durante o desenho (45 trechos redesenhados a cada quadro pesariam no celular)
+function heroResetBake(){ bctx.setTransform(1, 0, 0, 1, 0, 0); bctx.clearRect(0, 0, bake.width, bake.height); bctx.setTransform(hero.dpr, 0, 0, hero.dpr, 0, 0); hero.baked = 0; }
+function drawLeg(leg, dS, dE, ctx = hctx, record = true){
   const sub = subFrom(subUpTo(leg.path, dE), dS); if (sub.length < 2) return;
   const a = leg.path[0], z = leg.path[leg.path.length - 1];
-  const g = hctx.createLinearGradient(a.x, a.y, z.x, z.y); g.addColorStop(0, '#0a0a0a'); g.addColorStop(1, '#d8d8d6');
-  hctx.lineWidth = leg.width; hctx.lineCap = 'round'; hctx.lineJoin = 'round'; hctx.strokeStyle = g;
-  hctx.beginPath(); sub.forEach((q, i) => i ? hctx.lineTo(q.x, q.y) : hctx.moveTo(q.x, q.y)); hctx.stroke();
-  hero.vis.push({ leg, sub });
+  const g = ctx.createLinearGradient(a.x, a.y, z.x, z.y); g.addColorStop(0, '#0a0a0a'); g.addColorStop(1, '#d8d8d6');
+  ctx.lineWidth = leg.width; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = g;
+  ctx.beginPath(); sub.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke();
+  if (record) hero.vis.push({ leg, sub });
 }
 function heroRender(t){
   hero.vis = [];
@@ -526,7 +545,11 @@ function heroRender(t){
   const legs = hero.legs;
   if (t < hero.drawT){
     const i = Math.min(legs.length - 1, Math.floor(t / LEG_T)), k = (t - i * LEG_T) / LEG_T;
-    legs.forEach((l, j) => { if (j < i) drawLeg(l, 0, l.len); else if (j === i) drawLeg(l, 0, easeSnap(Math.min(1, k)) * l.len); });
+    if (hero.baked > i) heroResetBake();
+    while (hero.baked < i){ const l = legs[hero.baked++]; drawLeg(l, 0, l.len, bctx, false); }
+    hctx.drawImage(bake, 0, 0, hero.W, hero.H);
+    for (let j = 0; j < i; j++) hero.vis.push({ leg:legs[j], sub:legs[j].path });
+    drawLeg(legs[i], 0, easeSnap(Math.min(1, k)) * legs[i].len);
   } else if (t < hero.drawT + HOLD_T){
     legs.forEach(l => drawLeg(l, 0, l.len));
   } else {
@@ -1165,6 +1188,7 @@ async function boot(){
     return;
   }
   ARTISTS.forEach(a => BY_SLUG.set(a.slug, a));
+  if (hero.t < 3) heroNewCycle(); // a cobrona do começo já usa os pontos reais do mapa
   renderList();
   new IntersectionObserver(es => { if (es[0].isIntersecting){ mapNear = true; maybeInitMap(); } }, { rootMargin:'1200px 0px' }).observe($('#mapSection'));
   route();
