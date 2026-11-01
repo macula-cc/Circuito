@@ -26,11 +26,13 @@
   body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans); font-weight:380; letter-spacing:-.012em; }
   body.artist-open{ overflow:hidden; }
   a{ color:inherit; text-decoration:none; }
+  a, button{ -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
   button{ font:inherit; color:inherit; }
 
   /* ---------- hero (fixo no fundo; o texto sobe até o título, a seção Artistas cobre tudo) ---------- */
-  .hero{ position:sticky; top:0; height:100vh; height:100svh; overflow:hidden; background:var(--gray); z-index:0; }
-  #heroCanvas{ position:absolute; inset:0; width:100%; height:100%; display:block; transform:scale(1.12); will-change:filter; }
+  .hero{ position:fixed; inset:0; overflow:hidden; background:var(--gray); z-index:0; }
+  /* 100lvh = altura máxima da tela (barra do navegador recolhida): o canvas nunca precisa ser refeito quando a barra aparece/some */
+  #heroCanvas{ position:absolute; left:0; top:0; width:100%; height:100vh; height:100lvh; display:block; transform:scale(1.08); will-change:filter; }
   .veil{ position:absolute; inset:0; background:#e6e6e4; opacity:0; pointer-events:none; }
   .hero-content{ position:absolute; inset:0; will-change:transform; }
   .title{ position:absolute; left:var(--pad); top:calc(var(--pad) * .9); margin:0; font-weight:350; line-height:.88; letter-spacing:-.05em;
@@ -38,7 +40,7 @@
   .title span{ display:block; white-space:nowrap; }
   .lede{ position:absolute; left:var(--pad); right:var(--pad); bottom:var(--pad); margin:0; max-width:1180px; font-size:var(--body); line-height:1.22;
          will-change:transform, opacity; }
-  .spacer{ height:180vh; }
+  .spacer{ height:280vh; pointer-events:none; } /* pista de rolagem invisível: o hero fica fixo atrás */
 
   /* ---------- seção Artistas (branca, cobre o hero) ---------- */
   .artists{ position:relative; z-index:2; background:var(--paper); padding-top:calc(var(--pad) * 1.2); box-shadow:0 -40px 80px -30px rgba(0,0,0,.22); }
@@ -113,7 +115,7 @@
 
   @media (prefers-reduced-motion:reduce){
     .row{ opacity:1; transform:none; transition:none; }
-    .spacer{ height:40vh; }
+    .spacer{ height:140vh; }
   }
 </style>
 </head>
@@ -205,7 +207,8 @@ function photoURL(raw, size){
 // quando existe; senão cai no Drive, que às vezes responde 429 no navegador
 let LOCAL_PHOTOS = {};
 // manifesto: 1 = tem cópia local, 0 = link da planilha não funciona, ausente = artista novo (tenta o Drive)
-const thumbURL = a => LOCAL_PHOTOS[a.slug] === 1 ? `catalogo-fotos/t/${a.slug}.jpg` : LOCAL_PHOTOS[a.slug] === 0 ? null : photoURL(a.photoRaw, 640);
+const thumbURL = a => LOCAL_PHOTOS[a.slug] === 1 ? `catalogo-fotos/s/${a.slug}.jpg` : LOCAL_PHOTOS[a.slug] === 0 ? null : photoURL(a.photoRaw, 640);   // lista (240px)
+const midURL = a => LOCAL_PHOTOS[a.slug] === 1 ? `catalogo-fotos/t/${a.slug}.jpg` : thumbURL(a);                                                   // hover / abrir (640px)
 const bigURL = a => LOCAL_PHOTOS[a.slug] === 1 ? `catalogo-fotos/${a.slug}.jpg` : LOCAL_PHOTOS[a.slug] === 0 ? null : photoURL(a.photoRaw, 1600);
 function parseHandles(raw){
   return (raw || '').split(/[\s,;/|]+/)
@@ -302,9 +305,10 @@ function subFrom(pts, dist){
   return [pts[pts.length - 1]];
 }
 
+const COARSE = matchMedia('(pointer:coarse)').matches;
 function heroResize(){
-  hero.W = Math.max(1, heroEl.clientWidth); hero.H = Math.max(1, heroEl.clientHeight);
-  hero.dpr = Math.min(2, window.devicePixelRatio || 1);
+  hero.W = Math.max(1, hc.clientWidth); hero.H = Math.max(1, hc.clientHeight);
+  hero.dpr = COARSE ? 1 : Math.min(2, window.devicePixelRatio || 1);
   hc.width = hero.W * hero.dpr; hc.height = hero.H * hero.dpr;
   heroNewCycle();
 }
@@ -351,6 +355,7 @@ function heroLoop(ts){
   requestAnimationFrame(heroLoop);
   if (hero.covered || document.hidden || document.body.classList.contains('artist-open')){ hero.last = null; return; }
   if (hero.last == null) hero.last = ts;
+  if (COARSE && ts - hero.last < 30) return;
   hero.t += Math.min(.1, (ts - hero.last) / 1000); hero.last = ts;
   if (hero.t >= hero.total) heroNewCycle();
   heroRender(hero.t);
@@ -379,25 +384,33 @@ function fitTitle(){
   const fit = 100 * (window.innerWidth - pad * 2) / w, cap = heroEl.clientHeight * (wide ? .26 : .17);
   titleEl.style.fontSize = Math.min(fit, cap) + 'px';
 }
-let scrollQueued = false;
+let scrollQueued = false, TRACK = 0, lastFilter = '';
+function measureTrack(){ TRACK = spacerEl.offsetHeight; }
 function onScroll(){
   if (scrollQueued) return;
   scrollQueued = true;
   requestAnimationFrame(() => {
     scrollQueued = false;
-    const y = window.scrollY, vh = heroEl.clientHeight, S = spacerEl.offsetHeight;
+    const y = window.scrollY, vh = window.innerHeight;
     const p = REDUCED ? 1 : clamp01(y / (vh * 1.17)), e = easeIO(p);
-    ledeEl.style.transform = `translate3d(0, ${(1 - e) * vh}px, 0)`;
-    ledeEl.style.opacity = REDUCED ? 1 : clamp01(p * 5);
-    hc.style.filter = `blur(${(e * 20).toFixed(1)}px)`;
+    ledeEl.style.transform = `translate3d(0, ${((1 - e) * vh).toFixed(1)}px, 0)`;
+    ledeEl.style.opacity = REDUCED ? 1 : clamp01(p * 5).toFixed(2);
+    const f = `blur(${Math.round(e * (COARSE ? 12 : 20))}px)`;
+    if (f !== lastFilter){ hc.style.filter = f; lastFilter = f; }
     veilEl.style.opacity = (e * .35).toFixed(3);
-    const q = clamp01((y - S) / vh);
+    const q = clamp01((y - (TRACK - vh)) / vh);
     contentEl.style.transform = REDUCED ? '' : `translate3d(0, ${(-q * vh * .35).toFixed(1)}px, 0)`;
-    hero.covered = y > S + vh;
+    hero.covered = y > TRACK;
   });
 }
 window.addEventListener('scroll', onScroll, { passive:true });
-window.addEventListener('resize', () => { heroResize(); fitTitle(); onScroll(); });
+let lastW = window.innerWidth, lastH = window.innerHeight, resizeTimer;
+window.addEventListener('resize', () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  if (w === lastW && Math.abs(h - lastH) < 160){ onScroll(); return; } // barra do navegador (mobile): não refaz nada
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { lastW = w; lastH = h; measureTrack(); heroResize(); fitTitle(); onScroll(); }, 150);
+});
 
 /* ============================================================
    lista
@@ -410,6 +423,15 @@ function fitBig(){
   bigEl.style.fontSize = '100px';
   const w = s.getBoundingClientRect().width;
   bigEl.style.fontSize = (100 * (document.documentElement.clientWidth - pad * 2) / w) + 'px';
+}
+function prefetchMid(a, row){
+  const url = midURL(a); if (!url || a.midLoaded) return;
+  a.midLoaded = true;
+  loadImg(url).then(img => {
+    if (!img) return;
+    a.thumbSrc = img.src;
+    if (row) row.querySelector('.thumb i').style.backgroundImage = `url("${img.src}")`;
+  });
 }
 function igHTML(h){ return `<a class="ig" href="https://instagram.com/${h}" target="_blank" rel="noopener">@${h}</a>`; }
 function renderList(){
@@ -435,6 +457,8 @@ function renderList(){
     li.innerHTML = `<a class="row-link" href="#/${a.slug}"><span class="thumb"><i></i></span><span class="name"></span></a>`;
     li.querySelector('.name').textContent = a.name;
     if (a.handles.length) li.insertAdjacentHTML('beforeend', a.handles.map(igHTML).join(' '));
+    li.addEventListener('mouseenter', () => prefetchMid(a, li));
+    li.querySelector('.row-link').addEventListener('pointerdown', () => prefetchMid(a, li), { passive:true });
     li.querySelector('.row-link').addEventListener('click', e => {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
       e.preventDefault(); origin = li; location.hash = '#/' + a.slug;
@@ -559,7 +583,10 @@ function route(){
 window.addEventListener('hashchange', route);
 $('#aClose').addEventListener('click', () => { openedFromList ? history.back() : (location.hash = '#/'); });
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && current) $('#aClose').click(); });
-window.addEventListener('resize', () => { fitBig(); if (current) fitName(); });
+window.addEventListener('resize', () => {
+  if (window.innerWidth === lastW && Math.abs(window.innerHeight - lastH) < 160) return;
+  fitBig(); if (current) fitName();
+});
 
 /* ============================================================
    boot
@@ -568,7 +595,7 @@ async function boot(){
   heroStart();
   const fontsReady = Promise.race([document.fonts.load('350 100px Inter'), new Promise(r => setTimeout(r, 1500))]);
   await fontsReady;
-  fitBig(); fitTitle(); onScroll();
+  fitBig(); fitTitle(); measureTrack(); onScroll();
   try{
     [ARTISTS, LOCAL_PHOTOS] = await Promise.all([
       loadArtists(),

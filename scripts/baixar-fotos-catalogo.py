@@ -7,7 +7,7 @@ as fotos do próprio site.
 
 Uso (na pasta do projeto):   python3 scripts/baixar-fotos-catalogo.py
 Refazer tudo:                python3 scripts/baixar-fotos-catalogo.py --force
-Saída: catalogo-fotos/<slug>.jpg (até 1600px), catalogo-fotos/t/<slug>.jpg (até 640px)
+Saída: catalogo-fotos/<slug>.jpg (até 1600px), t/<slug>.jpg (até 640px), s/<slug>.jpg (até 240px, usado na lista)
        e catalogo-fotos/manifest.json (slug -> 1 = tem foto local, 0 = link não funciona).
 """
 import csv, io, json, os, re, sys, time, unicodedata, urllib.request
@@ -63,6 +63,7 @@ def save(data, path, maxside, quality):
 
 def main():
     os.makedirs(os.path.join(ROOT, 't'), exist_ok=True)
+    os.makedirs(os.path.join(ROOT, 's'), exist_ok=True)
     text = urllib.request.urlopen(urllib.request.Request(SHEET, headers=UA), timeout=40).read().decode('utf-8')
     rows = list(csv.reader(io.StringIO(text)))
     idx = {h.strip(): i for i, h in enumerate(rows[0])}
@@ -81,14 +82,16 @@ def main():
         url = photo_url(get(r, 'Foto do trabalho (URL)'))
         if not url:
             semfoto.append(nome); continue
-        big, small = os.path.join(ROOT, f'{slug}.jpg'), os.path.join(ROOT, 't', f'{slug}.jpg')
+        big, small, tiny = os.path.join(ROOT, f'{slug}.jpg'), os.path.join(ROOT, 't', f'{slug}.jpg'), os.path.join(ROOT, 's', f'{slug}.jpg')
         if not FORCE and os.path.exists(big) and os.path.exists(small):
+            if not os.path.exists(tiny):
+                save(open(big, 'rb').read(), tiny, 240, 76)
             manifest[slug] = 1; continue
         ok = False
         for tentativa in range(3):
             try:
                 data = fetch(url)
-                save(data, big, 1600, 82); save(data, small, 640, 80)
+                save(data, big, 1600, 82); save(data, small, 640, 80); save(data, tiny, 240, 76)
                 manifest[slug] = 1; ok = True
                 print('ok  ', nome); break
             except Exception as e:
