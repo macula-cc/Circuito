@@ -44,12 +44,13 @@
   .spacer{ height:280vh; pointer-events:none; } /* pista de rolagem invisível: o hero fica fixo atrás */
 
   /* ---------- seção Artistas (branca, cobre o hero) ---------- */
-  .artists{ position:relative; z-index:2; background:var(--paper); box-shadow:0 -40px 80px -30px rgba(0,0,0,.22); }
+  .artists{ position:relative; z-index:2; }
 
 
   /* ---------- mapa: fica no zoom inicial (interactive:false), então não captura a rolagem da página
      nem mostra detalhe de endereço; só os pins respondem ao clique ---------- */
-  .map-section{ position:relative; height:clamp(380px, 72vh, 760px); background:#cacacc; overflow:hidden; isolation:isolate; }
+  .map-section{ position:sticky; top:0; z-index:1; height:100vh; background:#cacacc; overflow:hidden; isolation:isolate; box-shadow:0 -40px 80px -30px rgba(0,0,0,.22); }
+  .list-layer{ position:relative; z-index:2; background:var(--paper); box-shadow:0 -40px 80px -30px rgba(0,0,0,.22); }
   #map{ position:absolute; inset:0; }
   .maplibregl-map{ font-family:var(--sans); }
   .maplibregl-ctrl-attrib{ font-family:var(--sans); font-size:.68rem !important; background:rgba(255,255,255,.75) !important; }
@@ -179,6 +180,7 @@
 <div class="artists" id="artists">
 <section class="map-section" id="mapSection" aria-label="Mapa dos ateliês"><div id="map"></div></section>
 
+<div class="list-layer">
 <main>
   <h2 class="big" id="big"><span>Artistas</span></h2>
   <ul class="list" id="list"></ul>
@@ -193,6 +195,7 @@
     Alessandra Sposetti · <a href="https://instagram.com/alessandrasposetti" target="_blank" rel="noopener">@alessandrasposetti</a><br>
     Adriana Macedo · <a href="https://instagram.com/adrianamacedo_artist" target="_blank" rel="noopener">@adrianamacedo_artist</a></p></div>
 </footer>
+</div>
 </div>
 
 <div class="overlay" id="overlay"></div>
