@@ -78,19 +78,24 @@
   .artist.open{ visibility:visible; pointer-events:auto; }
   .a-hero{ position:relative; height:100vh; height:100svh; background:var(--green); overflow:hidden; }
   .a-photo{ position:absolute; inset:0; background:center / cover no-repeat; }
-  .a-hero.has-photo::after{ content:''; position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,.5), rgba(0,0,0,0) 55%); }
-  .a-hero.hide-photo .a-photo, .a-hero.hide-photo::after{ opacity:0; }
-  .a-name{ position:absolute; left:var(--pad); right:var(--pad); bottom:calc(var(--pad) * .35 - .12em); margin:0; z-index:2;
-           font-weight:350; letter-spacing:-.05em; line-height:1.05; overflow:hidden; padding:.12em 0 .24em; }
+  .a-top.has-photo .a-hero::after{ content:''; position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,.5), rgba(0,0,0,0) 55%); }
+  .a-hero.hide-photo .a-photo, .a-top.has-photo .a-hero.hide-photo::after{ opacity:0; }
+  .a-top{ position:relative; }
+  /* o nome fica preso na base da tela enquanto a foto sobe; a borda da foto corta as letras
+     (cópia branca por cima da foto, preta por cima do fundo branco) */
+  .a-namebar{ position:sticky; z-index:2; pointer-events:none; }
+  .a-name{ position:absolute; left:var(--pad); right:var(--pad); bottom:calc(var(--pad) * .35 - .12em); margin:0;
+           font-weight:350; letter-spacing:-.05em; line-height:1.05; overflow:hidden; padding:.12em 0 .24em; color:var(--ink); }
   .a-name span{ display:block; transform:translateY(160%); }
-  .a-hero.has-photo .a-name{ color:#fff; }
+  .a-name-w{ color:var(--ink); }
+  .a-top.has-photo .a-name-w{ color:#fff; }
   .artist.revealed .a-name span{ transform:none; transition:transform 1s var(--ease); }
   .a-close{ position:absolute; top:var(--pad); right:var(--pad); z-index:3; cursor:pointer; font-family:var(--sans); font-weight:400; font-size:.79rem;
             color:var(--ink); padding:.55rem .9rem; min-height:38px; border-radius:999px;
             background:rgba(200,200,200,.55); backdrop-filter:blur(18px) saturate(180%); -webkit-backdrop-filter:blur(18px) saturate(180%);
             border:1px solid rgba(255,255,255,.4); box-shadow:0 3px 12px rgba(0,0,0,.22); transition:background .2s ease; }
   .a-close:hover{ background:rgba(255,255,255,.45); }
-  .a-meta{ padding:var(--pad) var(--pad) calc(var(--pad) * 4); }
+  .a-meta{ padding:calc(var(--pad) * .5) var(--pad) calc(var(--pad) * 4); }
   .a-meta > *{ opacity:0; transform:translateY(18px); }
   .artist.revealed .a-meta > *{ opacity:1; transform:none; transition:opacity .8s var(--ease), transform .8s var(--ease); }
   .artist.revealed .a-meta > :nth-child(2){ transition-delay:.12s; }
@@ -139,10 +144,16 @@
 </div>
 
 <section class="artist" id="artist" tabindex="-1" aria-label="Artista" aria-hidden="true">
-  <div class="a-hero" id="aHero">
-    <div class="a-photo" id="aPhoto"></div>
-    <button class="a-close" id="aClose" aria-label="Fechar">Fechar</button>
-    <h1 class="a-name" id="aName"><span></span></h1>
+  <div class="a-top" id="aTop">
+    <div class="a-hero" id="aHero">
+      <div class="a-photo" id="aPhoto"></div>
+      <button class="a-close" id="aClose" aria-label="Fechar">Fechar</button>
+    </div>
+    <div class="a-namebar" id="aNameBar">
+      <h1 class="a-name" id="aName"><span></span></h1>
+      <div class="a-name a-name-w" id="aNameW" aria-hidden="true"><span></span></div>
+    </div>
+    <div class="a-gap" id="aGap"></div>
   </div>
   <div class="a-meta">
     <div class="a-bio" id="aBio"></div>
@@ -434,7 +445,7 @@ function renderList(){
 /* ============================================================
    página do artista + transição (a miniatura vira o hero)
    ============================================================ */
-const artistEl = $('#artist'), aHero = $('#aHero'), aPhoto = $('#aPhoto'), aName = $('#aName'), aIgs = $('#aIgs'), aBio = $('#aBio');
+const artistEl = $('#artist'), aTop = $('#aTop'), aHero = $('#aHero'), aPhoto = $('#aPhoto'), aName = $('#aName'), aNameW = $('#aNameW'), aNameBar = $('#aNameBar'), aGap = $('#aGap'), aIgs = $('#aIgs'), aBio = $('#aBio');
 let current = null, origin = null, openedFromList = false, busy = null;
 
 function fitName(){
@@ -442,21 +453,39 @@ function fitName(){
   aName.style.fontSize = '100px'; span.style.display = 'inline-block'; span.style.whiteSpace = 'nowrap';
   const w = span.getBoundingClientRect().width, fit = 100 * avail / w;
   span.style.display = 'block';
-  if (fit >= min){ aName.style.fontSize = Math.min(max, fit) + 'px'; span.style.whiteSpace = 'nowrap'; }
-  else { aName.style.fontSize = min + 'px'; span.style.whiteSpace = 'normal'; }
+  const size = fit >= min ? Math.min(max, fit) : min, wrap = fit >= min ? 'nowrap' : 'normal';
+  for (const el of [aName, aNameW]){ el.style.fontSize = size + 'px'; el.firstElementChild.style.whiteSpace = wrap; }
+  const h = aName.offsetHeight, pad = parseFloat(getComputedStyle(artistEl).getPropertyValue('--pad')) || 16;
+  aNameBar.style.height = h + 'px'; aNameBar.style.marginTop = -h + 'px'; aNameBar.style.top = `calc(100vh - ${h}px)`; aNameBar.style.top = `calc(100svh - ${h}px)`;
+  aGap.style.height = (h + pad * .5) + 'px';
+  updateSplit();
 }
+// linha dura: acima da borda da foto o nome é branco, abaixo dela é preto
+function updateSplit(){
+  if (!current) return;
+  const edge = aHero.getBoundingClientRect().bottom, r = aName.getBoundingClientRect();
+  const cut = Math.min(r.height, Math.max(0, edge - r.top));
+  aNameW.style.clipPath = `inset(0 0 ${r.height - cut}px 0)`;
+  aName.style.clipPath = `inset(${cut}px 0 0 0)`;
+}
+let splitQueued = false;
+artistEl.addEventListener('scroll', () => {
+  if (splitQueued) return; splitQueued = true;
+  requestAnimationFrame(() => { splitQueued = false; updateSplit(); });
+}, { passive:true });
+
 function fillArtist(a){
-  aName.firstElementChild.textContent = a.name;
+  aName.firstElementChild.textContent = a.name; aNameW.firstElementChild.textContent = a.name;
   aIgs.innerHTML = a.handles.length ? '<span class="lbl">instagram:</span>' + a.handles.map(igHTML).join('') : '';
   aBio.className = 'a-bio';
   if (a.bio){ aBio.innerHTML = ''; a.bio.split(/\n+/).forEach(t => { const p = document.createElement('p'); p.textContent = t; aBio.appendChild(p); }); }
   else { aBio.classList.add('empty'); aBio.textContent = 'Mini bio em breve.'; }
-  aHero.classList.toggle('has-photo', !!a.thumbSrc);
+  aTop.classList.toggle('has-photo', !!a.thumbSrc);
   aPhoto.style.backgroundImage = a.thumbSrc ? `url("${a.thumbSrc}")` : 'none';
   if (bigURL(a)) loadImg(bigURL(a), true).then(img => {
     if (!img) return;
     a.bigSrc = img.src;
-    if (current === a){ aPhoto.style.backgroundImage = `url("${img.src}")`; aHero.classList.add('has-photo'); }
+    if (current === a){ aPhoto.style.backgroundImage = `url("${img.src}")`; aTop.classList.add('has-photo'); }
   });
   document.title = `${a.name} — Circuito de Ateliês do Centro`;
 }
