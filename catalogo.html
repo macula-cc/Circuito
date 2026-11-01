@@ -683,6 +683,29 @@ function onScroll(){
   });
 }
 window.addEventListener('scroll', onScroll, { passive:true });
+
+/* snap do mapa: ao parar de rolar com o mapa entrando em foco, ele encosta na margem superior */
+let snapTimer, snapping = false, touching = false, snapLastY = window.scrollY, snapDir = 0;
+function snapMap(){
+  if (snapping || touching || listOpen || document.body.classList.contains('artist-open') || !TRACK) return;
+  const y = window.scrollY, vh = window.innerHeight, d = TRACK - y;
+  const entering = snapDir > 0 && d > 2 && d < vh * .6;   // descendo, mapa ainda subindo
+  const returning = snapDir < 0 && d < -2 && d > -vh * .4; // voltando do rodapé
+  if (!entering && !returning) return;
+  snapping = true;
+  window.scrollTo({ top:TRACK, behavior: REDUCED ? 'auto' : 'smooth' });
+  setTimeout(() => { snapping = false; }, REDUCED ? 50 : 900);
+}
+function armSnap(){ clearTimeout(snapTimer); snapTimer = setTimeout(snapMap, 140); }
+window.addEventListener('scroll', () => {
+  const y = window.scrollY;
+  if (!snapping){ if (y !== snapLastY) snapDir = y > snapLastY ? 1 : -1; armSnap(); }
+  snapLastY = y;
+}, { passive:true });
+window.addEventListener('touchstart', () => { touching = true; snapping = false; clearTimeout(snapTimer); }, { passive:true });
+window.addEventListener('touchend', () => { touching = false; armSnap(); }, { passive:true });
+window.addEventListener('touchcancel', () => { touching = false; armSnap(); }, { passive:true });
+window.addEventListener('wheel', () => { snapping = false; }, { passive:true });
 let lastW = window.innerWidth, lastH = window.innerHeight, resizeTimer;
 window.addEventListener('resize', () => {
   const w = window.innerWidth, h = window.innerHeight;
