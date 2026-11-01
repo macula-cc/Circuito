@@ -60,7 +60,7 @@
   @media (hover:hover){
     .row:hover .thumb, .row:focus-within .thumb{ width:calc(var(--thumb-w) * 2.6); height:calc(var(--thumb-h) * 2.6); }
   }
-  .name{ font-size:clamp(1.2rem, .7rem + 2.1vw, 3rem); line-height:1.05; letter-spacing:-.03em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .name{ font-size:clamp(1.2rem, .7rem + 2.1vw, 3rem); line-height:1.3; letter-spacing:-.03em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .ig{ flex:none; font-size:clamp(.8rem, .62rem + .75vw, 1.25rem); white-space:nowrap; }
   .ig:hover{ text-decoration:underline; text-underline-offset:3px; }
   .msg{ padding:var(--pad); font-size:var(--body); color:var(--mid); }
@@ -81,9 +81,9 @@
   .a-photo{ position:absolute; inset:0; background:center / cover no-repeat; }
   .a-hero.has-photo::after{ content:''; position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,.5), rgba(0,0,0,0) 55%); }
   .a-hero.hide-photo .a-photo, .a-hero.hide-photo::after{ opacity:0; }
-  .a-name{ position:absolute; left:var(--pad); right:var(--pad); bottom:calc(var(--pad) * .35); margin:0; z-index:2;
-           font-weight:350; letter-spacing:-.05em; line-height:.95; overflow:hidden; padding-bottom:.08em; }
-  .a-name span{ display:block; transform:translateY(110%); }
+  .a-name{ position:absolute; left:var(--pad); right:var(--pad); bottom:calc(var(--pad) * .35 - .12em); margin:0; z-index:2;
+           font-weight:350; letter-spacing:-.05em; line-height:1.05; overflow:hidden; padding:.12em 0 .24em; }
+  .a-name span{ display:block; transform:translateY(160%); }
   .a-hero.has-photo .a-name{ color:#fff; }
   .artist.revealed .a-name span{ transform:none; transition:transform 1s var(--ease); }
   .a-close{ position:absolute; top:var(--pad); right:var(--pad); z-index:3; width:clamp(32px, 3.2vw, 46px); aspect-ratio:1; border-radius:50%;
@@ -129,7 +129,7 @@
 </main>
 
 <footer class="foot">
-  <div><p>Instagram:<br><a href="https://instagram.com/circuitodeateliesdocentro" target="_blank" rel="noopener">@circuitodeateliesdocentro</a></p></div>
+  <div><p>Instagram:<br><a href="https://instagram.com/circuito.de.atelies.do.centro" target="_blank" rel="noopener">@circuito.de.atelies.do.centro</a></p></div>
   <div><p>Idealização e Produção Executiva:<br>Fernanda Sattamini<br><a href="https://instagram.com/fernandasattamini" target="_blank" rel="noopener">@fernandasattamini</a></p></div>
   <div><p>Identidade visual e site:<br>Eduardo Mattos<br><a href="https://instagram.com/macula.cc" target="_blank" rel="noopener">@macula.cc</a></p></div>
   <div><p>Colaborações:<br>
