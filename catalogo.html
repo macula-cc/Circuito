@@ -33,10 +33,12 @@
   /* ---------- hero (fixo no fundo; o texto sobe até o título, a seção Artistas cobre tudo) ---------- */
   .hero{ position:fixed; inset:0; overflow:hidden; background:var(--gray); z-index:0; }
   /* 100lvh = altura máxima da tela (barra do navegador recolhida): o canvas nunca precisa ser refeito quando a barra aparece/some */
-  #heroCanvas{ position:absolute; left:0; top:0; width:100%; height:100vh; height:100lvh; display:block; transform:scale(1.08); will-change:filter; }
+  #heroCanvas{ position:absolute; left:0; top:0; width:100%; height:100vh; height:100lvh; display:block; will-change:filter; }
+  #titleCanvas{ position:absolute; left:0; top:0; width:100%; height:100vh; height:100lvh; display:block; pointer-events:none; }
   .veil{ position:absolute; inset:0; background:#e6e6e4; opacity:0; pointer-events:none; }
   .hero-content{ position:absolute; inset:0; will-change:transform; }
-  .title{ position:absolute; left:var(--pad); bottom:var(--pad); margin:0; will-change:transform; font-weight:350; line-height:.88; letter-spacing:-.05em;
+  /* o título visível é desenhado no #titleCanvas (pra poder virar negativo sobre a cobrona); este h1 só mantém o texto e a medida */
+  .title{ position:absolute; left:var(--pad); bottom:var(--pad); margin:0; color:transparent; pointer-events:none; font-weight:350; line-height:.88; letter-spacing:-.05em;
           text-transform:uppercase; }
   .title span{ display:block; white-space:nowrap; }
   .lede{ position:absolute; left:var(--pad); right:var(--pad); bottom:var(--pad); margin:0; max-width:1180px; font-size:var(--body); line-height:1.22;
@@ -170,6 +172,7 @@
 <header class="hero" id="hero">
   <canvas id="heroCanvas"></canvas>
   <div class="veil" id="veil"></div>
+  <canvas id="titleCanvas"></canvas>
   <div class="hero-content" id="heroContent">
     <h1 class="title" id="title">Circuito de Ateliês do Centro</h1>
     <p class="lede" id="lede">O CIRCUITO DE ATELIÊS DO CENTRO nasce da articulação de uma rede de artistas que compartilham o desejo de fortalecer a cena artística contemporânea do Centro do Rio de Janeiro e ampliar as possibilidades de encontro entre arte, cidade e público. Em uma região historicamente marcada pela diversidade cultural e pela efervescência de sua produção artística, o projeto volta o olhar para os lugares onde a arte acontece antes de chegar às exposições: os ateliês, como espaços de pesquisa, experimentação e criação, onde obras, ideias e processos ganham forma.</p>
@@ -424,8 +427,8 @@ function imgTry(job){
 /* ============================================================
    hero — a minhocona (verde → cinza), em tela cheia no fundo
    ============================================================ */
-const heroEl = $('#hero'), hc = $('#heroCanvas'), hctx = hc.getContext('2d');
-const hero = { W:0, H:0, dpr:1, legs:[], t:0, last:null, covered:false, total:0, drawT:0, totalLen:0 };
+const heroEl = $('#hero'), hc = $('#heroCanvas'), hctx = hc.getContext('2d'), tc = $('#titleCanvas'), tctx = tc.getContext('2d');
+const hero = { W:0, H:0, dpr:1, vis:[], e:0, titleTop:0, legs:[], t:0, last:null, covered:false, total:0, drawT:0, totalLen:0 };
 const LEG_T = .55, HOLD_T = 1.1, ERASE_T = 2.4, N_LEGS = 11;
 const easeSnap = t => t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
 
@@ -463,6 +466,7 @@ function heroResize(){
   hero.W = Math.max(1, hc.clientWidth); hero.H = Math.max(1, hc.clientHeight);
   hero.dpr = COARSE ? 1 : Math.min(2, window.devicePixelRatio || 1);
   hc.width = hero.W * hero.dpr; hc.height = hero.H * hero.dpr;
+  tc.width = hc.width; tc.height = hc.height;
   heroNewCycle();
 }
 function heroNewCycle(){
@@ -486,11 +490,13 @@ function heroNewCycle(){
 function drawLeg(leg, dS, dE){
   const sub = subFrom(subUpTo(leg.path, dE), dS); if (sub.length < 2) return;
   const a = leg.path[0], z = leg.path[leg.path.length - 1];
-  const g = hctx.createLinearGradient(a.x, a.y, z.x, z.y); g.addColorStop(0, '#39FF14'); g.addColorStop(1, '#d8d8d6');
+  const g = hctx.createLinearGradient(a.x, a.y, z.x, z.y); g.addColorStop(0, '#0a0a0a'); g.addColorStop(1, '#d8d8d6');
   hctx.lineWidth = leg.width; hctx.lineCap = 'round'; hctx.lineJoin = 'round'; hctx.strokeStyle = g;
   hctx.beginPath(); sub.forEach((q, i) => i ? hctx.lineTo(q.x, q.y) : hctx.moveTo(q.x, q.y)); hctx.stroke();
+  hero.vis.push({ leg, sub });
 }
 function heroRender(t){
+  hero.vis = [];
   hctx.setTransform(hero.dpr, 0, 0, hero.dpr, 0, 0);
   hctx.fillStyle = '#d8d8d6'; hctx.fillRect(0, 0, hero.W, hero.H);
   const legs = hero.legs;
@@ -511,9 +517,9 @@ function heroLoop(ts){
   if (COARSE && ts - hero.last < 30) return;
   hero.t += Math.min(.1, (ts - hero.last) / 1000); hero.last = ts;
   if (hero.t >= hero.total) heroNewCycle();
-  heroRender(hero.t);
+  heroRender(hero.t); heroDrawTitle();
 }
-function heroStatic(){ hero.t = hero.drawT + HOLD_T * .5; heroRender(hero.t); }
+function heroStatic(){ hero.t = hero.drawT + HOLD_T * .5; heroRender(hero.t); heroDrawTitle(); }
 function heroStart(){
   heroResize();
   if (REDUCED){ heroStatic(); return; }
@@ -528,6 +534,69 @@ const titleEl = $('#title'), ledeEl = $('#lede'), veilEl = $('#veil'), contentEl
 const clamp01 = v => Math.min(1, Math.max(0, v));
 const easeIO = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
 
+
+/* ============================================================
+   título em canvas: preto, e BRANCO (negativo) onde cruza com a parte escura da cobrona —
+   a metade do degradê de cada trecho que está mais perto do preto. O corte é duro (limiar
+   de 50%) e só vale no estado inicial do hero: assim que a cobrona ganha blur, o título
+   volta a ser todo preto.
+   ============================================================ */
+const TITLE = { black:null, white:null, bw:0, bh:0 };
+const maskC = document.createElement('canvas'), mctx = maskC.getContext('2d');
+const t1C = document.createElement('canvas'), t1 = t1C.getContext('2d'), t2C = document.createElement('canvas'), t2 = t2C.getContext('2d');
+function renderTitleSprites(){
+  const fs = parseFloat(titleEl.style.fontSize) || 40, lh = fs * .88, dpr = hero.dpr;
+  const lines = [...titleEl.children].map(c => c.textContent.toUpperCase());
+  TITLE.bw = Math.ceil(titleEl.getBoundingClientRect().width) + 8; TITLE.bh = Math.ceil(TITLE_H) + 8;
+  for (const [key, color] of [['black', '#111111'], ['white', '#ffffff']]){
+    const c = TITLE[key] || (TITLE[key] = document.createElement('canvas'));
+    c.width = Math.ceil(TITLE.bw * dpr); c.height = Math.ceil(TITLE.bh * dpr);
+    const x = c.getContext('2d');
+    x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, TITLE.bw, TITLE.bh);
+    x.fillStyle = color; x.textBaseline = 'alphabetic'; x.font = `350 ${fs}px Inter, -apple-system, Helvetica, Arial, sans-serif`;
+    const ls = -.05 * fs, native = 'letterSpacing' in x;
+    if (native) x.letterSpacing = ls + 'px';
+    lines.forEach((ln, i) => {
+      const y = 4 + i * lh + .8033 * fs;
+      if (native) x.fillText(ln, 4, y);
+      else { let px = 4; for (const ch of ln){ x.fillText(ch, px, y); px += x.measureText(ch).width + ls; } }
+    });
+  }
+}
+function heroDrawTitle(){
+  if (!TITLE.black) return;
+  const dpr = hero.dpr;
+  tctx.setTransform(1, 0, 0, 1, 0, 0); tctx.clearRect(0, 0, tc.width, tc.height);
+  const bx = TITLE_PAD - 4, by = hero.titleTop - 4, bw = TITLE.bw, bh = TITLE.bh;
+  if (by > window.innerHeight || by + bh < 0) return;
+  // com blur (qualquer rolagem), sem negativo: só o título preto
+  if (Math.round(hero.e * (COARSE ? 12 : 20)) > 0){ tctx.drawImage(TITLE.black, Math.round(bx * dpr), Math.round(by * dpr)); return; }
+  // máscara das partes escuras da cobrona (nítida, na resolução da tela)
+  const rm = dpr, mw = Math.max(1, Math.ceil(bw * rm)), mh = Math.max(1, Math.ceil(bh * rm));
+  if (maskC.width !== mw || maskC.height !== mh){ maskC.width = mw; maskC.height = mh; }
+  else { mctx.setTransform(1, 0, 0, 1, 0, 0); mctx.globalCompositeOperation = 'source-over'; mctx.clearRect(0, 0, mw, mh); }
+  mctx.setTransform(rm, 0, 0, rm, -bx * rm, -by * rm);
+  mctx.lineCap = 'round'; mctx.lineJoin = 'round';
+  hero.vis.forEach(({ leg, sub }) => {
+    const trace = () => { mctx.beginPath(); sub.forEach((q, i) => i ? mctx.lineTo(q.x, q.y) : mctx.moveTo(q.x, q.y)); mctx.stroke(); };
+    mctx.lineWidth = leg.width;
+    mctx.globalCompositeOperation = 'destination-out'; mctx.strokeStyle = '#000'; trace();           // o trecho de cima cobre o que estava embaixo
+    const a = leg.path[0], z = leg.path[leg.path.length - 1];
+    const g = mctx.createLinearGradient(a.x, a.y, z.x, z.y);
+    g.addColorStop(0, '#000'); g.addColorStop(.5, '#000'); g.addColorStop(.5001, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    mctx.globalCompositeOperation = 'source-over'; mctx.strokeStyle = g; trace();                     // só a metade escura entra na máscara
+  });
+  mctx.globalCompositeOperation = 'source-over';
+  const W2 = TITLE.black.width, H2 = TITLE.black.height;
+  if (t1C.width !== W2 || t1C.height !== H2){ t1C.width = t2C.width = W2; t1C.height = t2C.height = H2; }
+  t1.globalCompositeOperation = 'source-over'; t1.clearRect(0, 0, W2, H2); t1.drawImage(TITLE.black, 0, 0);
+  t1.globalCompositeOperation = 'destination-out'; t1.drawImage(maskC, 0, 0, W2, H2);                  // preto só fora da parte escura
+  t2.globalCompositeOperation = 'source-over'; t2.clearRect(0, 0, W2, H2); t2.drawImage(TITLE.white, 0, 0);
+  t2.globalCompositeOperation = 'destination-in'; t2.drawImage(maskC, 0, 0, W2, H2);                   // branco só dentro dela
+  tctx.drawImage(t1C, Math.round(bx * dpr), Math.round(by * dpr));
+  tctx.drawImage(t2C, Math.round(bx * dpr), Math.round(by * dpr));
+}
+
 let TITLE_H = 0, TITLE_PAD = 16;
 function fitTitle(){
   const wide = window.innerWidth >= 900, lines = wide ? ['Circuito de Ateliês', 'do Centro'] : ['Circuito de', 'Ateliês do', 'Centro'];
@@ -538,6 +607,7 @@ function fitTitle(){
   const fit = 100 * (window.innerWidth - pad * 2) / w, cap = heroEl.clientHeight * (wide ? .26 : .17);
   titleEl.style.fontSize = Math.min(fit, cap) + 'px';
   TITLE_H = titleEl.offsetHeight; TITLE_PAD = pad;
+  renderTitleSprites();
 }
 let scrollQueued = false, TRACK = 0, lastFilter = '';
 function measureTrack(){ TRACK = spacerEl.offsetHeight; }
@@ -549,16 +619,17 @@ function onScroll(){
     const y = window.scrollY, vh = window.innerHeight;
     const p = REDUCED ? 1 : clamp01(y / (vh * 1.17)), e = easeIO(p);
     ledeEl.style.transform = `translate3d(0, ${((1 - e) * vh).toFixed(1)}px, 0)`;
-    // o título começa alinhado pela base do hero e sobe até o topo junto com o texto
-    const travel = Math.max(0, vh - TITLE_PAD * 1.9 - TITLE_H);
-    titleEl.style.transform = `translate3d(0, ${(-e * travel).toFixed(1)}px, 0)`;
     ledeEl.style.opacity = REDUCED ? 1 : clamp01(p * 5).toFixed(2);
     const f = `blur(${Math.round(e * (COARSE ? 12 : 20))}px)`;
     if (f !== lastFilter){ hc.style.filter = f; lastFilter = f; }
     veilEl.style.opacity = (e * .35).toFixed(3);
-    const q = clamp01((y - (TRACK - vh)) / vh);
-    contentEl.style.transform = REDUCED ? '' : `translate3d(0, ${(-q * vh * .35).toFixed(1)}px, 0)`;
+    const travel = Math.max(0, vh - TITLE_PAD * 1.9 - TITLE_H);
+    const q = clamp01((y - (TRACK - vh)) / vh), shift = REDUCED ? 0 : -q * vh * .35;
+    contentEl.style.transform = REDUCED ? '' : `translate3d(0, ${shift.toFixed(1)}px, 0)`;
+    // o título começa alinhado pela base do hero e sobe até o topo junto com o texto (desenhado no canvas)
+    hero.e = e; hero.titleTop = (vh - TITLE_PAD - TITLE_H) - e * travel + shift;
     hero.covered = y > TRACK;
+    heroDrawTitle();
   });
 }
 window.addEventListener('scroll', onScroll, { passive:true });
