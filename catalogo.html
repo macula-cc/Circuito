@@ -15,7 +15,6 @@
     --ink:#111; --paper:#fff; --gray:#d8d8d6; --mid:#6b6b6b; --green:#39FF14;
     --pad:clamp(12px, 2.2vw, 32px);
     --body:clamp(1.06rem, .86rem + 1.05vw, 1.95rem);
-    --bio:clamp(1.02rem, .9rem + .6vw, 1.5rem);
     --hero-h:clamp(250px, 46vh, 560px);
     --thumb-w:clamp(56px, 9vw, 150px);
     --thumb-h:calc(var(--thumb-w) * .72);
@@ -86,20 +85,20 @@
   .a-name span{ display:block; transform:translateY(160%); }
   .a-hero.has-photo .a-name{ color:#fff; }
   .artist.revealed .a-name span{ transform:none; transition:transform 1s var(--ease); }
-  .a-close{ position:absolute; top:var(--pad); right:var(--pad); z-index:3; width:clamp(32px, 3.2vw, 46px); aspect-ratio:1; border-radius:50%;
-            border:0; background:var(--gray); cursor:pointer; display:grid; place-items:center; transition:transform .4s var(--ease), background .2s; }
-  .a-close::before, .a-close::after{ content:''; position:absolute; width:38%; height:1.5px; background:var(--ink); border-radius:2px; }
-  .a-close::before{ transform:rotate(45deg); } .a-close::after{ transform:rotate(-45deg); }
-  .a-close:hover{ transform:scale(1.12); background:#fff; }
+  .a-close{ position:absolute; top:var(--pad); right:var(--pad); z-index:3; cursor:pointer; font-family:var(--sans); font-weight:400; font-size:.79rem;
+            color:var(--ink); padding:.55rem .9rem; min-height:38px; border-radius:999px;
+            background:rgba(200,200,200,.55); backdrop-filter:blur(18px) saturate(180%); -webkit-backdrop-filter:blur(18px) saturate(180%);
+            border:1px solid rgba(255,255,255,.4); box-shadow:0 3px 12px rgba(0,0,0,.22); transition:background .2s ease; }
+  .a-close:hover{ background:rgba(255,255,255,.45); }
   .a-meta{ padding:var(--pad) var(--pad) calc(var(--pad) * 4); }
   .a-meta > *{ opacity:0; transform:translateY(18px); }
   .artist.revealed .a-meta > *{ opacity:1; transform:none; transition:opacity .8s var(--ease), transform .8s var(--ease); }
   .artist.revealed .a-meta > :nth-child(2){ transition-delay:.12s; }
-  .a-igs{ display:flex; flex-wrap:wrap; gap:0 .5em; font-size:var(--body); }
-  .a-igs .lbl{ color:var(--mid); margin-right:.1em; }
+  .a-igs{ display:flex; flex-wrap:wrap; gap:0 .5em; margin-top:.3em; font-size:var(--body); }
+  .a-igs .lbl{ margin-right:.1em; }
   .a-igs .ig{ font-size:inherit; }
   .a-igs a{ text-decoration:underline; text-underline-offset:4px; text-decoration-thickness:1px; }
-  .a-bio{ margin:calc(var(--pad) * 1.3) 0 0; font-size:var(--bio); line-height:1.28; max-width:46em; }
+  .a-bio{ margin:0; font-size:var(--body); line-height:1.25; max-width:40em; }
   .a-bio p{ margin:0 0 1em; }
   .a-bio.empty{ color:var(--mid); }
   .morph{ position:fixed; z-index:60; background:var(--green) center / cover no-repeat; pointer-events:none; }
@@ -142,12 +141,12 @@
 <section class="artist" id="artist" tabindex="-1" aria-label="Artista" aria-hidden="true">
   <div class="a-hero" id="aHero">
     <div class="a-photo" id="aPhoto"></div>
-    <button class="a-close" id="aClose" aria-label="Fechar"></button>
+    <button class="a-close" id="aClose" aria-label="Fechar">Fechar</button>
     <h1 class="a-name" id="aName"><span></span></h1>
   </div>
   <div class="a-meta">
-    <div class="a-igs" id="aIgs"></div>
     <div class="a-bio" id="aBio"></div>
+    <div class="a-igs" id="aIgs"></div>
   </div>
 </section>
 
