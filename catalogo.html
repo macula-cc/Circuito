@@ -34,7 +34,7 @@
   .hero{ position:fixed; inset:0; overflow:hidden; background:var(--gray); z-index:0; }
   /* 100lvh = altura máxima da tela (barra do navegador recolhida): o canvas nunca precisa ser refeito quando a barra aparece/some */
   #heroCanvas{ position:absolute; left:0; top:0; width:100%; height:100vh; height:100lvh; display:block; will-change:filter; }
-  #titleCanvas{ position:absolute; left:0; top:0; width:100%; height:100vh; height:100lvh; display:block; pointer-events:none; }
+  #titleCanvas{ position:absolute; left:0; top:0; display:block; pointer-events:none; will-change:transform; }
   .veil{ position:absolute; inset:0; background:#e6e6e4; opacity:0; pointer-events:none; }
   .hero-content{ position:absolute; inset:0; will-change:transform; }
   /* o título visível é desenhado no #titleCanvas (pra poder virar negativo sobre a cobrona); este h1 só mantém o texto e a medida */
@@ -105,12 +105,12 @@
   .switcher button.active{ color:#fff; }
   .switcher button.active::before{ opacity:1; }
   .switcher button:not(.active):hover{ background:rgba(255,255,255,.35); }
-  .list-panel{ position:fixed; inset:0; z-index:700; background:var(--paper); overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
-               padding-top:calc(var(--pad) * 1.2 + env(safe-area-inset-top));
-               transform:translateY(100%); visibility:hidden; transition:transform .55s cubic-bezier(.16,1,.3,1), visibility 0s .55s; }
-  .list-panel.open{ transform:none; visibility:visible; transition-delay:0s; }
-  .list-panel .list{ padding-bottom:calc(6.5rem + env(safe-area-inset-bottom)); } /* o toggle fixo não cobre os últimos da lista */
-  body.list-open{ overflow:hidden; }
+  /* a lista ocupa o lugar do mapa (mesma posição, no fluxo): quem rola pra baixo chega no rodapé, pra cima volta ao texto */
+  .list-section{ display:none; position:relative; min-height:100vh; background:var(--paper); isolation:isolate;
+                 padding-top:calc(var(--pad) * 1.2 + env(safe-area-inset-top)); box-shadow:0 -40px 80px -30px rgba(0,0,0,.22); }
+  .list-section .list{ padding-bottom:calc(var(--pad) * 2); }
+  body.list-open .list-section{ display:block; }
+  body.list-open .map-section{ display:none; }
   .artists .foot{ background:var(--paper); position:relative; }
 
   /* ---------- lista ---------- */
@@ -202,6 +202,10 @@
 
 <div class="artists" id="artists">
 <section class="map-section" id="mapSection" aria-label="Mapa dos ateliês"><div id="map"></div></section>
+<section class="list-section" id="listSection" aria-label="Lista de artistas">
+  <h2 class="big" id="big"><span>Artistas</span></h2>
+  <ul class="list" id="list"></ul>
+</section>
 <footer class="foot" id="pageFoot">
   <div><p>Instagram:<br><a href="https://instagram.com/circuito.de.atelies.do.centro" target="_blank" rel="noopener">@circuito.de.atelies.do.centro</a></p></div>
   <div><p>Idealização e Produção Executiva:<br>Fernanda Sattamini<br><a href="https://instagram.com/fernandasattamini" target="_blank" rel="noopener">@fernandasattamini</a></p></div>
@@ -216,13 +220,6 @@
 <div class="switcher" id="switcher" role="group" aria-label="Mapa ou lista de artistas">
   <button id="swMap" class="active" aria-pressed="true">Mapa</button>
   <button id="swList" aria-pressed="false">Lista</button>
-</div>
-
-<div class="list-panel" id="listPanel" aria-hidden="true">
-<main>
-  <h2 class="big" id="big"><span>Artistas</span></h2>
-  <ul class="list" id="list"></ul>
-</main>
 </div>
 
 <div class="overlay" id="overlay"></div>
@@ -505,7 +502,7 @@ function heroResize(){
   hero.W = Math.max(1, hc.clientWidth); hero.H = Math.max(1, hc.clientHeight);
   hero.dpr = COARSE ? 1 : Math.min(2, window.devicePixelRatio || 1);
   hc.width = hero.W * hero.dpr; hc.height = hero.H * hero.dpr;
-  tc.width = hc.width; tc.height = hc.height;
+  hero.tdpr = Math.min(3, window.devicePixelRatio || 1);
   bake.width = hc.width; bake.height = hc.height;
   heroNewCycle();
 }
@@ -561,7 +558,7 @@ function heroLoop(ts){
   requestAnimationFrame(heroLoop);
   if (hero.covered || document.hidden || document.body.classList.contains('artist-open')){ hero.last = null; return; }
   if (hero.last == null) hero.last = ts;
-  if (COARSE && ts - hero.last < 30) return;
+  if (COARSE && ts - hero.last < (hero.e > .5 ? 60 : 30)) return; // celular: com blur forte a cobrona nem precisa de tanto quadro
   hero.t += Math.min(.1, (ts - hero.last) / 1000); hero.last = ts;
   if (hero.t >= hero.total) heroNewCycle();
   heroRender(hero.t); heroDrawTitle();
@@ -592,11 +589,13 @@ const TITLE = { black:null, white:null, bw:0, bh:0, padTop:4 };
 const maskC = document.createElement('canvas'), mctx = maskC.getContext('2d');
 const t1C = document.createElement('canvas'), t1 = t1C.getContext('2d'), t2C = document.createElement('canvas'), t2 = t2C.getContext('2d');
 function renderTitleSprites(){
-  const fs = parseFloat(titleEl.style.fontSize) || 40, lh = fs * .88, dpr = hero.dpr;
+  const fs = parseFloat(titleEl.style.fontSize) || 40, lh = fs * .88, dpr = hero.tdpr;
   const lines = [...titleEl.children].map(c => c.textContent.toUpperCase());
   // folga em cima proporcional à fonte: o acento do Ê passa bem da altura das maiúsculas
   TITLE.padTop = Math.ceil(fs * .3) + 4;
   TITLE.bw = Math.ceil(titleEl.getBoundingClientRect().width) + 8; TITLE.bh = Math.ceil(TITLE_H) + TITLE.padTop + 4;
+  tc.width = Math.ceil(TITLE.bw * dpr); tc.height = Math.ceil(TITLE.bh * dpr);
+  tc.style.width = TITLE.bw + 'px'; tc.style.height = TITLE.bh + 'px'; TITLE.mode = '';
   for (const [key, color] of [['black', '#111111'], ['white', '#ffffff']]){
     const c = TITLE[key] || (TITLE[key] = document.createElement('canvas'));
     c.width = Math.ceil(TITLE.bw * dpr); c.height = Math.ceil(TITLE.bh * dpr);
@@ -614,12 +613,17 @@ function renderTitleSprites(){
 }
 function heroDrawTitle(){
   if (!TITLE.black) return;
-  const dpr = hero.dpr;
-  tctx.setTransform(1, 0, 0, 1, 0, 0); tctx.clearRect(0, 0, tc.width, tc.height);
+  const dpr = hero.tdpr;
   const bx = TITLE_PAD - 4, by = hero.titleTop - TITLE.padTop, bw = TITLE.bw, bh = TITLE.bh;
+  // o canvas só tem o tamanho do título e anda por transform (sem redesenhar a cada rolagem)
+  tc.style.transform = `translate3d(${bx}px, ${by.toFixed(2)}px, 0)`;
   if (by > window.innerHeight || by + bh < 0) return;
-  // com blur (qualquer rolagem), sem negativo: só o título preto
-  if (Math.round(hero.e * (COARSE ? 12 : 20)) > 0){ tctx.drawImage(TITLE.black, Math.round(bx * dpr), Math.round(by * dpr)); return; }
+  // com blur (qualquer rolagem), sem negativo: só o título preto, desenhado uma vez
+  if (Math.round(hero.e * (COARSE ? 12 : 20)) > 0){
+    if (TITLE.mode !== 'black'){ tctx.setTransform(1, 0, 0, 1, 0, 0); tctx.clearRect(0, 0, tc.width, tc.height); tctx.drawImage(TITLE.black, 0, 0); TITLE.mode = 'black'; }
+    return;
+  }
+  TITLE.mode = 'neg';
   // máscara das partes escuras da cobrona (nítida, na resolução da tela)
   const rm = dpr, mw = Math.max(1, Math.ceil(bw * rm)), mh = Math.max(1, Math.ceil(bh * rm));
   if (maskC.width !== mw || maskC.height !== mh){ maskC.width = mw; maskC.height = mh; }
@@ -642,8 +646,9 @@ function heroDrawTitle(){
   t1.globalCompositeOperation = 'destination-out'; t1.drawImage(maskC, 0, 0, W2, H2);                  // preto só fora da parte escura
   t2.globalCompositeOperation = 'source-over'; t2.clearRect(0, 0, W2, H2); t2.drawImage(TITLE.white, 0, 0);
   t2.globalCompositeOperation = 'destination-in'; t2.drawImage(maskC, 0, 0, W2, H2);                   // branco só dentro dela
-  tctx.drawImage(t1C, Math.round(bx * dpr), Math.round(by * dpr));
-  tctx.drawImage(t2C, Math.round(bx * dpr), Math.round(by * dpr));
+  tctx.setTransform(1, 0, 0, 1, 0, 0); tctx.clearRect(0, 0, tc.width, tc.height);
+  tctx.drawImage(t1C, 0, 0);
+  tctx.drawImage(t2C, 0, 0);
 }
 
 let TITLE_H = 0, TITLE_PAD = 16;
@@ -678,34 +683,41 @@ function onScroll(){
     // o título começa alinhado pela base do hero e sobe até o topo junto com o texto (desenhado no canvas)
     hero.e = e; hero.titleTop = (vh - TITLE_PAD - TITLE_H) - e * travel + shift;
     hero.covered = y > TRACK;
-    switcherEl.classList.toggle('show', listOpen || (y > TRACK - vh * .5 && y < TRACK + 40));
+    const secEnd = TRACK + (listOpen ? listSectionEl.offsetHeight - vh : 40);
+    switcherEl.classList.toggle('show', y > TRACK - vh * .5 && y < secEnd);
     heroDrawTitle();
   });
 }
 window.addEventListener('scroll', onScroll, { passive:true });
 
-/* snap do mapa: ao parar de rolar com o mapa entrando em foco, ele encosta na margem superior */
-let snapTimer, snapping = false, touching = false, snapLastY = window.scrollY, snapDir = 0;
-function snapMap(){
-  if (snapping || touching || listOpen || document.body.classList.contains('artist-open') || !TRACK) return;
-  const y = window.scrollY, vh = window.innerHeight, d = TRACK - y;
-  const entering = snapDir > 0 && d > 2 && d < vh * .6;   // descendo, mapa ainda subindo
-  const returning = snapDir < 0 && d < -2 && d > -vh * .4; // voltando do rodapé
-  if (!entering && !returning) return;
+/* snap da seção Artistas (mapa ou lista): assim que ela entra em foco, encosta na margem superior */
+let snapRaf = 0, snapping = false, touching = false, snapLastY = window.scrollY, snapDir = 0;
+function snapTo(target){
+  const y0 = window.scrollY, dist = target - y0, t0 = performance.now(), dur = REDUCED ? 0 : Math.min(420, 220 + Math.abs(dist) * .22);
   snapping = true;
-  window.scrollTo({ top:TRACK, behavior: REDUCED ? 'auto' : 'smooth' });
-  setTimeout(() => { snapping = false; }, REDUCED ? 50 : 900);
+  const step = now => {
+    const k = dur ? Math.min(1, (now - t0) / dur) : 1;
+    window.scrollTo(0, y0 + dist * (1 - Math.pow(1 - k, 3)));
+    if (k < 1){ snapRaf = requestAnimationFrame(step); return; }
+    snapRaf = 0; snapping = false; snapLastY = window.scrollY;
+  };
+  snapRaf = requestAnimationFrame(step);
 }
-function armSnap(){ clearTimeout(snapTimer); snapTimer = setTimeout(snapMap, 140); }
+function cancelSnap(){ if (snapRaf){ cancelAnimationFrame(snapRaf); snapRaf = 0; } snapping = false; }
+function checkSnap(){
+  if (snapping || touching || document.body.classList.contains('artist-open') || !TRACK) return;
+  const y = window.scrollY, vh = window.innerHeight, d = TRACK - y;
+  const entering = snapDir > 0 && d > 2 && d < vh * .75;                       // descendo, seção ainda subindo
+  const returning = !listOpen && snapDir < 0 && d < -2 && d > -vh * .4;       // voltando do rodapé ao mapa
+  if (entering || returning) snapTo(TRACK);
+}
 window.addEventListener('scroll', () => {
   const y = window.scrollY;
-  if (!snapping){ if (y !== snapLastY) snapDir = y > snapLastY ? 1 : -1; armSnap(); }
-  snapLastY = y;
+  if (!snapping){ if (y !== snapLastY) snapDir = y > snapLastY ? 1 : -1; snapLastY = y; checkSnap(); }
 }, { passive:true });
-window.addEventListener('touchstart', () => { touching = true; snapping = false; clearTimeout(snapTimer); }, { passive:true });
-window.addEventListener('touchend', () => { touching = false; armSnap(); }, { passive:true });
-window.addEventListener('touchcancel', () => { touching = false; armSnap(); }, { passive:true });
-window.addEventListener('wheel', () => { snapping = false; }, { passive:true });
+window.addEventListener('touchstart', () => { touching = true; cancelSnap(); }, { passive:true });
+window.addEventListener('touchend', () => { touching = false; checkSnap(); }, { passive:true });
+window.addEventListener('touchcancel', () => { touching = false; }, { passive:true });
 let lastW = window.innerWidth, lastH = window.innerHeight, resizeTimer;
 window.addEventListener('resize', () => {
   const w = window.innerWidth, h = window.innerHeight;
@@ -717,13 +729,14 @@ window.addEventListener('resize', () => {
 /* ============================================================
    lista
    ============================================================ */
-const listEl = $('#list'), bigEl = $('#big'), listPanelEl = $('#listPanel');
+const listEl = $('#list'), bigEl = $('#big'), listSectionEl = $('#listSection');
 let ARTISTS = [], BY_SLUG = new Map(), ROWS = new Map();
 
 function fitBig(){
   const s = bigEl.firstElementChild, pad = parseFloat(getComputedStyle(bigEl).paddingLeft) || 0;
   bigEl.style.fontSize = '100px';
   const w = s.getBoundingClientRect().width;
+  if (!w) return; // lista escondida (modo mapa): mede de novo ao abrir
   bigEl.style.fontSize = (100 * (document.documentElement.clientWidth - pad * 2) / w) + 'px';
 }
 function prefetchMid(a, row){
@@ -748,10 +761,10 @@ function renderList(){
       e.target.querySelector('.thumb i').style.backgroundImage = `url("${img.src}")`;
       e.target.querySelector('.thumb').classList.add('loaded');
     });
-  }), { root:listPanelEl, rootMargin:'600px 0px' });
+  }), { rootMargin:'600px 0px' });
   const reveal = new IntersectionObserver(es => es.forEach(e => {
     if (e.isIntersecting){ e.target.classList.add('in'); reveal.unobserve(e.target); }
-  }), { root:listPanelEl, rootMargin:'0px 0px -4% 0px' });
+  }), { rootMargin:'0px 0px -4% 0px' });
 
   const frag = document.createDocumentFragment();
   ARTISTS.forEach(a => {
@@ -861,7 +874,7 @@ async function closeArtist(){
   // volta pra miniatura de onde veio (drawer ou lista); se o drawer já fechou, cai na linha da lista
   let target = currentOrigin && currentOrigin.isConnected ? currentOrigin : rowThumb;
   if (target && target.closest('.drawer') && !drawerEl.classList.contains('open')) target = rowThumb;
-  if (target && target.closest('.list-panel') && !listOpen) target = null; // lista fechada (ex.: link direto): só some com fade
+  if (target && target.closest('.list-section') && !listOpen) target = null; // lista fechada (ex.: link direto): só some com fade
   currentOrigin = null;
   const done = () => {
     artistEl.getAnimations().forEach(x => x.cancel());
@@ -1175,7 +1188,7 @@ $('#drawerClose').addEventListener('click', closeDrawer);
 overlayEl.addEventListener('click', closeDrawer);
 
 /* ============================================================
-   toggle Mapa | Lista — a lista (só de artistas) vem por cima do mapa
+   toggle Mapa | Lista — a lista (só de artistas) ocupa o lugar do mapa
    ============================================================ */
 const switcherEl = $('#switcher'), swMap = $('#swMap'), swList = $('#swList');
 let listOpen = false;
@@ -1183,11 +1196,12 @@ function setListOpen(open){
   if (open === listOpen) return;
   listOpen = open;
   if (open) closeDrawer();
-  listPanelEl.classList.toggle('open', open); listPanelEl.setAttribute('aria-hidden', String(!open));
+  if (!open && window.scrollY > TRACK) window.scrollTo(0, TRACK); // a lista é mais alta que o mapa: volta pro topo da seção
   document.body.classList.toggle('list-open', open);
   swMap.classList.toggle('active', !open); swList.classList.toggle('active', open);
   swMap.setAttribute('aria-pressed', String(!open)); swList.setAttribute('aria-pressed', String(open));
-  if (open){ listPanelEl.scrollTop = 0; fitBig(); }
+  if (open) fitBig();
+  else if (map){ map.resize(); frameMap(); syncMarkers(); }
   onScroll();
 }
 swMap.addEventListener('click', () => setListOpen(false));
