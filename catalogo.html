@@ -704,20 +704,31 @@ function snapTo(target){
   snapRaf = requestAnimationFrame(step);
 }
 function cancelSnap(){ if (snapRaf){ cancelAnimationFrame(snapRaf); snapRaf = 0; } snapping = false; }
+function snapBlocked(){ return snapping || touching || document.body.classList.contains('artist-open') || !TRACK; }
+/* na hora: descendo, a seção ainda subindo e já com 25% na tela — puxa */
 function checkSnap(){
-  if (snapping || touching || document.body.classList.contains('artist-open') || !TRACK) return;
-  const y = window.scrollY, vh = window.innerHeight, d = TRACK - y;
-  const entering = snapDir > 0 && d > 2 && d < vh * .75;                       // descendo, seção ainda subindo
-  const returning = !listOpen && snapDir < 0 && d < -2 && d > -vh * .4;       // voltando do rodapé ao mapa
-  if (entering || returning) snapTo(TRACK);
+  if (snapBlocked()) return;
+  const d = TRACK - window.scrollY;
+  if (snapDir > 0 && d > 2 && d < window.innerHeight * .75) snapTo(TRACK);
 }
+/* em repouso: a seção "gruda". Se parou perto dela (ela ocupa ~75%+ da tela), volta; pra soltar, é preciso rolar mais que isso */
+function restSnap(){
+  if (snapBlocked()) return;
+  const vh = window.innerHeight, d = TRACK - window.scrollY, hold = vh * .25;
+  const above = d > 2 && (d < hold || (snapDir > 0 && d < vh * .75));                  // mapa/lista ainda abaixo do topo
+  const below = !listOpen && d < -2 && d > -(snapDir < 0 ? vh * .5 : hold);            // passou um pouco (só o mapa; a lista é pra ler)
+  if (above || below) snapTo(TRACK);
+}
+let restTimer = 0;
+const armRest = () => { clearTimeout(restTimer); restTimer = setTimeout(restSnap, 200); };
 window.addEventListener('scroll', () => {
   const y = window.scrollY;
   if (!snapping){ if (y !== snapLastY) snapDir = y > snapLastY ? 1 : -1; snapLastY = y; checkSnap(); }
+  armRest();
 }, { passive:true });
-window.addEventListener('touchstart', () => { touching = true; cancelSnap(); }, { passive:true });
-window.addEventListener('touchend', () => { touching = false; checkSnap(); }, { passive:true });
-window.addEventListener('touchcancel', () => { touching = false; }, { passive:true });
+window.addEventListener('touchstart', () => { touching = true; cancelSnap(); clearTimeout(restTimer); }, { passive:true });
+window.addEventListener('touchend', () => { touching = false; checkSnap(); armRest(); }, { passive:true });
+window.addEventListener('touchcancel', () => { touching = false; armRest(); }, { passive:true });
 let lastW = window.innerWidth, lastH = window.innerHeight, resizeTimer;
 window.addEventListener('resize', () => {
   const w = window.innerWidth, h = window.innerHeight;
