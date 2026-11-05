@@ -390,30 +390,13 @@
                  cursor:pointer; text-decoration:none; transition:opacity 0.15s ease; }
   .artist-photo:hover{ opacity:0.85; }
 
-  /* fixed min-height reserved for the whole text block, so cards line up
-     whether or not the 'sala' line exists — the room element is fully
-     removed from the DOM when empty rather than leaving a blank line. */
-  .artist-body{ display:flex; flex-direction:column; min-height:6.1rem; min-width:0; }
+  .artist-body{ display:flex; flex-direction:column; min-width:0; }
 
   a.artist-name{ display:block; color:inherit; text-decoration:none; }
   .artist-name{ font-family:var(--sans-display); font-weight:450; font-size:0.9rem; margin:0.55rem 0 0.1rem; line-height:1.2; overflow-wrap:break-word; }
   .artist-meta{ font-family:var(--sans-display); font-size:0.83rem; line-height:1.4; color:var(--gray); margin-bottom:0.3rem; display:flex; flex-wrap:wrap; gap:0.4rem; align-items:center; min-width:0; overflow-wrap:break-word; }
   .artist-meta a{ color:var(--ink); text-decoration:underline; text-underline-offset:2px; }
   .artist-meta a:hover{ opacity:0.6; }
-  .artist-room{ font-family:var(--sans-display); font-size:0.75rem; color:var(--gray); margin-top:0.3rem; }
-  .artist-room .artist-obs{ border:1px solid var(--line); padding:0.05rem 0.3rem; }
-  .day-badges{ display:flex; gap:0.35rem; margin-top:0.45rem; flex-wrap:wrap; }
-  /* mesmo estilo/técnica dos pins (ver .pin::before): núcleo sólido menor
-     (inset:1px) desfocado, dando uma borda esfumada em vez de borda dura
-     — verde quando presente, preto quando não, mesmas cores/contraste. */
-  .day-pill{ font-family:var(--sans-display); font-size:0.68rem; font-weight:500;
-             padding:0.15rem 0.45rem; border-radius:3px; position:relative; }
-  .day-pill::before{ content:''; position:absolute; inset:1px; border-radius:2px;
-                      filter:blur(2px); z-index:-1; }
-  .day-pill.present::before{ background:#39FF14; }
-  .day-pill.present{ color:#173318; }
-  .day-pill.absent::before{ background:#171717; }
-  .day-pill.absent{ color:#fff; }
   .photo-note{ font-family:var(--sans-display); font-size:0.75rem; color:var(--gray); font-style:italic; margin-top:0.9rem; grid-column:1 / -1; }
 
   .map-error{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -699,6 +682,16 @@ function setupMarquee(){
   track.innerHTML = '';
   track.appendChild(seg1);
   track.appendChild(seg2);
+  setMarqueeSpeed();
+}
+// velocidade constante em px/s (proporcional ao tamanho da fonte): a duração fixa de 180s
+// deixava o marquee mais lento a cada item que saía do grupo, porque o segmento ficava mais curto
+function setMarqueeSpeed(){
+  const track = document.getElementById('marquee-track');
+  const seg = track && track.firstElementChild, item = seg && seg.querySelector('.marquee-item');
+  if (!item) return;
+  const fs = parseFloat(getComputedStyle(item).fontSize) || 28;
+  track.style.animationDuration = Math.max(20, seg.offsetWidth / (fs * 1.6)) + 's';
 }
 setupMarquee();
 
@@ -709,7 +702,7 @@ setupMarquee();
 Promise.race([
   document.fonts ? document.fonts.ready : Promise.resolve(),
   new Promise(r => setTimeout(r, 1500))
-]).then(() => document.documentElement.classList.add('fonts-ready'));
+]).then(() => { setMarqueeSpeed(); document.documentElement.classList.add('fonts-ready'); });
 
 /* ============================================================
    DATA SOURCE
@@ -1449,6 +1442,7 @@ function startHeroSnake(){
   heroSnakeCtx = heroSnakeCanvas.getContext('2d');
   resizeHeroSnakeCanvas();
   window.addEventListener('resize', resizeHeroSnakeCanvas);
+  window.addEventListener('resize', setMarqueeSpeed);
   startHeroSnakeCycle();
   heroSnakeActive = true;
   if (!heroSnakeRafId) heroSnakeRafId = requestAnimationFrame(heroSnakeLoop);
@@ -1779,34 +1773,6 @@ function openDrawer(locId){
 
     body.appendChild(name);
     body.appendChild(meta);
-
-    // sala/ateliê: only added to the DOM when it actually exists (no blank line otherwise)
-    if (art.obs){
-      const room = document.createElement('div');
-      room.className = 'artist-room';
-      const tag = document.createElement('span');
-      tag.className = 'artist-obs';
-      tag.textContent = art.obs;
-      room.appendChild(tag);
-      body.appendChild(room);
-    }
-
-    // dias de presença: always shown once informed
-    const badges = document.createElement('div');
-    badges.className = 'day-badges';
-    if (art.dia18 != null){
-      const b = document.createElement('span');
-      b.className = 'day-pill ' + (art.dia18 ? 'present' : 'absent');
-      b.textContent = '18/09';
-      badges.appendChild(b);
-    }
-    if (art.dia19 != null){
-      const b = document.createElement('span');
-      b.className = 'day-pill ' + (art.dia19 ? 'present' : 'absent');
-      b.textContent = '19/09';
-      badges.appendChild(b);
-    }
-    body.appendChild(badges);
 
     card.appendChild(photo);
     card.appendChild(body);
