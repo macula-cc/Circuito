@@ -3,8 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!-- versão em teste: tirar o noindex quando este arquivo virar o index.html -->
+<meta name="robots" content="noindex">
 <meta name="format-detection" content="telephone=no, address=no, email=no, date=no">
 <title>Circuito de Ateliês do Centro</title>
+
+<!-- Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-B98G04GM9E"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-B98G04GM9E');
+</script>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,6 +32,18 @@
     --gray: #6b6b6b;
     --hover: #f0f0f0;
     --paper:#fff;
+    /* variáveis da lista e da página do artista (vindas do catálogo) */
+    --mid:#6b6b6b; --ph:#d8d8d6; --green:#39FF14;
+    --pad:clamp(12px, 2.2vw, 32px);
+    --body:clamp(1.06rem, .86rem + 1.05vw, 1.95rem);
+    --thumb-w:clamp(56px, 9vw, 150px);
+    --thumb-h:calc(var(--thumb-w) * .72);
+    --ease:cubic-bezier(.22,.8,.2,1);
+    /* fundo do mapa: claro de dia, escuro a partir das 18h (horário do
+       Rio) — ver script no <head>, que sobrescreve isso cedo, antes do
+       body pintar. Só afeta o mapa; o resto do site (lista, sobre) nunca
+       muda de cor. */
+    --map-bg:#C8C8CA;
   }
   *{ box-sizing:border-box; }
   html, body{ height:100%; overflow:hidden; }
@@ -31,7 +54,7 @@
      cima do nosso CSS mesmo com format-detection setado */
   a[x-apple-data-detectors]{ color:inherit !important; text-decoration:inherit !important; }
   button{ font:inherit; touch-action:manipulation; }
-  .row, .drawer-close, .switcher button, .sort-switch button{ -webkit-tap-highlight-color:transparent; }
+  .row, .row-link, .drawer-close, .switcher button, .artist a, .artist button{ -webkit-tap-highlight-color:transparent; }
 
   /* ---------------- Hero: full-bleed map (always mounted) ---------------- */
   /* isolation:isolate contém o mix-blend-mode:multiply do .map-dim (TESTE)
@@ -43,15 +66,16 @@
      uma cortina revelando a página preta que já está por baixo o tempo
      todo (ver .about-page), em vez de um overlay que aparece por cima */
   .hero.lifted{ transform:translateY(-100%); }
-  #map{ position:absolute; inset:0; width:100%; height:100%; background:#e9e9e9; z-index:1; isolation:isolate; }
+  #map{ position:absolute; inset:0; width:100%; height:100%; background:var(--map-bg); z-index:1; isolation:isolate; }
   /* MapLibre é vetorial — não tem mais tile-pane pra filtrar via CSS; as
      cores de água/terra são definidas direto no estilo (ver applyMonochromeStyle,
      JS), camada por camada, em vez de um filtro aproximado por cima do raster */
-  .maplibregl-map{ background:#e9e9e9; font-family:var(--sans); }
+  .maplibregl-map{ background:var(--map-bg); font-family:var(--sans); }
 
-  /* TESTE: mesmo cinza do "poster" (index-teste2), levemente transparente
-     (10%) — dá pra ver o mapa de leve por baixo (ruas, quarteirões, pontos)
-     em vez de esconder tudo. Sem blur: o mapa aparece nítido, só suave.
+  /* cinza bem claro, levemente transparente (10%) — dá pra ver o mapa de
+     leve por baixo (ruas, quarteirões, pontos) em vez de esconder tudo.
+     Sem blur: o mapa aparece nítido, só suave. Não é branco puro — mesmo
+     tom do fundo inicial do .event-marquee, pra combinar as duas faixas.
      Some no primeiro toque, junto com a marca. */
   .map-dim{ position:absolute; inset:0; z-index:150; background:rgba(216,216,214,0.90);
             pointer-events:none; transition:opacity 0.6s ease; }
@@ -76,27 +100,44 @@
 
   /* ---------------- Marquee do evento (topo) ----------------
      faixa full-bleed no topo com o nome/data/edição se repetindo em
-     scroll horizontal contínuo — substitui as pílulas testadas antes.
-     Fundo em degradê preto->cinza bem claro (nunca chega no branco puro,
-     senão o texto branco sumiria de vez na ponta clara) FIXO na faixa
-     (não anda junto com o texto). Texto sempre branco sólido, sem
-     mix-blend-mode nem mask-image — as duas técnicas testadas antes pra
-     inverter a cor automaticamente deixavam o texto com aliasing pior
-     (percebido como "pixelado", sobretudo em telas retina); cor sólida
-     lisa garante a mesma qualidade de renderização do resto do site.
-     TESTE: antes da 1ª interação, fundo cinza chapado (mesmo tom do
-     .map-dim, sem transparência) com texto preto, combinando com o overlay
-     por baixo da marca; depois que a marca some (shrinkHero), volta pro
-     degradê preto->cinza com texto branco de sempre (.interacted). */
+     scroll horizontal contínuo — substitui o hero-title grande centralizado
+     usado antes. Fundo em degradê preto->cinza bem claro (nunca chega no
+     branco puro na PONTA CLARA DO DEGRADÊ, senão o texto branco sumiria
+     de vez ali) FIXO na faixa (não anda junto com o texto). Texto branco
+     sólido nesse estado (fora dos dias do evento), sem mix-blend-mode nem
+     mask-image — as duas técnicas testadas pra inverter a cor
+     automaticamente deixavam o texto com aliasing pior (percebido como
+     "pixelado", sobretudo em telas retina); cor sólida lisa garante a
+     mesma qualidade de renderização do resto do site.
+     Antes da 1ª interação, fundo cinza chapado (mesmo tom do .map-dim, sem
+     transparência) com texto preto, sempre — nos dias do evento ou não.
+     Só depois que a marca some (shrinkHero) e vira o degradê (.interacted)
+     é que muda: nos dias do evento a ponta escura vira verde-limão (mesmo
+     tom dos pins/cobrinha) em vez de preto — e o texto continua PRETO
+     também (não branco, que sumiria em cima do verde); fora do evento
+     continua o degradê preto->cinza de sempre, com texto branco de sempre
+     (branco não sumiria ali, é só o verde que exigia trocar o texto). */
   .event-marquee{ position:absolute; top:0; left:0; right:0; z-index:220;
                    padding:6px 0; overflow:hidden; isolation:isolate;
                    background:#d8d8d6; }
   .event-marquee.interacted{ background:linear-gradient(to right, #050505, #d8d8d6); }
+  html.evento-hoje .event-marquee.interacted{ background:linear-gradient(to right, #39FF14, #d8d8d6); }
   .marquee-layer{ display:flex; align-items:center; overflow:hidden; }
+  /* animation-play-state:paused até as fontes (Inter/Instrument Serif,
+     carregadas via <link> no <head>, font-display:swap) terminarem de
+     carregar de verdade — ver "fonts-ready" no JS. Sem isso, a rolagem
+     começa medindo a largura com a fonte de fallback do sistema; quando a
+     webfont troca no meio da animação, width:max-content reflui e muda a
+     largura do segmento em ~20% (medido), o que desloca o ponto onde
+     translateX(-50%) fecha o loop — trava/corta o texto visivelmente.
+     Mais comum no celular por causa de rede mais lenta/variável. */
   .marquee-track{ display:flex; align-items:baseline; width:max-content;
                    white-space:nowrap; color:#111111; transition:color 0.6s ease;
-                   animation:marquee-scroll 180s linear infinite; }
+                   animation:marquee-scroll 180s linear infinite;
+                   animation-play-state:paused; }
+  html.fonts-ready .marquee-track{ animation-play-state:running; }
   .event-marquee.interacted .marquee-track{ color:#fff; }
+  html.evento-hoje .event-marquee.interacted .marquee-track{ color:#111111; }
   .marquee-seg{ display:flex; align-items:baseline; }
   /* mesma tipografia/peso do resto do site pra rótulo em caixa alta (ver
      .list-title/.about-title): sans 350, letter-spacing -0.025em */
@@ -105,9 +146,6 @@
   .marquee-item.marquee-date{ font-family:var(--serif); font-weight:400; text-transform:none; letter-spacing:0;
                                font-size:2.2rem; }
   .marquee-item.marquee-date em{ font-style:italic; margin-left:0.3em; }
-  /* "Edição 01" em capitulação normal (não uppercase) — mesmo tratamento
-     do .hero-edition original, só sem o selo/pílula */
-  .marquee-item.marquee-edition{ text-transform:none; }
   @keyframes marquee-scroll{ from{ transform:translateX(0); } to{ transform:translateX(-50%); } }
 
   @media (max-width:640px){
@@ -115,9 +153,34 @@
     .marquee-item.marquee-date{ font-size:1.55rem; }
   }
 
+  /* ---------------- Legenda dos pins (aberto/fechado) ----------------
+     mesmo visual "vidro" do .switcher/.about-btn (fundo claro translúcido
+     + blur), pra garantir leitura em cima do mapa claro OU escuro — texto
+     sólido sempre funciona, ao contrário de branco/preto fixo que quebra
+     num dos dois modos. Bolinhas com o mesmo núcleo desfocado dos pins
+     (ver .pin::before), só menores. */
+  .map-legend{ position:absolute; top:66px; left:1rem; z-index:210;
+               display:flex; gap:0.7rem; align-items:center;
+               background:rgba(200,200,200,0.55); backdrop-filter:blur(18px) saturate(180%);
+               -webkit-backdrop-filter:blur(18px) saturate(180%);
+               border:1px solid rgba(255,255,255,0.4); border-radius:999px;
+               padding:0.35rem 0.7rem;
+               font-family:var(--sans-display); font-size:0.72rem; color:#111;
+               box-shadow:0 2px 10px rgba(0,0,0,0.08); }
+  .legend-item{ display:flex; align-items:center; gap:0.32rem; white-space:nowrap; }
+  .legend-dot{ width:10px; height:10px; border-radius:50%; position:relative; flex-shrink:0; }
+  .legend-dot::before{ content:''; position:absolute; inset:1px; border-radius:50%; filter:blur(1px); z-index:-1; }
+  .legend-dot.aberto::before{ background:#39FF14; }
+  .legend-dot.fechado::before{ background:#171717; }
+
+  @media (max-width:640px){
+    .map-legend{ top:52px; gap:0.5rem; padding:0.3rem 0.6rem; font-size:0.64rem; }
+    .legend-item{ gap:0.26rem; }
+    .legend-dot{ width:8px; height:8px; }
+  }
+
   /* ---------------- View switcher (glass pill toggle) + about button ----------------
-     centralizados na parte inferior da tela — o sort-switch (por endereço/
-     por artista) fica numa linha própria acima deles, mesmo esquema */
+     centralizados na parte inferior da tela */
   .top-actions{ position:absolute; bottom:calc(1.6rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:500;
                 display:flex; align-items:center; gap:0.5rem; }
   .switcher{ display:flex; gap:2px; font-family:var(--sans-display); font-weight:400; font-size:0.79rem;
@@ -150,24 +213,6 @@
               transition:background 0.2s ease; }
   .about-btn:hover{ background:rgba(255,255,255,0.35); }
 
-  .sort-switch{ position:absolute; bottom:calc(5rem + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:600;
-                width:max-content;
-                display:flex; gap:2px; font-family:var(--sans-display); font-weight:400; font-size:0.73rem;
-                background:rgba(200,200,200,0.55); backdrop-filter:blur(18px) saturate(180%);
-                -webkit-backdrop-filter:blur(18px) saturate(180%);
-                border:1px solid rgba(255,255,255,0.4); border-radius:999px; padding:3px;
-                box-shadow:0 2px 10px rgba(0,0,0,0.08);
-                opacity:0; pointer-events:none; transition:opacity 0.2s ease; }
-  .sort-switch.visible{ opacity:1; pointer-events:auto; }
-  .sort-switch button{ background:transparent; border:none; cursor:pointer; color:var(--ink);
-                        padding:0.5rem 0.7rem; min-height:38px; border-radius:999px; position:relative;
-                        transition:color 0.2s ease; }
-  .sort-switch button::before{ content:''; position:absolute; inset:2px; border-radius:999px;
-                                background:#171717; filter:blur(2px); z-index:-1;
-                                opacity:0; transition:opacity 0.2s ease; }
-  .sort-switch button.active{ color:#fff; }
-  .sort-switch button.active::before{ opacity:1; }
-  .sort-switch button:not(.active):hover{ background:rgba(255,255,255,0.35); }
 
   /* pins: 40px invisible tap target, badge circle with initials centered inside */
   /* z-index com !important: o MapLibre define um z-index INLINE em cada
@@ -178,24 +223,33 @@
      garante que os pins dos ateliês fiquem sempre acima das estações,
      não importa o zoom/posição. */
   .pin-hit{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2 !important; }
-  /* TESTE: radial-gradient não dá pra ver num disco de 24px — a faixa de
-     transição proporcional ao stop do Figma (71%->100% do raio) vira só
-     ~3.5px reais, indistinguível de uma borda dura. Troca pra um blur de
-     verdade: ::before é um círculo sólido MENOR que o .pin (inset:4px),
-     desfocado com filter:blur — o desfoque espalha a borda dele pra fora
-     até quase a borda do .pin, dando um núcleo sólido com transição
-     realmente esfumada. Número fica no .pin (::before não borra o texto,
-     só o próprio pseudo-elemento). Sem box-shadow no estado de repouso —
-     a sombra confundia com o esfumado; continua só no hover/active. */
-  .pin{ width:29px; height:29px; border-radius:50%; position:relative;
+  /* radial-gradient não dá pra ver num disco de 24px — a faixa de
+     transição proporcional a um stop tipo Figma (ex: 71%->100% do raio)
+     vira só uns pixels reais, indistinguível de uma borda dura. Usa um
+     blur de verdade: ::before é um círculo sólido MENOR que o .pin
+     (inset:2px), desfocado com filter:blur — o desfoque espalha a borda
+     dele pra fora até quase a borda do .pin, dando um núcleo sólido com
+     transição realmente esfumada. Número fica no .pin (::before não
+     borra o texto, só o próprio pseudo-elemento). Sem box-shadow no
+     estado de repouso — a sombra confundia com o esfumado; continua só
+     no hover/active. */
+  .pin{ width:24px; height:24px; border-radius:50%; position:relative;
         display:flex; align-items:center; justify-content:center;
-        font-family:var(--mono); font-size:0.65rem; font-weight:500; color:#fff; letter-spacing:0.01em;
+        font-family:var(--mono); font-size:0.6rem; font-weight:500; letter-spacing:0.01em;
         transition:transform 0.18s cubic-bezier(.4,0,.2,1), box-shadow 0.18s ease;
         transform:scale(1); }
   .pin::before{ content:''; position:absolute; inset:2px; border-radius:50%;
-                background:#171717; filter:blur(2.4px); z-index:-1; }
+                filter:blur(2px); z-index:-1; }
   .pin-hit:hover .pin, .pin-hit:active .pin{ transform:scale(1.18); box-shadow:0 4px 16px rgba(0,0,0,0.35); }
   .pin.active{ transform:scale(1.18); box-shadow:0 0 0 3px rgba(0,0,0,0.18); }
+  /* cor com significado (ver .day-pill), não decorativa: verde quando o
+     espaço tem pelo menos um artista presente (hoje, se for dia 18 ou 19;
+     em qualquer um dos dois dias fora dessa janela — ver isLocationOpenNow,
+     JS), preto quando não. */
+  .pin.fechado::before{ background:#171717; }
+  .pin.fechado{ color:#fff; }
+  .pin.aberto::before{ background:#39FF14; }
+  .pin.aberto{ color:#173318; }
 
   /* transit stations (metrô/VLT): blue circular badge with letter — click
      to see the name and type in a popup. Two distinct blue tones (not a
@@ -220,11 +274,11 @@
      licença, não só estética) — texto/fundo mais fracos que o padrão do
      MapLibre, e a versão completa também aparece no "Sobre" */
   .maplibregl-ctrl-group{ border-radius:0 !important; box-shadow:none !important; border:1px solid var(--line) !important; }
-  .maplibregl-ctrl-group button{ background:#fff !important; color:#111 !important; font-family:var(--sans-display) !important; }
+  .maplibregl-ctrl-group button{ background:var(--paper) !important; color:var(--ink) !important; font-family:var(--sans-display) !important; }
   .maplibregl-ctrl-attrib{ font-family:var(--sans-display); font-size:0.68rem !important; background:rgba(255,255,255,0.75) !important; }
   .locate-control-btn{ width:29px; height:29px; display:flex; align-items:center; justify-content:center;
-                        background:#fff; border:1px solid var(--line); border-top:none; cursor:pointer;
-                        font-size:1rem; color:#111; }
+                        background:var(--paper); border:1px solid var(--line); border-top:none; cursor:pointer;
+                        font-size:1rem; color:var(--ink); }
 
   .user-dot{ position:relative; width:14px; height:14px; border-radius:50%; background:#3B82F6; border:2px solid #fff;
              box-shadow:0 0 0 4px rgba(59,130,246,0.28); }
@@ -242,95 +296,55 @@
      abre, e de volta pra baixo quando fecha, cobrindo/revelando a lista
      sem precisar trocar de display — dá pra ir de lista pra sobre e
      voltar com uma transição suave em vez de um corte seco. */
-  .list-page{ position:fixed; inset:0; background:#ffffff;
+  .list-page{ position:fixed; inset:0; background:var(--paper);
               overflow-y:auto; -webkit-overflow-scrolling:touch; }
   .list-page .list-close{ position:fixed;
              top:calc(1.6rem + env(safe-area-inset-top)); right:calc(1.6rem + env(safe-area-inset-right));
-             background:rgba(0,0,0,0.08); color:#111; z-index:2; }
+             background:rgba(0,0,0,0.08); color:var(--ink); z-index:2; }
   .list-page .list-close:hover{ background:rgba(0,0,0,0.16); }
 
   /* padding-bottom generoso pra o último item da lista não ficar embaixo
-     do toggle mapa/lista/sobre + sort-switch (por endereço/por artista),
-     que são fixed e ficam sobrepostos ao final do scroll senão */
+     do toggle mapa/lista/sobre, que é fixed e fica sobreposto ao final
+     do scroll senão */
   .list-body{ width:100%;
-              padding:calc(4.6rem + env(safe-area-inset-top)) 1.6rem calc(9rem + env(safe-area-inset-bottom)); }
-  .list-head{ margin:0 0 2rem; }
-  /* mesmo estilo do .about-title (Geist uppercase), só que em tinta escura
-     — a página da lista é branca, a do "sobre" é preta */
-  .list-title{ font-family:var(--sans-display); font-weight:350; text-transform:uppercase; letter-spacing:-0.025em;
-               color:var(--ink); font-size:2rem; margin:0; }
+              padding:calc(4.6rem + env(safe-area-inset-top)) 0 calc(9rem + env(safe-area-inset-bottom)); }
+  .list-page{ font-family:var(--sans-display); font-weight:380; letter-spacing:-.012em; }
+  .row-link, .ig{ text-decoration:none; }
 
-  .row{ display:flex; align-items:baseline; gap:0.5rem; padding:1.1rem 0.2rem; border-bottom:1px solid var(--line);
-        cursor:pointer; background:none; border-left:none; border-right:none; border-top:none; width:100%;
-        text-align:left; font-family:inherit; color:var(--ink); transition:background 0.15s ease, padding-left 0.15s ease; }
-  .row:hover{ background:var(--hover); padding-left:0.6rem; }
-  .row.pending{ color:var(--gray); font-style:italic; }
-  .row-num{ font-family:var(--mono); font-size:0.83rem; color:var(--gray); width:1.6rem; flex-shrink:0; }
-  .row-main{ flex-grow:1; min-width:0; }
-  /* mesmo estilo do corpo de texto grande do "Sobre" (.about-main p) —
-     breakpoint próprio no mobile (ver abaixo) pra não ficar gigante numa
-     tela pequena */
-  .row-title{ font-family:var(--sans-display); font-size:1.77rem; line-height:1.27; }
-  .row-sub{ font-family:var(--sans-display); font-size:0.79rem; color:var(--gray); display:block; margin-top:0.15rem; }
-  .row-count{ font-family:var(--sans-display); font-size:0.79rem; color:var(--gray); white-space:nowrap; }
-
-  @media (max-width:640px){
-    .row-title{ font-size:1.3rem; }
+  /* ---------- lista ---------- */
+  .big{ margin:0; padding:calc(var(--pad) * .6) var(--pad) 0; font-weight:350; line-height:.8; letter-spacing:-.045em;
+        text-transform:uppercase; white-space:nowrap; overflow:hidden; }
+  .big span{ display:inline-block; }
+  .list{ list-style:none; margin:calc(var(--pad) * .9) 0 0; padding:0 var(--pad); min-height:40vh; }
+  .row{ display:flex; align-items:center; gap:var(--pad); padding:calc(var(--thumb-h) * .13) 0;
+        opacity:0; transform:translateY(16px); transition:opacity .7s var(--ease), transform .7s var(--ease); }
+  .row.in{ opacity:1; transform:none; }
+  .row-link{ flex:1; min-width:0; display:flex; align-items:center; gap:clamp(10px, 1.6vw, 24px); }
+  .thumb{ position:relative; flex:none; width:var(--thumb-w); height:var(--thumb-h); background:var(--ph); overflow:hidden;
+          transition:width .6s var(--ease), height .6s var(--ease); }
+  .thumb i{ position:absolute; inset:0; background:center / cover no-repeat; opacity:0; transition:opacity .6s ease; }
+  .thumb.loaded i{ opacity:1; }
+  @media (hover:hover){
+    .row:hover .thumb, .row:focus-within .thumb{ width:calc(var(--thumb-w) * 2.6); height:calc(var(--thumb-h) * 2.6); }
+    .row:hover .thumb{ transition-delay:.35s; } /* só ao entrar com o mouse; ao sair, volta na hora */
   }
+  .name{ font-size:clamp(1.2rem, .7rem + 2.1vw, 3rem); line-height:1.3; letter-spacing:-.03em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ig{ flex:none; font-size:clamp(.8rem, .62rem + .75vw, 1.25rem); white-space:nowrap; }
+  .ig:hover{ text-decoration:underline; text-underline-offset:3px; }
+  .msg{ padding:var(--pad); font-size:var(--body); color:var(--mid); }
+  .msg a{ text-decoration:underline; text-underline-offset:3px; color:var(--ink); }
 
-  /* miniatura da foto na lista "por artista" (não existe na "por
-     endereço" — um espaço pode ter vários artistas, não faz sentido
-     mostrar uma foto só) */
-  /* mesma proporção 4:3 da foto do drawer (.artist-photo) */
-  .row-photo{ width:72px; aspect-ratio:4/3; border-radius:4px; background:#e4e4e4; flex-shrink:0;
-              background-size:cover; background-position:center; }
-
-  /* lista "por artista": só no celular (max-width:640px, mesmo corte já
-     usado na página Sobre pra separar celular de tablet/desktop — mais
-     permissivo que o breakpoint geral do site em 780px, que trataria até
-     um iPad em retrato como "mobile") fica empilhada (foto à esquerda,
-     nome/instagram/endereço em coluna à direita). A partir daí (tablet
-     inclusive), 4 colunas lado a lado: foto | nome | instagram | espaço,
-     com a coluna do nome bem mais larga que as outras duas. */
-  .row-artista{ display:grid; grid-template-columns:72px 2fr 1fr 1fr; grid-template-areas:"photo title insta sub";
-                align-items:center; column-gap:1.2rem; row-gap:0.15rem; }
-  .row-artista .row-photo{ grid-area:photo; }
-  .row-artista .row-title{ grid-area:title; }
-  .row-artista .row-sub{ grid-area:sub; margin-top:0; }
-  .row-artista .row-instagram{ grid-area:insta; font-family:var(--sans-display); font-size:0.79rem; color:var(--gray);
-                                white-space:nowrap; align-self:center; }
-
-  /* colunas a partir do tablet — só o celular (≤640px) mantém a
-     diagramação empilhada de sempre. .row-main vira display:contents pra
-     "num"/"título"/"endereço" disputarem as colunas do grid do .row
-     diretamente, sem precisar tocar no HTML gerado por JS (que continua o
-     mesmo pros dois breakpoints). A coluna do nome (2fr) fica bem mais
-     larga que a do endereço (1fr), pra combinar com o mockup. */
-  .row:not(.row-artista){ display:grid; grid-template-columns:1.6rem 2fr 1fr; align-items:baseline; }
-  .row:not(.row-artista) .row-main{ display:contents; }
-  .row:not(.row-artista) .row-sub{ margin-top:0; margin-left:0.5rem; }
-
-  @media (max-width:640px){
-    .row:not(.row-artista){ display:flex; align-items:baseline; }
-    .row:not(.row-artista) .row-main{ display:block; }
-    .row:not(.row-artista) .row-sub{ margin-top:0.15rem; margin-left:0; }
-
-    .row-artista{ grid-template-columns:72px 1fr; grid-template-areas:"photo title" "photo insta" "photo sub";
-                  column-gap:1rem; row-gap:0.15rem; align-items:start; }
-    .row-artista .row-instagram{ align-self:center; }
-  }
 
   /* ---------------- Drawer ---------------- */
   .overlay{ position:fixed; inset:0; background:rgba(0,0,0,0.15); opacity:0; pointer-events:none;
             transition:opacity 0.25s ease; z-index:900; }
   .overlay.open{ opacity:1; pointer-events:auto; }
 
+  /* fundo branco chapado (não mais vidro translúcido) — mesmo motivo do
+     .lightbox-modal: garante leitura independente do que estiver no mapa */
   .drawer{ position:fixed; z-index:950; display:flex; flex-direction:column;
            transition:transform 0.35s cubic-bezier(.4,0,.2,1);
-           background:rgba(255,255,255,0.35);
-           backdrop-filter:blur(32px) saturate(180%);
-           -webkit-backdrop-filter:blur(32px) saturate(180%);
-           border:1px solid rgba(255,255,255,0.6);
+           background:#fff;
            border-radius:10px;
            box-shadow:0 24px 70px rgba(0,0,0,0.25); }
   @media (min-width:781px){
@@ -347,11 +361,6 @@
 
   .drawer-head{ padding:1.6rem 1.6rem 1.1rem; border-bottom:1px solid var(--line); flex-shrink:0; position:relative; }
   .drawer-title{ font-family:var(--sans-display); font-weight:400; font-size:1.57rem; letter-spacing:-0.02em; margin:0 0 0.15rem; line-height:1.2; }
-  .drawer-addr{ font-family:var(--sans-display); font-size:0.94rem; color:var(--gray); }
-  .drawer-directions{ display:inline-block; font-family:var(--sans-display); font-size:0.94rem; color:var(--gray);
-                       text-decoration:underline; text-underline-offset:2px; margin-top:0.4rem; }
-  .drawer-directions:hover{ opacity:0.6; }
-  .drawer-directions.hidden{ display:none; }
 
   /* botão fechar em círculo — mesmo visual no drawer, no lightbox e no
      "sobre"; só a posição (pra alinhar com o título de cada um) muda */
@@ -378,7 +387,7 @@
                  background-size:cover; background-position:center;
                  display:flex; align-items:center; justify-content:center;
                  font-family:var(--sans-display); font-size:0.94rem; color:var(--gray);
-                 cursor:zoom-in; transition:opacity 0.15s ease; }
+                 cursor:pointer; text-decoration:none; transition:opacity 0.15s ease; }
   .artist-photo:hover{ opacity:0.85; }
 
   /* fixed min-height reserved for the whole text block, so cards line up
@@ -386,6 +395,7 @@
      removed from the DOM when empty rather than leaving a blank line. */
   .artist-body{ display:flex; flex-direction:column; min-height:6.1rem; min-width:0; }
 
+  a.artist-name{ display:block; color:inherit; text-decoration:none; }
   .artist-name{ font-family:var(--sans-display); font-weight:450; font-size:0.9rem; margin:0.55rem 0 0.1rem; line-height:1.2; overflow-wrap:break-word; }
   .artist-meta{ font-family:var(--sans-display); font-size:0.83rem; line-height:1.4; color:var(--gray); margin-bottom:0.3rem; display:flex; flex-wrap:wrap; gap:0.4rem; align-items:center; min-width:0; overflow-wrap:break-word; }
   .artist-meta a{ color:var(--ink); text-decoration:underline; text-underline-offset:2px; }
@@ -393,63 +403,63 @@
   .artist-room{ font-family:var(--sans-display); font-size:0.75rem; color:var(--gray); margin-top:0.3rem; }
   .artist-room .artist-obs{ border:1px solid var(--line); padding:0.05rem 0.3rem; }
   .day-badges{ display:flex; gap:0.35rem; margin-top:0.45rem; flex-wrap:wrap; }
-  .day-pill{ font-family:var(--sans-display); font-size:0.68rem; padding:0.15rem 0.45rem; border-radius:3px; border:1px solid transparent; }
-  .day-pill.present{ background:#DFF3E3; color:#1F6B33; border-color:#B9E0C2; }
-  .day-pill.absent{ background:#FBE2E0; color:#9A3324; border-color:#F0C4C0; }
+  /* mesmo estilo/técnica dos pins (ver .pin::before): núcleo sólido menor
+     (inset:1px) desfocado, dando uma borda esfumada em vez de borda dura
+     — verde quando presente, preto quando não, mesmas cores/contraste. */
+  .day-pill{ font-family:var(--sans-display); font-size:0.68rem; font-weight:500;
+             padding:0.15rem 0.45rem; border-radius:3px; position:relative; }
+  .day-pill::before{ content:''; position:absolute; inset:1px; border-radius:2px;
+                      filter:blur(2px); z-index:-1; }
+  .day-pill.present::before{ background:#39FF14; }
+  .day-pill.present{ color:#173318; }
+  .day-pill.absent::before{ background:#171717; }
+  .day-pill.absent{ color:#fff; }
   .photo-note{ font-family:var(--sans-display); font-size:0.75rem; color:var(--gray); font-style:italic; margin-top:0.9rem; grid-column:1 / -1; }
 
   .map-error{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
               font-family:var(--sans-display); font-size:0.88rem; color:var(--gray); text-align:center; padding:2rem; }
 
-  /* ---------------- Lightbox (modal, glassmorphism) ---------------- */
-  .lightbox{ position:fixed; inset:0; z-index:1000;
-             background:transparent;
-             display:flex; align-items:center; justify-content:center;
-             opacity:0; pointer-events:none; transition:opacity 0.25s ease;
-             padding:calc(1rem + env(safe-area-inset-top)) calc(1rem + env(safe-area-inset-right))
-                     calc(1rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left)); }
-  .lightbox.open{ opacity:1; pointer-events:auto; }
+  /* ---------- página do artista ---------- */
+  .artist{ position:fixed; inset:0; z-index:1000; background:var(--paper); overflow-y:auto; overscroll-behavior:contain;
+           visibility:hidden; opacity:0; pointer-events:none; }
+  .artist{ outline:none; }
+  .artist.open{ visibility:visible; pointer-events:auto; }
+  .a-hero{ position:relative; height:100vh; height:100svh; background:var(--green); overflow:hidden; }
+  .a-photo{ position:absolute; inset:0; background:center / cover no-repeat; }
+  .a-top.has-photo .a-hero::after{ content:''; position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,.5), rgba(0,0,0,0) 55%); }
+  .a-hero.hide-photo .a-photo, .a-top.has-photo .a-hero.hide-photo::after{ opacity:0; }
+  .a-top{ position:relative; }
+  /* o nome fica preso na base da tela enquanto a foto sobe; a borda da foto corta as letras
+     (cópia branca por cima da foto, preta por cima do fundo branco) */
+  .a-namebar{ position:sticky; z-index:2; pointer-events:none; }
+  .a-name{ position:absolute; left:var(--pad); right:var(--pad); bottom:calc(var(--pad) * .35 - .12em); margin:0;
+           font-weight:350; letter-spacing:-.05em; line-height:1.05; overflow:hidden; padding:.12em 0 .24em; color:var(--ink); }
+  .a-name span{ display:block; transform:translateY(160%); }
+  .a-name-w{ color:var(--ink); }
+  .a-top.has-photo .a-name-w{ color:#fff; }
+  .artist.revealed .a-name span{ transform:none; transition:transform 1s var(--ease); }
+  .a-close{ position:absolute; top:var(--pad); right:var(--pad); z-index:3; cursor:pointer; font-family:var(--sans-display); font-weight:400; font-size:.79rem;
+            color:var(--ink); width:clamp(32px, 3.2vw, 46px); aspect-ratio:1; padding:0; display:grid; place-items:center; border-radius:50%;
+            background:rgba(200,200,200,.55); backdrop-filter:blur(18px) saturate(180%); -webkit-backdrop-filter:blur(18px) saturate(180%);
+            border:1px solid rgba(255,255,255,.4); box-shadow:0 3px 12px rgba(0,0,0,.22); transition:transform .4s var(--ease), background .2s ease; }
+  .a-close::before, .a-close::after{ content:''; position:absolute; width:38%; height:1.5px; background:var(--ink); border-radius:2px; }
+  .a-close::before{ transform:rotate(45deg); } .a-close::after{ transform:rotate(-45deg); }
+  .a-close:hover{ transform:scale(1.12); background:rgba(255,255,255,.45); }
+  .a-meta{ padding:calc(var(--pad) * .5) var(--pad) calc(var(--pad) * 4); }
+  .a-meta > *{ opacity:0; transform:translateY(18px); }
+  .artist.revealed .a-meta > *{ opacity:1; transform:none; transition:opacity .8s var(--ease), transform .8s var(--ease); }
+  .artist.revealed .a-meta > :nth-child(2){ transition-delay:.12s; }
+  .a-igs{ display:flex; flex-wrap:wrap; gap:0 .5em; margin-top:.3em; font-size:var(--body); }
+  .a-igs .lbl{ margin-right:.1em; }
+  .a-igs .ig{ font-size:inherit; }
+  .a-igs a{ text-decoration:underline; text-underline-offset:4px; text-decoration-thickness:1px; }
+  .a-bio{ margin:0; font-size:var(--body); line-height:1.25; max-width:40em; }
+  .a-bio p{ margin:0 0 1em; }
+  .a-bio.empty{ color:var(--mid); }
+  .morph{ position:fixed; z-index:1010; background:var(--green) center / cover no-repeat; pointer-events:none; }
 
-  .lightbox-modal{ position:relative; width:100%; height:100%;
-                    background:rgba(255,255,255,0.35);
-                    backdrop-filter:blur(32px) saturate(180%);
-                    -webkit-backdrop-filter:blur(32px) saturate(180%);
-                    border:1px solid rgba(255,255,255,0.6);
-                    border-radius:10px;
-                    box-shadow:0 24px 70px rgba(0,0,0,0.25);
-                    display:flex; flex-direction:column;
-                    transform:scale(0.97); transition:transform 0.25s ease; }
-  .lightbox.open .lightbox-modal{ transform:scale(1); }
-
-  /* linha dedicada só pro botão "fechar", mesmo esquema do drawer-head:
-     o conteúdo (imagem/legenda) fica num bloco separado que começa
-     sempre abaixo dela, então nunca disputa o mesmo espaço — mesmo se a
-     imagem+legenda for alta o bastante pra rolar */
-  .lightbox-head{ flex-shrink:0; height:1.8rem; position:relative; }
-
-  /* justify-content:flex-start (não center) é essencial aqui: com o conteúdo
-     centralizado, quando a imagem+legenda é mais alta que o espaço visível
-     o scroll nasce parado no meio do conteúdo (a parte de cima fica
-     "escondida" acima do topo do scroll) — parece foto cortada, mas na
-     real é só posição inicial de rolagem errada. Com flex-start o topo
-     real do conteúdo sempre coincide com scrollTop:0. */
-  .lightbox-body{ flex-grow:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
-                   display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
-                   padding:1.6rem 1.8rem 2.2rem; }
-
-  .lightbox-modal img{ max-width:100%; max-height:70vh; object-fit:contain; border:1px solid rgba(0,0,0,0.1); }
-  .lightbox-placeholder{ display:none; width:100%; max-width:520px; aspect-ratio:4/3; background:rgba(0,0,0,0.05);
-                          align-items:center; justify-content:center;
-                          font-family:var(--sans-display); font-size:1.21rem; color:var(--gray); border:1px solid rgba(0,0,0,0.12); }
-  .lightbox-placeholder.show{ display:flex; }
-  .lightbox-caption{ max-width:520px; margin-top:1.4rem; text-align:center; }
-  .lightbox-caption .lb-name{ font-family:var(--serif); font-size:1.32rem; color:var(--ink); margin:0 0 0.4rem; }
-  .lightbox-caption .lb-room{ font-family:var(--sans-display); font-size:0.83rem; color:var(--gray); margin-bottom:0.5rem; }
-  .lightbox-caption .lb-bio{ font-family:var(--sans); font-size:0.97rem; line-height:1.55; color:var(--gray); margin:0.8rem 0 0; }
-  /* centralizado em toda a margem vazia do topo — lightbox-head (1.8rem)
-     + padding-top do lightbox-body (1.6rem) — até onde a imagem começa,
-     não só na faixa estreita do lightbox-head */
-  .lightbox-close{ position:absolute; top:14.2px; right:1rem; }
+  .artist{ font-family:var(--sans-display); font-weight:380; letter-spacing:-.012em; }
+  @media (prefers-reduced-motion:reduce){ .row{ opacity:1; transform:none; transition:none; } }
 
   /* ---------------- "Sobre" descortinado ----------------
      página preta que fica sempre presente, por baixo do .hero (que vem
@@ -472,25 +482,47 @@
   .about-page .about-close:hover{ background:rgba(255,255,255,0.22); }
 
   .about-body{ width:100%;
-               padding:calc(4.6rem + env(safe-area-inset-top)) 1.6rem calc(3rem + env(safe-area-inset-bottom)); }
+               padding:calc(4.6rem + env(safe-area-inset-top)) 0 0; }
 
-  .about-head{ margin:0 0 2rem; }
+  .about-head{ margin:0 var(--pad) 2rem; }
   .about-title{ font-family:var(--sans-display); font-weight:350; text-transform:uppercase; letter-spacing:-0.025em;
                 color:#fff; font-size:2rem; margin:0; }
 
-  .about-grid{ display:grid; grid-template-columns:1fr 320px; gap:2.6rem; align-items:start; }
-  .about-main{ max-width:900px; }
-  .about-main p{ font-family:var(--sans-display); font-size:1.77rem; line-height:1.27; color:#cfcfcf; margin:0 0 0.9rem; }
+  /* texto na mesma diagramação do texto de abertura do catálogo: corpo grande fluido, entrelinha curta, margem lateral --pad */
+  .about-main{ max-width:1180px; padding:0 var(--pad); }
+  .about-main p{ font-family:var(--sans-display); font-weight:380; letter-spacing:-.012em; font-size:var(--body); line-height:1.22;
+                 color:#cfcfcf; margin:0 0 1em; }
   .about-main p:last-child{ margin-bottom:0; }
 
-  .about-credits{ font-family:var(--sans-display); }
-  .about-credits p{ font-size:0.95rem; line-height:1.5; color:#cfcfcf; margin:0 0 0.9rem; }
-  .about-credits a{ color:#fff; }
-
-  @media (max-width:640px){
-    .about-grid{ grid-template-columns:1fr; gap:1.8rem; }
-  }
+  /* rodapé em 4 colunas, igual ao do catálogo */
+  .about-foot{ display:grid; grid-template-columns:repeat(4, 1fr); gap:var(--pad);
+               padding:calc(var(--pad) * 4) var(--pad) calc(6.5rem + env(safe-area-inset-bottom)); /* folga pro toggle fixo não cobrir o fim */
+               font-family:var(--sans-display); font-size:clamp(.72rem, .6rem + .35vw, .95rem); line-height:1.28; color:#cfcfcf; }
+  .about-foot p{ margin:0 0 .9em; }
+  .about-foot a{ color:#fff; text-decoration:underline; text-underline-offset:2px; }
+  .about-foot .wide{ grid-column:span 2; }
+  @media (max-width:760px){ .about-foot{ grid-template-columns:repeat(2, 1fr); } }
 </style>
+
+<script>
+// ---------------- Dia do evento (Rio) ----------------
+// Roda cedo (aqui no <head>, antes do body pintar). Modo noturno do mapa
+// foi removido — fica sempre no claro, não importa a hora. Só resta
+// decidir o dia do evento de verdade (18 ou 19/09/2026, não só "dia 18 do
+// mês atual, seja lá qual for"), usado pro pin verde/preto (ver
+// isLocationOpenNow, JS principal), a cor da cobrona (ver
+// heroStrokeLegsInRange) e o fundo do marquee no estado inicial (ver
+// .evento-hoje .event-marquee).
+(function(){
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year:'numeric', month:'2-digit', day:'2-digit'
+  }).formatToParts(new Date());
+  const get = t => (parts.find(p => p.type === t) || {}).value;
+  const isEventDay = get('year') === '2026' && get('month') === '09' && (get('day') === '18' || get('day') === '19');
+  window.RIO_NOW = { day: get('day'), isEventDay };
+  document.documentElement.classList.toggle('evento-hoje', isEventDay);
+})();
+</script>
 
 </head>
 <body>
@@ -498,8 +530,8 @@
 <div class="list-page" id="list-page">
   <button class="list-close icon-close" id="list-close" aria-label="Fechar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6L18 18M18 6L6 18"/></svg></button>
   <div class="list-body">
-    <div class="list-head"><h2 class="list-title">Índice do circuito</h2></div>
-    <div class="rows" id="rows"></div>
+    <h2 class="big" id="big"><span>Artistas</span></h2>
+    <ul class="list" id="list"></ul>
   </div>
 </div>
 
@@ -507,20 +539,19 @@
   <button class="about-close icon-close" id="about-close" aria-label="Fechar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6L18 18M18 6L6 18"/></svg></button>
   <div class="about-body">
     <div class="about-head"><h2 class="about-title">Circuito de Ateliês do Centro</h2></div>
-    <div class="about-grid">
-      <div class="about-main">
-        <p>O Circuito de Ateliês do Centro nasce da articulação de uma rede de artistas que compartilham o desejo de fortalecer a cena artística contemporânea do Centro do Rio de Janeiro e ampliar as possibilidades de encontro entre arte, cidade e público. Em uma região historicamente marcada pela diversidade cultural e pela efervescência de sua produção artística, o projeto volta o olhar para os lugares onde a arte acontece antes de chegar às exposições: os ateliês, como espaços de pesquisa, experimentação e criação, onde obras, ideias e processos ganham forma.</p>
-        <p>Mais do que apresentar trabalhos, o Circuito propõe abrir as portas dos ateliês e aproximar o público do fazer artístico, possibilitando o contato direto com artistas, suas pesquisas e os contextos em que suas práticas se desenvolvem. A iniciativa valoriza, assim, a dimensão experimental da arte e revela os caminhos que antecedem a obra finalizada.</p>
-        <p>Ao fortalecer conexões entre artistas e público, o Circuito de Ateliês do Centro reafirma a região como um importante polo de criação contemporânea e propõe uma experiência de arte baseada no encontro, na descoberta e na proximidade. Um convite para conhecer não apenas onde a arte é apresentada, mas onde ela nasce.</p>
-      </div>
-      <div class="about-credits">
-        <p>Idealização e Produção Executiva:<br>Fernanda Sattamini<br><a href="https://instagram.com/fernandasattamini" target="_blank" rel="noopener">@fernandasattamini</a></p>
-        <p>Identidade visual e site:<br>Eduardo Mattos<br><a href="https://instagram.com/macula.cc" target="_blank" rel="noopener">@macula.cc</a></p>
-        <p>Colaborações:<br>Nuno Quinhões · <a href="https://instagram.com/nunoquinhoes" target="_blank" rel="noopener">@nunoquinhoes</a><br>Alessandra Sposetti · <a href="https://instagram.com/alessandrasposetti" target="_blank" rel="noopener">@alessandrasposetti</a><br>Adriana Macedo · <a href="https://instagram.com/adrianamacedo_artist" target="_blank" rel="noopener">@adrianamacedo_artist</a></p>
-        <p>Apoio institucional:<br>Secretaria da Cultura e Economia Criativa<br>Casa Proeza</p>
-        <p>Mapa:<br><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a> contributors, tiles por <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, biblioteca <a href="https://maplibre.org" target="_blank" rel="noopener">MapLibre GL JS</a>.</p>
-      </div>
+    <div class="about-main">
+      <p>O CIRCUITO DE ATELIÊS DO CENTRO nasce da articulação de uma rede de artistas que compartilham o desejo de fortalecer a cena artística contemporânea do Centro do Rio de Janeiro e ampliar as possibilidades de encontro entre arte, cidade e público. Em uma região historicamente marcada pela diversidade cultural e pela efervescência de sua produção artística, o projeto volta o olhar para os lugares onde a arte acontece antes de chegar às exposições: os ateliês, como espaços de pesquisa, experimentação e criação, onde obras, ideias e processos ganham forma.</p>
+      <p>Mais do que apresentar trabalhos, o Circuito propõe abrir as portas dos ateliês e aproximar o público do fazer artístico, possibilitando o contato direto com artistas, suas pesquisas e os contextos em que suas práticas se desenvolvem. A iniciativa valoriza, assim, a dimensão experimental da arte e revela os caminhos que antecedem a obra finalizada.</p>
+      <p>Ao fortalecer conexões entre artistas e público, o Circuito de Ateliês do Centro reafirma a região como um importante polo de criação contemporânea e propõe uma experiência de arte baseada no encontro, na descoberta e na proximidade. Um convite para conhecer não apenas onde a arte é apresentada, mas onde ela nasce.</p>
     </div>
+    <footer class="about-foot">
+      <div><p>Instagram:<br><a href="https://instagram.com/circuito.de.atelies.do.centro" target="_blank" rel="noopener">@circuito.de.atelies.do.centro</a></p></div>
+      <div><p>Idealização e Produção Executiva:<br>Fernanda Sattamini<br><a href="https://instagram.com/fernandasattamini" target="_blank" rel="noopener">@fernandasattamini</a></p></div>
+      <div><p>Identidade visual e site:<br>Eduardo Mattos<br><a href="https://instagram.com/macula.cc" target="_blank" rel="noopener">@macula.cc</a></p></div>
+      <div><p>Colaborações:<br>Nuno Quinhões · <a href="https://instagram.com/nunoquinhoes" target="_blank" rel="noopener">@nunoquinhoes</a><br>Alessandra Sposetti · <a href="https://instagram.com/alessandrasposetti" target="_blank" rel="noopener">@alessandrasposetti</a><br>Adriana Macedo · <a href="https://instagram.com/adrianamacedo_artist" target="_blank" rel="noopener">@adrianamacedo_artist</a></p></div>
+      <div><p>Apoio institucional:<br>Secretaria da Cultura e Economia Criativa<br>Casa Proeza</p></div>
+      <div class="wide"><p>Mapa:<br><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a> contributors, tiles por <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, biblioteca <a href="https://maplibre.org" target="_blank" rel="noopener">MapLibre GL JS</a>.</p></div>
+    </footer>
   </div>
 </div>
 
@@ -533,6 +564,11 @@
     <div class="marquee-layer"><div class="marquee-track" id="marquee-track"></div></div>
   </div>
 
+  <div class="map-legend">
+    <span class="legend-item"><span class="legend-dot aberto"></span>Ateliê aberto</span>
+    <span class="legend-item"><span class="legend-dot fechado"></span>Ateliê fechado</span>
+  </div>
+
 </div>
 
 <div class="top-actions">
@@ -543,9 +579,6 @@
   <button class="about-btn" id="about-btn">Sobre</button>
 </div>
 
-<div class="sort-switch" id="sort-switch">
-  <button id="sort-endereco" class="active">Por Endereço</button>
-  <button id="sort-artista">Por Artista</button>
 </div>
 
 <div class="overlay" id="overlay"></div>
@@ -553,29 +586,27 @@
   <div class="drawer-head">
     <button class="drawer-close icon-close" id="drawer-close" aria-label="Fechar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6L18 18M18 6L6 18"/></svg></button>
     <div class="drawer-title" id="drawer-local">—</div>
-    <div class="drawer-addr" id="drawer-endereco">—</div>
-    <a class="drawer-directions" id="drawer-directions" href="#" target="_blank" rel="noopener">Como chegar →</a>
   </div>
   <div class="drawer-list" id="drawer-list"></div>
 </div>
 
-<div class="lightbox" id="lightbox">
-  <div class="lightbox-modal">
-    <div class="lightbox-head">
-      <button class="lightbox-close icon-close" id="lightbox-close" aria-label="Fechar imagem"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6L18 18M18 6L6 18"/></svg></button>
+<section class="artist" id="artist" tabindex="-1" aria-label="Artista" aria-hidden="true">
+  <div class="a-top" id="aTop">
+    <div class="a-hero" id="aHero">
+      <div class="a-photo" id="aPhoto"></div>
+      <button class="a-close" id="aClose" aria-label="Fechar"></button>
     </div>
-    <div class="lightbox-body">
-      <img id="lightbox-img" src="" alt="">
-      <div class="lightbox-placeholder" id="lightbox-placeholder"></div>
-      <div class="lightbox-caption" id="lightbox-caption">
-        <p class="lb-name" id="lightbox-name"></p>
-        <div class="lb-room" id="lightbox-room"></div>
-        <div class="day-badges" id="lightbox-days" style="justify-content:center;"></div>
-        <p class="lb-bio" id="lightbox-bio"></p>
-      </div>
+    <div class="a-namebar" id="aNameBar">
+      <h1 class="a-name" id="aName"><span></span></h1>
+      <div class="a-name a-name-w" id="aNameW" aria-hidden="true"><span></span></div>
     </div>
+    <div class="a-gap" id="aGap"></div>
   </div>
-</div>
+  <div class="a-meta">
+    <div class="a-bio" id="aBio"></div>
+    <div class="a-igs" id="aIgs"></div>
+  </div>
+</section>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
@@ -584,7 +615,62 @@
 // let quebraria se a declaração continuasse depois de onde é usada
 let LOCATIONS = [];
 
-// ---------------- marquee do topo: nome/data/edição/contagem em loop ----------------
+// ---------------- utilitários do catálogo: fotos locais, carregador de imagens, links de artista ----------------
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = s => document.querySelector(s);
+const EASE_IN_OUT = 'cubic-bezier(.65,0,.15,1)';
+
+const slugify = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+// só aceita o que dá pra mostrar de verdade como imagem: arquivo do Drive
+// (vira miniatura) ou link direto de imagem. Post de Instagram, álbum do
+// Google Fotos, nome de arquivo solto etc. não são imagem — ficam sem foto.
+function photoURL(raw, size){
+  const m = (raw || '').match(/https?:\/\/[^\s]+/);
+  if (!m) return null;
+  const url = m[0];
+  const drive = url.match(/drive\.google\.com\/file\/d\/([\w-]+)/) || url.match(/drive\.google\.com\/(?:open|uc)\?[^#]*\bid=([\w-]+)/);
+  if (drive) return `https://drive.google.com/thumbnail?id=${drive[1]}&sz=w${size}`;
+  if (/\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(url) || /freight\.cargo\.site|payload\.cargocollective\.com/.test(url)) return url;
+  return null;
+}
+// fotos: cópia local (catalogo-fotos/, gerada por scripts/baixar-fotos-catalogo.py)
+// quando existe; senão cai no Drive, que às vezes responde 429 no navegador
+let LOCAL_PHOTOS = {};
+// manifesto: 1 = tem cópia local, 0 = link da planilha não funciona, ausente = artista novo (tenta o Drive)
+const thumbURL = a => LOCAL_PHOTOS[a.slug] === 1 ? `catalogo-fotos/s/${a.slug}.jpg` : LOCAL_PHOTOS[a.slug] === 0 ? null : photoURL(a.photoRaw, 640);   // lista (240px)
+const midURL = a => LOCAL_PHOTOS[a.slug] === 1 ? `catalogo-fotos/t/${a.slug}.jpg` : thumbURL(a);                                                   // hover / abrir (640px)
+const bigURL = a => LOCAL_PHOTOS[a.slug] === 1 ? `catalogo-fotos/${a.slug}.jpg` : LOCAL_PHOTOS[a.slug] === 0 ? null : photoURL(a.photoRaw, 1600);
+function parseHandles(raw){
+  return (raw || '').split(/[\s,;/|]+/)
+    .map(h => h.replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/[/?].*$/, ''))
+    .filter(h => /^[\w.]+$/.test(h));
+}
+const imgCache = new Map(), imgQueue = []; let imgActive = 0;
+const IMG_MAX = 6;
+function loadImg(url, prio){
+  if (!url) return Promise.resolve(null);
+  if (imgCache.has(url)) return imgCache.get(url);
+  const p = new Promise(res => { const job = { url, res, tries:0 }; prio ? imgQueue.unshift(job) : imgQueue.push(job); imgPump(); });
+  imgCache.set(url, p);
+  return p;
+}
+function imgPump(){ while (imgActive < IMG_MAX && imgQueue.length) imgTry(imgQueue.shift()); }
+function imgTry(job){
+  imgActive++;
+  const img = new Image();
+  img.onload = () => { imgActive--; job.res(img); imgPump(); };
+  img.onerror = () => {
+    imgActive--; job.tries++;
+    if (job.tries < 3) setTimeout(() => { imgQueue.push(job); imgPump(); }, 1200 * job.tries);
+    else job.res(null);
+    imgPump();
+  };
+  img.src = job.tries ? job.url + (job.url.includes('?') ? '&' : '?') + '_r=' + job.tries : job.url;
+}
+
+
+// ---------------- marquee do topo: nome/contagem em loop ----------------
 // monta um "segmento" com a sequência repetida algumas vezes (largo o
 // bastante pra cobrir até telas bem largas) e duplica esse segmento uma
 // vez — a animação (ver @keyframes marquee-scroll) desloca a trilha por
@@ -603,8 +689,6 @@ function setupMarquee(){
     : '';
   const groupHTML = `
     <span class="marquee-item">Circuito de Ateliês do Centro</span>
-    <span class="marquee-item marquee-date">Ateliês abertos <em>18 – 19 de Setembro</em></span>
-    <span class="marquee-item marquee-edition">Edição 01</span>
     ${countsHTML}
   `;
   const segHTML = groupHTML.repeat(6);
@@ -617,6 +701,15 @@ function setupMarquee(){
   track.appendChild(seg2);
 }
 setupMarquee();
+
+// só libera a rolagem do marquee (ver animation-play-state em .marquee-track)
+// depois que as fontes terminarem de carregar de verdade — com um teto de
+// 1.5s pra não travar parado pra sempre no caso raro de document.fonts.ready
+// nunca resolver (ex: navegador sem suporte à Font Loading API)
+Promise.race([
+  document.fonts ? document.fonts.ready : Promise.resolve(),
+  new Promise(r => setTimeout(r, 1500))
+]).then(() => document.documentElement.classList.add('fonts-ready'));
 
 /* ============================================================
    DATA SOURCE
@@ -674,6 +767,72 @@ function parseCoord(raw, min, max){
   return (isNaN(n) || n < min || n > max) ? null : n;
 }
 
+// coordenadas curadas à mão pros endereços já confirmados — mesmo
+// princípio das estações de metrô/VLT (curadas no código, sem depender de
+// serviço externo): evita depender de Latitude/Longitude digitado certo na
+// planilha (a formatação de célula do Sheets já corrompeu esses valores
+// mais de uma vez — vírgula decimal virando separador de milhar) e evita
+// geocodificação ao vivo (lenta, ~1.1s por endereço) pros endereços mais
+// comuns. Endereço NOVO que ainda não estiver aqui cai automaticamente no
+// comportamento de sempre (lê Latitude/Longitude da planilha, ou
+// geocodifica via Nominatim se estiver vazio) — nada quebra, só não fica
+// com essa otimização até alguém adicionar aqui. Só edita quem mexe no
+// código (não é editável pela planilha).
+const CURATED_COORDS = {
+  'Arco do Telles, 17 - Pça XV': { lat: -22.9027582, lng: -43.1746864 },
+  'Av. Churchill 94, 4o andar': { lat: -22.9079936, lng: -43.1703966 }, // corrigido: reaudit — batia exato com o prédio real (Ministério Público do Trabalho), ~220m do valor antigo
+  'Av. Erasmo Braga 255, Sobreloja': { lat: -22.9056853, lng: -43.1744404 },
+  'Av. Marechal Floriano 143': { lat: -22.9024075, lng: -43.1853374 },
+  'Av. Nilo Peçanha 50, 2201': { lat: -22.9060475, lng: -43.1776024 },
+  'Av. Presidente Vargas 509/1603': { lat: -22.902087, lng: -43.180236 }, // corrigido: reaudit — batia exato com o prédio real (Edifício Montreal), ~360m do valor antigo
+  'Av. Rio Branco 277': { lat: -22.9118133, lng: -43.1747917 },
+  'Avenida Beira Mar 216': { lat: -22.9105342, lng: -43.1704502 },
+  'Avenida Franklin Roosevelt 39': { lat: -22.9096441, lng: -43.1714199 },
+  'Avenida Treze de Maio, nº 13, 1909': { lat: -22.9090323, lng: -43.1771338 },
+  'Largo de Santa Rita 6, sobrado': { lat: -22.8998691, lng: -43.1811527 },
+  'Praça XV de Novembro 34, Sobreloja': { lat: -22.902694, lng: -43.174694 },
+  'Rua Acre 83': { lat: -22.9005015, lng: -43.181881 },
+  'Rua Andre Cavalcanti 108': { lat: -22.914189, lng: -43.1868113 },
+  'Rua Buenos Aires 70, 601': { lat: -22.9022024, lng: -43.1774392 },
+  'Rua Camerino, 59': { lat: -22.9007393, lng: -43.1862836 },
+  'Rua Conde de Lages 27': { lat: -22.9172024, lng: -43.1777996 },
+  'Rua Conde de Lages 44': { lat: -22.9172024, lng: -43.1777996 },
+  'Rua da Alfândega 91': { lat: -22.9025776, lng: -43.1797789 },
+  'Rua da Conceição 105': { lat: -22.9016505, lng: -43.1836073 },
+  'Rua da Quitanda 3': { lat: -22.9053821, lng: -43.1760508 },
+  'Rua da quitanda 3': { lat: -22.9054597, lng: -43.1760521 },
+  'Rua do Passeio 2': { lat: -22.9125195, lng: -43.1754608 },
+  'Rua do Rosário 104, 4º andar': { lat: -22.9026452, lng: -43.1777889 },
+  'Rua do Russel, 300': { lat: -22.9233172, lng: -43.1728138 },
+  'Rua do Senado 227': { lat: -22.9091948, lng: -43.1846348 }, // corrigido: reaudit — match exato com o número da casa, ~490m do valor antigo
+  'Rua dos invalidos 27, sobrado': { lat: -22.9090507, lng: -43.1856628 },
+  'Rua dos Inválidos 08': { lat: -22.913504, lng: -43.1842394 },
+  'Rua Luis de Camões 42': { lat: -22.9055693, lng: -43.1822654 },
+  'Rua Luís de Camões 02, sobrado': { lat: -22.904813, lng: -43.1811294 },
+  'Rua Mayrink Veiga 6, 11º andar': { lat: -22.899271, lng: -43.180383 },
+  'Rua Sara, 82': { lat: -22.9008919, lng: -43.2041747 },
+  'Rua Luís de Camões 75': { lat: -22.9055693, lng: -43.1822654 },
+  'Rua Sarah, 34': { lat: -22.9013783, lng: -43.2044414 }, // corrigido: célula com lat/lng corrompida pela planilha ("-229.013.783"), caiu no geocoding automático e resolveu em Nilópolis por engano
+  'Rua da Lapa 102': { lat: -22.9155886, lng: -43.1777324 }, // corrigido: geocodificação automática (com o sufixo "Centro" na busca) resolvia no Centro Histórico de Paraty, não no Centro do Rio — "Centro" bateu com o nome do bairro de lá
+  'Av. Gomes Freire, 33': { lat: -22.9116751, lng: -43.1835037 }, // Ateliê 2050 LAPA — endereço novo, geocodado (trecho da Av. Gomes Freire na Lapa)
+  'Rua Conde de Lages ,27': { lat: -22.9172024, lng: -43.1777996 }, // mesma coordenada de "Rua Conde de Lages 27" — variação de formatação na planilha (vírgula antes do número)
+  'Rua do Russel, 300 Edificio Lage': { lat: -22.9233172, lng: -43.1728138 }, // mesma coordenada de "Rua do Russel, 300" — erro de digitação na planilha juntou o nome do prédio (deveria estar em Local/Coletivo) ao endereço
+  'Av. Mem de Sá, 33': { lat: -22.9106465, lng: -43.1842689 }, // 2050 LAPA — célula de lat/lng corrompida pela planilha, geocodado e confirmado
+  'Rua Miguel Couto, 98': { lat: -22.900923, lng: -43.180354 }, // corrigido: célula corrompida pela planilha ("-22.900.923"/"-43.180.354")
+  'Rua do Senado 338': { lat: -22.9116961314177, lng: -43.1926349617462 }, // corrigido: célula bem corrompida pela planilha ("-22.911.696.131.417.700")
+  'Rua Camerino, 57': { lat: -22.9007393, lng: -43.1862836 }, // mesma coordenada do vizinho já curado "Rua Camerino, 59"
+  'R. Carlos Sampaio, 47': { lat: -22.9131142, lng: -43.1882705 }, // geocodado — confiança média, 2 candidatos ~250m diferentes dentro do Centro
+  'Avenida Beira Mar 262': { lat: -22.910610, lng: -43.170899 }, // corrigido: reclamação de morador (pino parecia ficar antes do 216, deveria vir depois) — interpolado a partir de números de porta REAIS mapeados no OpenStreetMap na mesma via (216, confirmado certo, e 280), não geocodificação de texto livre
+  'Rua México 164': { lat: -22.9071644, lng: -43.1757713 },
+  'Rua México 31': { lat: -22.9114856, lng: -43.1743552 },
+  'Rua Pedro Ernesto 56': { lat: -22.8960326, lng: -43.1936254 },
+  'Rua Pedro Ernesto 56 - Gamboa': { lat: -22.8961902, lng: -43.1935285 },
+  'Rua Teixeira de Freitas 5': { lat: -22.914568, lng: -43.176575 },
+  'Rua Uruguaiana 10': { lat: -22.9061872, lng: -43.1785202 },
+  'Rua Álvaro Alvim 21, 18º andar': { lat: -22.9115713, lng: -43.1761788 },
+  'Travessa do Paço 23': { lat: -22.904291, lng: -43.1733626 },
+};
+
 // artistas colando o link de "visualizar" do Google Drive (drive.google.com/
 // file/d/ID/view) em vez de um link de imagem direto — isso não é uma
 // imagem, é uma página HTML, então <img>/background-image nunca carrega.
@@ -703,6 +862,7 @@ async function loadLocationsFromSheet(){
 
   const locMap = {};
   const order = [];
+  const usedSlugs = new Set();
 
   table.slice(1).forEach(row => {
     const local = get(row, 'Local / Coletivo');
@@ -713,6 +873,9 @@ async function loadLocationsFromSheet(){
     const instagram = get(row, 'Instagram').replace(/^@/, '');
     const foto = resolveDrivePhotoURL(get(row, 'Foto do trabalho (URL)'));
     const bio = get(row, 'Mini bio (1 parágrafo curto)');
+    // aceita os dois nomes de coluna: 'Sala' é o nome novo (o Eduardo vai
+    // renomear a coluna na planilha), 'Observações' é o nome antigo — assim
+    // funciona não importa a ordem em que a coluna é renomeada de verdade
     const obs = get(row, 'Sala') || get(row, 'Observações');
     const latRaw = get(row, 'Latitude');
     const lngRaw = get(row, 'Longitude');
@@ -724,16 +887,22 @@ async function loadLocationsFromSheet(){
       locMap[key] = {
         id: 'loc' + order.length,
         local, endereco,
-        lat: parseCoord(latRaw, -90, 90),
-        lng: parseCoord(lngRaw, -180, 180),
+        lat: CURATED_COORDS[endereco] ? CURATED_COORDS[endereco].lat : parseCoord(latRaw, -90, 90),
+        lng: CURATED_COORDS[endereco] ? CURATED_COORDS[endereco].lng : parseCoord(lngRaw, -180, 180),
         artistas: []
       };
       order.push(key);
     }
+    let slug = slugify(nome) || 'artista', n = 2;
+    while (usedSlugs.has(slug)) slug = slugify(nome) + '-' + n++;
+    usedSlugs.add(slug);
     locMap[key].artistas.push({
       nome, instagram, obs, foto, bio,
       dia18: d18Raw.trim() !== '',
-      dia19: d19Raw.trim() !== ''
+      dia19: d19Raw.trim() !== '',
+      // usados pela lista e pela página do artista
+      name: nome, slug, handles: parseHandles(get(row, 'Instagram')), photoRaw: get(row, 'Foto do trabalho (URL)'),
+      sala: obs, thumbSrc: null, loc: locMap[key]
     });
   });
 
@@ -764,13 +933,27 @@ function pinLabel(loc){
   return n ? String(n).padStart(2, '0') : '?';
 }
 
+// pin verde quando o espaço tem pelo menos um artista presente no dia de
+// hoje, só durante os dias do evento (18-19/09, horário do Rio). Fora
+// dessa janela — como agora, com o evento já encerrado — fica sempre
+// preto (não mostra mais "aberto em qualquer um dos dois dias", que só
+// fazia sentido como fallback de teste ANTES do evento acontecer).
+function isLocationOpenNow(loc){
+  const now = window.RIO_NOW;
+  if (now && now.isEventDay){
+    if (now.day === '18') return loc.artistas.some(a => a.dia18);
+    if (now.day === '19') return loc.artistas.some(a => a.dia19);
+  }
+  return false;
+}
+
 // ---------------- map (isolated in try/catch so a load failure doesn't break the rest) ----------------
 let map = null;
 const markers = {};
-function makePinEl(label, active){
+function makePinEl(label, active, aberto){
   const el = document.createElement('div');
   el.className = 'pin-hit';
-  el.innerHTML = `<div class="pin${active?' active':''}">${label}</div>`;
+  el.innerHTML = `<div class="pin${active?' active':''} ${aberto?'aberto':'fechado'}">${label}</div>`;
   return el;
 }
 
@@ -843,8 +1026,20 @@ function syncAllMarkers(){
     if (markers[loc.id]){
       markers[loc.id].setLngLat(pos);
     } else {
-      const el = makePinEl(pinLabel(loc), false);
-      el.addEventListener('click', () => { focusMapOnLocation(loc); openDrawer(loc.id); });
+      const el = makePinEl(pinLabel(loc), false, isLocationOpenNow(loc));
+      el.addEventListener('click', () => {
+        // evento no Google Analytics (gtag já configurado no <head>) — dá
+        // pra ver no GA4 quantos cliques cada ponto do mapa recebeu,
+        // filtrando por pin_numero/endereco/local
+        if (typeof gtag === 'function'){
+          gtag('event', 'map_pin_click', {
+            pin_numero: pinLabel(loc),
+            endereco: loc.endereco,
+            local: loc.local || ''
+          });
+        }
+        focusMapOnLocation(loc); openDrawer(loc.id);
+      });
       const marker = new maplibregl.Marker({ element: el, anchor:'center' }).setLngLat(pos).addTo(map);
       markers[loc.id] = marker;
     }
@@ -884,23 +1079,14 @@ function addStationMarkers(){
   });
 }
 
-// customiza cores camada por camada — água quase branca, resto em tons de
-// cinza — só é possível porque o MapLibre é vetorial (cada feição chega
-// com seu próprio tipo/nome, ao contrário do tile raster, que a gente só
-// via como pixels prontos e tinha que filtrar por aproximação). Estética
-// "xerox de linha": preenchimentos claros/quase brancos, ruas brancas se
-// destacando do cinza dos quarteirões, contorno de prédio invisível.
+// customiza cores camada por camada — só é possível porque o MapLibre é
+// vetorial (cada feição chega com seu próprio tipo/nome, ao contrário do
+// tile raster, que a gente só via como pixels prontos e tinha que filtrar
+// por aproximação). Fixo — modo noturno foi removido, sempre claro.
 const MONO_COLORS = {
-  background: '#d4d4d4',    // cinza claro dos quarteirões (um pouco mais escuro)
-  water: '#e8e8e8',         // quase branco, só pra diferenciar da terra (um pouco mais escuro)
-  landuse: '#d4d4d4',       // mesmo cinza dos quarteirões
-  building: '#d4d4d4',      // preenchimento igual ao quarteirão — prédio não se destaca
-  buildingOutline: '#d4d4d4', // igual ao preenchimento — contorno some de vez
-  road: '#e6e6e6',          // cinza claro (não mais branco), se destacando do cinza dos quarteirões
-  roadCasing: '#e6e6e6',
-  boundary: '#cccccc',
-  text: '#111111',
-  textHalo: '#ffffff'
+  background: '#CACACC', water: '#D4D4D6', landuse: '#CACACC', building: '#CACACC',
+  buildingOutline: '#CACACC', road: '#D9D9DB', roadCasing: '#D9D9DB',
+  boundary: '#B2B2B3', text: '#222222', textHalo: '#D9D9DB'
 };
 function applyMonochromeStyle(){
   const layers = map.getStyle().layers || [];
@@ -925,8 +1111,25 @@ function applyMonochromeStyle(){
       } else if (layer.type === 'background'){
         map.setPaintProperty(layer.id, 'background-color', MONO_COLORS.background);
       } else if (layer.type === 'fill'){
+        // camadas com "fill-pattern" (ex: hachurado de área de pedestre,
+        // zona úmida) pintam uma textura de sprite por cima — não dá pra
+        // recolorir com fill-color, então em vez de deixar o hachurado
+        // sempre branco/cinza aparecendo por cima de qualquer paleta, some
+        // com a camada inteira
+        if (map.getPaintProperty(layer.id, 'fill-pattern')){
+          map.setLayoutProperty(layer.id, 'visibility', 'none');
+          return;
+        }
         const color = isWater ? MONO_COLORS.water : (isBuilding ? MONO_COLORS.building : MONO_COLORS.landuse);
         map.setPaintProperty(layer.id, 'fill-color', color);
+        // algumas camadas de preenchimento (prédio, parque) trazem um
+        // "fill-outline-color" próprio no estilo-base, fixo, sem ligação
+        // com fill-color — sem isso, cada prédio ficava com um contorno
+        // claro/esbranquiçado por cima de qualquer paleta. Iguala ao
+        // preenchimento pra ficar invisível, como o resto do "xerox".
+        if (map.getPaintProperty(layer.id, 'fill-outline-color') !== undefined){
+          map.setPaintProperty(layer.id, 'fill-outline-color', color);
+        }
       } else if (layer.type === 'line'){
         let color = MONO_COLORS.landuse; // linhas genéricas (contorno de parque etc.)
         if (isWater) color = MONO_COLORS.water;
@@ -983,7 +1186,10 @@ function frameMapToPoints(){
   }
   const lats = withCoords.map(l => l.lat), lngs = withCoords.map(l => l.lng);
   const bounds = [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]];
-  map.fitBounds(bounds, { padding: { top:220, left:30, right:30, bottom:50 }, duration:0 });
+  // top:220 era pra não cobrir o hero-title grande de antes, que ocupava o
+  // topo da tela — foi substituído pela marquee, bem mais baixa (~58px),
+  // então não precisa mais de tanto respiro ali
+  map.fitBounds(bounds, { padding: { top:90, left:30, right:30, bottom:50 }, duration:0 });
 }
 
 /* ============================================================
@@ -1016,7 +1222,7 @@ const HERO_SNAKE_ERASE_DURATION = 3;  // s pra apagar tudo de uma vez
 // gerador-video.html: 30/1000), multiplicada pelo mesmo fator de
 // crescimento que estoura o espalhamento pra fora da tela
 const HERO_SNAKE_WIDTH_RATIO = 40/1000;
-const HERO_SNAKE_GROW = 4; // fator único de crescimento: espalhamento + espessura
+const HERO_SNAKE_GROW = 5.5; // fator único de crescimento: espalhamento + espessura
 let heroSnakeWidth = 46; // recalculado em buildHeroSnakeLegs() a cada ciclo
 
 function heroEaseOutSnap(t){ return t >= 1 ? 1 : 1 - Math.pow(2, -10*t); }
@@ -1121,10 +1327,14 @@ function buildHeroSnakeLegs(){
     .filter(l => l.lat != null && l.lng != null)
     .map(l => map.project([l.lng, l.lat]));
   if (rawPts.length < 2) return false;
+  // no mobile a caixa ocupa quase a tela toda (menos margem reservada à
+  // esquerda) — no desktop tem mais texto/UI disputando espaço, então
+  // mantém a caixa mais estreita, alinhada à direita
+  const isMobileHero = window.innerWidth <= 780;
   const box = {
-    x: window.innerWidth * 0.30,
+    x: window.innerWidth * (isMobileHero ? 0.06 : 0.30),
     y: window.innerHeight * 0.02,
-    w: window.innerWidth * 0.68,
+    w: window.innerWidth * (isMobileHero ? 0.92 : 0.68),
     h: window.innerHeight * 0.96
   };
   // fillFraction > 1 de propósito: estoura pra fora da caixa (e da própria
@@ -1188,7 +1398,10 @@ function heroStrokeLegsInRange(dStart, dEnd){
       if (sub.length >= 2){
         const a = leg[0], b = leg[leg.length-1];
         const grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-        grad.addColorStop(0, '#0a0a0a');
+        // nos dias do evento, a ponta escura vira verde-limão (mesmo tom
+        // dos pins/legenda) — só isso muda; a ponta clara e o marquee
+        // continuam exatamente como sempre, sem cor nenhuma
+        grad.addColorStop(0, window.RIO_NOW.isEventDay ? '#39FF14' : '#0a0a0a');
         grad.addColorStop(1, '#d8d8d6');
         ctx.lineWidth = heroSnakeWidth;
         ctx.lineCap = 'round';
@@ -1493,7 +1706,6 @@ async function resolveMissingCoordinates(){
       loc.lat = coords.lat;
       loc.lng = coords.lng;
       syncAllMarkers(); // recalcula sobreposições — um novo ponto pode colidir com um já existente
-      renderRows(); // atualiza a lista, tirando o endereço do estado "pendente"
     }
     // pequena pausa entre chamadas por educação com o serviço gratuito
     await new Promise(r => setTimeout(r, 1100));
@@ -1521,15 +1733,6 @@ function openDrawer(locId){
   if (!loc) return;
 
   document.getElementById('drawer-local').textContent = loc.local || loc.endereco;
-  document.getElementById('drawer-endereco').textContent = loc.local ? loc.endereco : '';
-
-  const directionsLink = document.getElementById('drawer-directions');
-  if (loc.lat != null && loc.lng != null){
-    directionsLink.href = `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`;
-    directionsLink.classList.remove('hidden');
-  } else {
-    directionsLink.classList.add('hidden');
-  }
 
   const list = document.getElementById('drawer-list');
   list.innerHTML = '';
@@ -1541,18 +1744,28 @@ function openDrawer(locId){
     const card = document.createElement('div');
     card.className = 'artist-card';
 
-    const photo = document.createElement('div');
-    photo.className = 'artist-photo';
-    if (art.foto){ photo.style.backgroundImage = `url('${art.foto}')`; }
-    else { photo.textContent = initials(art.nome); }
-    photo.addEventListener('click', () => openLightbox(art));
+    const photo = document.createElement('a');
+    photo.className = 'artist-photo'; photo.href = '#/' + art.slug; photo.setAttribute('aria-label', art.nome);
+    const mid = midURL(art);
+    if (mid){
+      loadImg(mid).then(img => {
+        if (img){ photo.style.backgroundImage = `url("${img.src}")`; art.thumbSrc = img.src; }
+        else photo.textContent = initials(art.nome);
+      });
+    } else { photo.textContent = initials(art.nome); }
+    const openArtistPage = el => el.addEventListener('click', e => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+      e.preventDefault(); origin = photo; location.hash = '#/' + art.slug;
+    });
+    openArtistPage(photo);
 
     const body = document.createElement('div');
     body.className = 'artist-body';
 
-    const name = document.createElement('p');
-    name.className = 'artist-name';
+    const name = document.createElement('a');
+    name.className = 'artist-name'; name.href = '#/' + art.slug;
     name.textContent = art.nome;
+    openArtistPage(name);
 
     const meta = document.createElement('div');
     meta.className = 'artist-meta';
@@ -1603,7 +1816,7 @@ function openDrawer(locId){
 
   list.appendChild(grid);
 
-  if (loc.artistas.every(a => !a.foto)){
+  if (loc.artistas.every(a => !midURL(a))){
     const note = document.createElement('p');
     note.className = 'photo-note';
     note.textContent = 'Fotos dos trabalhos em breve.';
@@ -1622,53 +1835,185 @@ function closeDrawer(){
 document.getElementById('drawer-close').addEventListener('click', closeDrawer);
 overlay.addEventListener('click', closeDrawer);
 
-// ---------------- lightbox ----------------
-const lightbox = document.getElementById('lightbox');
-const lightboxImg = document.getElementById('lightbox-img');
-const lightboxPlaceholder = document.getElementById('lightbox-placeholder');
-const lightboxName = document.getElementById('lightbox-name');
-const lightboxRoom = document.getElementById('lightbox-room');
-const lightboxDays = document.getElementById('lightbox-days');
-const lightboxBio = document.getElementById('lightbox-bio');
-function openLightbox(art){
-  if (art.foto){
-    lightboxImg.src = art.foto;
-    lightboxImg.alt = art.nome || '';
-    lightboxImg.style.display = 'block';
-    lightboxPlaceholder.classList.remove('show');
-  } else {
-    lightboxImg.style.display = 'none';
-    lightboxImg.src = '';
-    lightboxPlaceholder.textContent = initials(art.nome) + ' — sem foto ainda';
-    lightboxPlaceholder.classList.add('show');
-  }
-  lightboxName.textContent = art.nome || '';
+// ---------------- lista (só de artistas) ----------------
+let ARTISTS = [], BY_SLUG = new Map(), ROWS = new Map();
+const listEl = $('#list'), bigEl = $('#big'), listPageEl = $('#list-page');
 
-  lightboxRoom.textContent = art.obs || '';
-
-  lightboxDays.innerHTML = '';
-  if (art.dia18 != null){
-    const b = document.createElement('span');
-    b.className = 'day-pill ' + (art.dia18 ? 'present' : 'absent');
-    b.textContent = '18/09';
-    lightboxDays.appendChild(b);
-  }
-  if (art.dia19 != null){
-    const b = document.createElement('span');
-    b.className = 'day-pill ' + (art.dia19 ? 'present' : 'absent');
-    b.textContent = '19/09';
-    lightboxDays.appendChild(b);
-  }
-
-  lightboxBio.textContent = (art.bio && art.bio.trim()) ? art.bio : 'Mini bio em breve.';
-  lightbox.classList.add('open');
+function fitBig(){
+  const s = bigEl.firstElementChild, pad = parseFloat(getComputedStyle(bigEl).paddingLeft) || 0;
+  bigEl.style.fontSize = '100px';
+  const w = s.getBoundingClientRect().width;
+  if (!w) return; // lista escondida (modo mapa): mede de novo ao abrir
+  bigEl.style.fontSize = (100 * (document.documentElement.clientWidth - pad * 2) / w) + 'px';
 }
-function closeLightbox(){
-  lightbox.classList.remove('open');
-  lightboxImg.src = '';
+function prefetchMid(a, row){
+  const url = midURL(a); if (!url || a.midLoaded) return;
+  a.midLoaded = true;
+  loadImg(url).then(img => {
+    if (!img) return;
+    a.thumbSrc = img.src;
+    if (row) row.querySelector('.thumb i').style.backgroundImage = `url("${img.src}")`;
+  });
 }
-document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
-lightbox.addEventListener('click', (e) => { if (e.target === lightbox) closeLightbox(); });
+function igHTML(h){ return `<a class="ig" href="https://instagram.com/${h}" target="_blank" rel="noopener">@${h}</a>`; }
+function renderList(){
+  const hydrate = new IntersectionObserver(es => es.forEach(e => {
+    if (!e.isIntersecting) return;
+    hydrate.unobserve(e.target);
+    const a = e.target._a, url = thumbURL(a);
+    if (!url) return;
+    loadImg(url).then(img => {
+      if (!img) return;
+      a.thumbSrc = img.src;
+      e.target.querySelector('.thumb i').style.backgroundImage = `url("${img.src}")`;
+      e.target.querySelector('.thumb').classList.add('loaded');
+    });
+  }), { root:listPageEl, rootMargin:'600px 0px' });
+  const reveal = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting){ e.target.classList.add('in'); reveal.unobserve(e.target); }
+  }), { root:listPageEl, rootMargin:'0px 0px -4% 0px' });
+
+  const frag = document.createDocumentFragment();
+  ARTISTS.forEach(a => {
+    const li = document.createElement('li'); li.className = 'row'; li._a = a;
+    li.innerHTML = `<a class="row-link" href="#/${a.slug}"><span class="thumb"><i></i></span><span class="name"></span></a>`;
+    li.querySelector('.name').textContent = a.name;
+    if (a.handles.length) li.insertAdjacentHTML('beforeend', a.handles.map(igHTML).join(' '));
+    li.addEventListener('mouseenter', () => prefetchMid(a, li));
+    li.querySelector('.row-link').addEventListener('pointerdown', () => prefetchMid(a, li), { passive:true });
+    li.querySelector('.row-link').addEventListener('click', e => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+      e.preventDefault(); origin = li.querySelector('.thumb');
+      // mesmo evento de antes (ver map_pin_click) — dá pra ver no GA4 quais artistas recebem mais cliques na lista
+      if (typeof gtag === 'function') gtag('event', 'artist_row_click', { artista:a.name, endereco:a.loc ? a.loc.endereco : '', local:a.loc ? (a.loc.local || '') : '' });
+      location.hash = '#/' + a.slug;
+    });
+    frag.appendChild(li); ROWS.set(a.slug, li);
+    hydrate.observe(li); reveal.observe(li);
+  });
+  listEl.appendChild(frag);
+}
+
+// ---------------- página do artista + transição (a miniatura vira o hero) ----------------
+const artistEl = $('#artist'), aTop = $('#aTop'), aHero = $('#aHero'), aPhoto = $('#aPhoto'), aName = $('#aName'), aNameW = $('#aNameW'), aNameBar = $('#aNameBar'), aGap = $('#aGap'), aIgs = $('#aIgs'), aBio = $('#aBio');
+let current = null, origin = null, currentOrigin = null, openedFromList = false, busy = null;
+
+function fitName(){
+  const span = aName.firstElementChild, avail = aName.clientWidth, max = Math.min(window.innerWidth * .115, 190), min = 34;
+  aName.style.fontSize = '100px'; span.style.display = 'inline-block'; span.style.whiteSpace = 'nowrap';
+  const w = span.getBoundingClientRect().width, fit = 100 * avail / w;
+  span.style.display = 'block';
+  const size = fit >= min ? Math.min(max, fit) : min, wrap = fit >= min ? 'nowrap' : 'normal';
+  for (const el of [aName, aNameW]){ el.style.fontSize = size + 'px'; el.firstElementChild.style.whiteSpace = wrap; }
+  const h = aName.offsetHeight, pad = parseFloat(getComputedStyle(artistEl).getPropertyValue('--pad')) || 16;
+  aNameBar.style.height = h + 'px'; aNameBar.style.marginTop = -h + 'px'; aNameBar.style.top = `calc(100vh - ${h}px)`; aNameBar.style.top = `calc(100svh - ${h}px)`;
+  aGap.style.height = (h + pad * .5) + 'px';
+  updateSplit();
+}
+// linha dura: acima da borda da foto o nome é branco, abaixo dela é preto
+function updateSplit(){
+  if (!current) return;
+  const edge = aHero.getBoundingClientRect().bottom, r = aName.getBoundingClientRect();
+  const cut = Math.min(r.height, Math.max(0, edge - r.top));
+  aNameW.style.clipPath = `inset(0 0 ${r.height - cut}px 0)`;
+  aName.style.clipPath = `inset(${cut}px 0 0 0)`;
+}
+let splitQueued = false;
+artistEl.addEventListener('scroll', () => {
+  if (splitQueued) return; splitQueued = true;
+  requestAnimationFrame(() => { splitQueued = false; updateSplit(); });
+}, { passive:true });
+
+function fillArtist(a){
+  aName.firstElementChild.textContent = a.name; aNameW.firstElementChild.textContent = a.name;
+  aIgs.innerHTML = a.handles.length ? '<span class="lbl">instagram:</span>' + a.handles.map(igHTML).join('') : '';
+  aBio.className = 'a-bio';
+  if (a.bio){ aBio.innerHTML = ''; a.bio.split(/\n+/).forEach(t => { const p = document.createElement('p'); p.textContent = t; aBio.appendChild(p); }); }
+  else { aBio.classList.add('empty'); aBio.textContent = 'Mini bio em breve.'; }
+  aTop.classList.toggle('has-photo', !!a.thumbSrc);
+  aPhoto.style.backgroundImage = a.thumbSrc ? `url("${a.thumbSrc}")` : 'none';
+  if (bigURL(a)) loadImg(bigURL(a), true).then(img => {
+    if (!img) return;
+    a.bigSrc = img.src;
+    if (current === a){ aPhoto.style.backgroundImage = `url("${img.src}")`; aTop.classList.add('has-photo'); }
+  });
+  document.title = `${a.name} — Circuito de Ateliês do Centro`;
+}
+function makeMorph(rect, src){
+  const m = document.createElement('div'); m.className = 'morph';
+  Object.assign(m.style, { left:rect.left + 'px', top:rect.top + 'px', width:rect.width + 'px', height:rect.height + 'px' });
+  if (src) m.style.backgroundImage = `url("${src}")`;
+  document.body.appendChild(m); return m;
+}
+function morphTo(m, from, to, D){
+  return m.animate([
+    { left:from.left + 'px', top:from.top + 'px', width:from.width + 'px', height:from.height + 'px' },
+    { left:to.left + 'px', top:to.top + 'px', width:to.width + 'px', height:to.height + 'px' }
+  ], { duration:D, easing:EASE_IN_OUT, fill:'forwards' }).finished;
+}
+
+async function openArtist(a, originEl){
+  current = a; currentOrigin = originEl || null; document.body.classList.add('artist-open');
+  fillArtist(a);
+  artistEl.scrollTop = 0; artistEl.classList.remove('revealed');
+  artistEl.classList.add('open'); artistEl.setAttribute('aria-hidden', 'false');
+  fitName();
+  const animate = originEl && !REDUCED;
+  if (!animate){
+    artistEl.style.opacity = 1; artistEl.classList.add('revealed'); artistEl.focus({ preventScroll:true }); return;
+  }
+  const token = busy = {};
+  const from = originEl.getBoundingClientRect(), to = aHero.getBoundingClientRect();
+  const m = makeMorph(from, a.thumbSrc);
+  aHero.classList.add('hide-photo');
+  artistEl.animate([{ opacity:0 }, { opacity:1 }], { duration:380, easing:'ease', fill:'forwards' });
+  await morphTo(m, from, to, 800);
+  if (busy !== token) { m.remove(); return; }
+  aHero.classList.remove('hide-photo'); m.remove();
+  artistEl.getAnimations().forEach(x => x.cancel()); artistEl.style.opacity = 1;
+  artistEl.classList.add('revealed');
+  artistEl.focus({ preventScroll:true });
+}
+async function closeArtist(){
+  const a = current; if (!a) return;
+  current = null; document.title = 'Artistas — Circuito de Ateliês do Centro';
+  const row = ROWS.get(a.slug), token = busy = {};
+  const rowThumb = row && row.querySelector('.thumb');
+  // volta pra miniatura de onde veio (drawer ou lista); se o drawer já fechou, cai na linha da lista
+  let target = currentOrigin && currentOrigin.isConnected ? currentOrigin : rowThumb;
+  if (target && target.closest('.drawer') && !drawer.classList.contains('open')) target = rowThumb;
+  if (target && target.closest('.list-page') && currentMode !== 'list') target = null; // lista fechada (ex.: link direto): só some com fade
+  currentOrigin = null;
+  const done = () => {
+    artistEl.getAnimations().forEach(x => x.cancel());
+    artistEl.classList.remove('open', 'revealed'); artistEl.style.opacity = ''; artistEl.setAttribute('aria-hidden', 'true');
+    aHero.classList.remove('hide-photo'); document.body.classList.remove('artist-open');
+    const f = target && target.closest('a, button'); if (f) f.focus({ preventScroll:true });
+  };
+  if (!target || REDUCED){ done(); return; }
+  artistEl.scrollTop = 0;
+  if (target === rowThumb){
+    const r0 = row.getBoundingClientRect();
+    if (r0.bottom < 0 || r0.top > window.innerHeight) row.scrollIntoView({ block:'center' });
+  }
+  const from = aHero.getBoundingClientRect(), to = target.getBoundingClientRect();
+  const m = makeMorph(from, a.bigSrc || a.thumbSrc);
+  aHero.classList.add('hide-photo'); artistEl.classList.remove('revealed');
+  artistEl.animate([{ opacity:1 }, { opacity:0 }], { duration:520, easing:'ease', fill:'forwards' });
+  await morphTo(m, from, to, 720);
+  m.remove();
+  if (busy === token) done();
+}
+
+function route(){
+  const m = location.hash.match(/^#\/(.+)$/), a = m && BY_SLUG.get(decodeURIComponent(m[1]));
+  if (a && current !== a){ openedFromList = !!origin; openArtist(a, origin); }
+  else if (!a && current) closeArtist();
+  origin = null;
+}
+window.addEventListener('hashchange', route);
+$('#aClose').addEventListener('click', () => { openedFromList ? history.back() : (location.hash = '#/'); });
+window.addEventListener('resize', () => { fitBig(); if (current) fitName(); });
 
 // ---------------- TESTE: "sobre" descortinado (mapa sobe/desce como cortina) ----------------
 const heroEl = document.querySelector('.hero');
@@ -1688,12 +2033,6 @@ function focusMapOnLocation(loc){
     duration: 600,
     padding: isMobile ? { top:0, bottom:window.innerHeight * 0.7, left:0, right:0 } : { top:0, bottom:0, left:0, right:0 }
   });
-}
-
-function goToLocation(loc){
-  applyMode('map');
-  setTimeout(() => focusMapOnLocation(loc), 50);
-  openDrawer(loc.id);
 }
 
 // ---------------- hero: marca (cobrona) some no primeiro toque, marquee do topo fica ----------------
@@ -1731,12 +2070,8 @@ document.addEventListener('keydown', shrinkHero);
 const aboutPage = document.getElementById('about-page');
 const switchMapBtn = document.getElementById('switch-map');
 const switchListBtn = document.getElementById('switch-list');
-const sortSwitch = document.getElementById('sort-switch');
-const sortEnderecoBtn = document.getElementById('sort-endereco');
-const sortArtistaBtn = document.getElementById('sort-artista');
 
 let currentMode = 'map'; // 'map' | 'list' | 'about'
-let currentSort = 'endereco';
 
 function applyMode(mode){
   currentMode = mode;
@@ -1747,95 +2082,39 @@ function applyMode(mode){
   aboutPage.classList.toggle('active', mode === 'about');
   switchMapBtn.classList.toggle('active', mode === 'map');
   switchListBtn.classList.toggle('active', mode === 'list');
-  sortSwitch.classList.toggle('visible', mode === 'list');
+  if (mode === 'list') fitBig();
 }
-function setSort(s){
-  currentSort = s;
-  sortEnderecoBtn.classList.toggle('active', s === 'endereco');
-  sortArtistaBtn.classList.toggle('active', s === 'artista');
-  renderRows();
-}
-
 switchMapBtn.addEventListener('click', () => applyMode('map'));
 switchListBtn.addEventListener('click', () => applyMode('list'));
 document.getElementById('about-btn').addEventListener('click', () => applyMode('about'));
 document.getElementById('about-close').addEventListener('click', () => applyMode('map'));
 document.getElementById('list-close').addEventListener('click', () => applyMode('map'));
-sortEnderecoBtn.addEventListener('click', () => setSort('endereco'));
-sortArtistaBtn.addEventListener('click', () => setSort('artista'));
 
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ closeLightbox(); applyMode('map'); } });
-
-// ---------------- rows rendering ----------------
-const rowsEl = document.getElementById('rows');
-
-function renderRowsByEndereco(){
-  rowsEl.innerHTML = '';
-  const sorted = LOCATIONS
-    .map((loc) => loc)
-    .sort((a,b) => (a.local || a.endereco).localeCompare(b.local || b.endereco, 'pt-BR', { sensitivity:'base' }));
-
-  sorted.forEach((loc) => {
-    const btn = document.createElement('button');
-    btn.className = 'row' + (loc.lat == null ? ' pending' : '');
-    btn.innerHTML = `
-      <span class="row-num">${pinLabel(loc)}</span>
-      <span class="row-main">
-        <span class="row-title">${loc.local || loc.endereco}</span>
-        ${loc.local ? `<span class="row-sub">${loc.endereco}</span>` : ''}
-      </span>
-    `;
-    btn.addEventListener('click', () => goToLocation(loc));
-    rowsEl.appendChild(btn);
-  });
-}
-
-function renderRowsByArtista(){
-  rowsEl.innerHTML = '';
-  let flat = [];
-  LOCATIONS.forEach((loc) => {
-    loc.artistas.forEach(art => {
-      flat.push({ nome: art.nome, instagram: art.instagram, foto: art.foto, loc });
-    });
-  });
-  flat.sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity:'base' }));
-
-  flat.forEach((entry) => {
-    const btn = document.createElement('button');
-    btn.className = 'row row-artista' + (entry.loc.lat == null ? ' pending' : '');
-    btn.innerHTML = `
-      <span class="row-photo"></span>
-      <span class="row-title">${entry.nome}</span>
-      <span class="row-instagram">${entry.instagram ? '@'+entry.instagram : ''}</span>
-      <span class="row-sub">${entry.loc.local || entry.loc.endereco}</span>
-    `;
-    if (entry.foto) btn.querySelector('.row-photo').style.backgroundImage = `url('${entry.foto}')`;
-    btn.addEventListener('click', () => goToLocation(entry.loc));
-    rowsEl.appendChild(btn);
-  });
-}
-
-function renderRows(){
-  if (currentSort === 'endereco') renderRowsByEndereco();
-  else renderRowsByArtista();
-}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ if (current){ $('#aClose').click(); return; } applyMode('map'); } });
 
 async function boot(){
   try{
-    LOCATIONS = await loadLocationsFromSheet();
+    [LOCATIONS, LOCAL_PHOTOS] = await Promise.all([
+      loadLocationsFromSheet(),
+      fetch('catalogo-fotos/manifest.json').then(r => r.ok ? r.json() : {}).catch(() => ({}))
+    ]);
   } catch(err){
     console.error('Falha ao carregar a planilha:', err);
     document.getElementById('map').innerHTML =
       '<div class="map-error">Não foi possível carregar os dados da planilha agora.<br>Tente recarregar a página em instantes.</div>';
-    document.getElementById('rows').innerHTML =
-      '<p style="font-family:var(--sans-display);font-size:0.88rem;color:var(--gray);padding:1rem 0.2rem;">Não foi possível carregar os dados agora.</p>';
+    listEl.innerHTML = '<li class="msg">Não foi possível carregar os artistas agora. <a href="">Tentar de novo</a></li>';
     return;
   }
   computeLocationNumbers();
   setupMarquee();
   initMap();
   resolveMissingCoordinates();
-  renderRows();
+  ARTISTS = LOCATIONS.flatMap(l => l.artistas).filter(a => a.nome)
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity:'base' }));
+  ARTISTS.forEach(a => BY_SLUG.set(a.slug, a));
+  renderList();
+  fitBig(); document.fonts.ready.then(fitBig);
+  route();
 }
 boot();
 </script>
